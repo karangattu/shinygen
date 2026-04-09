@@ -1,0 +1,32 @@
+[
+  {
+    "prompt": "Create a clinical trials dashboard with enrollment trends and status filters",
+    "model": "claude-sonnet",
+    "framework": "shiny-r",
+    "output_dir": "./batch_r/sonnet",
+    "csv_file": "./test_data_csv_files/trials_short_50.csv",
+    "screenshot": true,
+    "judge_model": "claude-sonnet",
+    "max_iterations": 3
+  },
+  {
+    "prompt": "Create a clinical trials dashboard with enrollment trends and status filters",
+    "model": "gpt54",
+    "framework": "shiny-r",
+    "output_dir": "./batch_r/gpt54",
+    "csv_file": "./test_data_csv_files/trials_short_50.csv",
+    "screenshot": true,
+    "judge_model": "claude-sonnet",
+    "max_iterations": 3
+  },
+  {
+    "prompt": "Create a clinical trials dashboard with enrollment trends and status filters",
+    "model": "claude-opus",
+    "framework": "shiny-r",
+    "output_dir": "./batch_r/opus",
+    "csv_file": "./test_data_csv_files/trials_short_50.csv",
+    "screenshot": true,
+    "judge_model": "claude-sonnet",
+    "max_iterations": 3
+  }
+]

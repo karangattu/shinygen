@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "shinygen"
+version = "0.1.0"
+description = "Generate, evaluate, and refine Shiny apps using LLM agents in Docker sandboxes"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Karan Gathani" },
+]
+keywords = ["shiny", "llm", "code-generation", "evaluation", "dashboard"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
+dependencies = [
+    "click>=8.0",
+    "inspect-ai>=0.3.129",
+    "inspect-swe>=0.1.0",
+    "anthropic>=0.34.0",
+    "openai>=1.0.0",
+    "httpx>=0.27",
+]
+
+[project.urls]
+Homepage = "https://github.com/karangathani/shinygen"
+Repository = "https://github.com/karangathani/shinygen"
+"Bug Tracker" = "https://github.com/karangathani/shinygen/issues"
+
+[project.optional-dependencies]
+screenshot = [
+    "playwright>=1.48.0",
+    "Pillow>=10.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pyright>=1.1.350",
+    "black>=24.0",
+    "isort>=5.10",
+    "playwright>=1.48.0",
+    "Pillow>=10.0",
+]
+
+[project.scripts]
+shinygen = "shinygen.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shinygen"]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"

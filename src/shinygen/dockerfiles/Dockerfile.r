@@ -1,0 +1,58 @@
+# Combined R + Python sandbox for Shiny R app generation.
+# Base: rocker/r-ver provides R 4.4; Python 3.12 added on top.
+
+FROM rocker/r-ver:4.4.2
+
+# System deps for R packages, Python, and Chromium (Playwright)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libpng-dev \
+    libtiff5-dev \
+    libjpeg-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+    libxrandr2 libgbm1 libpango-1.0-0 libcairo2 \
+    libasound2t64 libnspr4 libdbus-1-3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-install R packages
+RUN Rscript -e ' \
+    install.packages(c( \
+        "shiny", "bslib", "bsicons", \
+        "ggplot2", "dplyr", "readr", "tidyr", "stringr", "lubridate", \
+        "plotly", "DT", "leaflet", \
+        "thematic", "htmltools", "htmlwidgets" \
+    ), repos = "https://cloud.r-project.org") \
+'
+
+# Python packages
+RUN pip3 install --break-system-packages --no-cache-dir \
+    shiny \
+    plotly \
+    faicons \
+    pandas \
+    matplotlib \
+    seaborn \
+    great-tables \
+    itables \
+    htmltools \
+    shinywidgets \
+    playwright
+
+# Install Chromium for Playwright (used by agent for visual self-evaluation)
+RUN playwright install chromium
+
+# Working directory
+RUN mkdir -p /home/user/project
+WORKDIR /home/user/project
+
+CMD ["sleep", "infinity"]

@@ -1,0 +1,10 @@
+services:
+  default:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: sleep infinity
+    working_dir: /home/user/project
+    init: true
+    volumes:
+      - ./results:/output

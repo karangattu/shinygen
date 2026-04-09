@@ -1,0 +1,178 @@
+name: Run shinygen
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Natural language description of the app to generate"
+        required: true
+        type: string
+      model:
+        description: "Generation model"
+        required: true
+        default: claude-sonnet
+        type: choice
+        options:
+          - claude-opus
+          - claude-sonnet
+          - gpt54
+          - gpt54-mini
+          - codex-gpt53
+      framework:
+        description: "Target framework"
+        required: true
+        default: shiny_python
+        type: choice
+        options:
+          - shiny_python
+          - shiny_r
+      screenshot:
+        description: "Enable screenshot-based visual evaluation"
+        required: true
+        default: false
+        type: boolean
+      judge_model:
+        description: "Optional judge model"
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - claude-opus
+          - claude-sonnet
+          - gpt54
+          - gpt54-mini
+          - codex-gpt53
+      max_iterations:
+        description: "Maximum generation/judge refinement iterations"
+        required: true
+        default: "3"
+        type: string
+      quality_threshold:
+        description: "Minimum quality score (1-10) to accept"
+        required: true
+        default: "7.0"
+        type: string
+      web_fetch:
+        description: "Allow the agent to use web search tools"
+        required: true
+        default: true
+        type: boolean
+      verbose:
+        description: "Enable verbose logging"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate required API key secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+            echo "Missing required secret: ANTHROPIC_API_KEY" >&2
+            missing=1
+          fi
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "Missing required secret: OPENAI_API_KEY" >&2
+            missing=1
+          fi
+          if [[ "${missing}" -ne 0 ]]; then
+            echo "Configure both repository secrets before running this workflow." >&2
+            exit 1
+          fi
+
+      - name: Install shinygen
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Run shinygen generate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+
+          cmd=(
+            shinygen generate
+            --prompt "${{ inputs.prompt }}"
+            --model "${{ inputs.model }}"
+            --framework "${{ inputs.framework }}"
+            --output "${OUTPUT_DIR}"
+            --max-iterations "${{ inputs.max_iterations }}"
+            --quality-threshold "${{ inputs.quality_threshold }}"
+          )
+
+          if [[ "${{ inputs.screenshot }}" == "true" ]]; then
+            cmd+=(--screenshot)
+          else
+            cmd+=(--no-screenshot)
+          fi
+
+          if [[ "${{ inputs.web_fetch }}" == "true" ]]; then
+            cmd+=(--web-fetch)
+          else
+            cmd+=(--no-web-fetch)
+          fi
+
+          if [[ "${{ inputs.verbose }}" == "true" ]]; then
+            cmd+=(--verbose)
+          fi
+
+          if [[ "${{ inputs.judge_model }}" != "none" ]]; then
+            cmd+=(--judge-model "${{ inputs.judge_model }}")
+          fi
+
+          "${cmd[@]}" 2>&1 | tee "${OUTPUT_DIR}/run.log"
+
+      - name: Write metrics summary into output directory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+
+          {
+            echo "shinygen run summary"
+            echo "run_id: ${{ github.run_id }}"
+            echo "run_attempt: ${{ github.run_attempt }}"
+            echo "workflow: ${{ github.workflow }}"
+            echo "job: ${{ github.job }}"
+            echo "timestamp_utc: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo
+            echo "timing:"
+            grep -E '^  Time:' "${OUTPUT_DIR}/run.log" || echo "  Time: not found in run.log"
+            echo
+            echo "tokens:"
+            grep -E '^  Tokens:' "${OUTPUT_DIR}/run.log" || echo "  Tokens: not found in run.log"
+            echo
+            echo "cost:"
+            grep -E '^  Cost:|^    \[total\]' "${OUTPUT_DIR}/run.log" || echo "  Cost: not found in run.log"
+          } > "${OUTPUT_DIR}/run_metrics.txt"
+
+      - name: Upload run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shinygen-run-${{ github.run_id }}
+          path: ${{ env.OUTPUT_DIR }}
+          if-no-files-found: warn

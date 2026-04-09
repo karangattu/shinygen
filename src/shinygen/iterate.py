@@ -1,0 +1,508 @@
+"""
+Main orchestration loop: generate → extract → screenshot → judge → refine.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import shutil
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from .config import (
+    DEFAULT_MAX_ITERATIONS,
+    DEFAULT_QUALITY_THRESHOLD,
+    FRAMEWORKS,
+    find_free_port,
+    preflight_checks,
+    resolve_framework,
+    resolve_model,
+)
+from .pricing import Timer, UsageStats
+
+if TYPE_CHECKING:
+    from inspect_ai.log import EvalLog
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GenerationResult:
+    """Result of a generation + refinement pipeline."""
+
+    app_dir: Path | None = None
+    source_code: str = ""
+    score: float = 0.0
+    iterations: int = 0
+    passed: bool = False
+    judge_feedback: dict | None = None
+    screenshot_paths: list[Path] = field(default_factory=list)
+    error: str | None = None
+    usage: UsageStats = field(default_factory=UsageStats)
+
+
+def _write_run_summary(
+    output_path: Path,
+    result: GenerationResult,
+    *,
+    prompt: str,
+    requested_model: str,
+    resolved_model_id: str,
+    agent: str,
+    framework_key: str,
+    artifact_name: str,
+    judge_model: str | None,
+    data_file_names: list[str],
+) -> Path:
+    """Persist structured run metadata for workflow artifacts."""
+    summary = {
+        "prompt": prompt,
+        "model": {
+            "requested": requested_model,
+            "resolved_id": resolved_model_id,
+            "agent": agent,
+        },
+        "framework": framework_key,
+        "artifact_name": artifact_name,
+        "judge_model": judge_model,
+        "passed": result.passed,
+        "score": result.score,
+        "iterations": result.iterations,
+        "error": result.error,
+        "data_files": sorted(data_file_names),
+        "screenshots": [path.name for path in result.screenshot_paths],
+        "judge_feedback": result.judge_feedback,
+        "usage": result.usage.to_dict(),
+    }
+    summary_path = output_path / "run_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    return summary_path
+
+
+def _extract_generation_usage_rows(log: "EvalLog") -> list[dict[str, object]]:
+    """Extract model usage rows from an Inspect eval log object."""
+    stats = getattr(log, "stats", None)
+    model_usage = getattr(stats, "model_usage", None) or {}
+    rows: list[dict[str, object]] = []
+
+    for model_name, usage in model_usage.items():
+        input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        cache_write = int(getattr(usage, "input_tokens_cache_write", 0) or 0)
+        cache_read = int(getattr(usage, "input_tokens_cache_read", 0) or 0)
+        total_cost = getattr(usage, "total_cost", None)
+        cost_override: float | None = None
+        if total_cost is not None:
+            try:
+                cost_override = float(total_cost)
+            except (TypeError, ValueError):
+                cost_override = None
+
+        rows.append(
+            {
+                "model": str(model_name),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_write_tokens": cache_write,
+                "cache_read_tokens": cache_read,
+                "cost_override": cost_override,
+            }
+        )
+
+    return rows
+
+
+def generate_and_refine(
+    prompt: str,
+    model: str,
+    framework: str = "shiny_python",
+    output_dir: str | Path = "output",
+    skills_dir: str | Path | None = None,
+    data_files: dict[str, str] | None = None,
+    screenshot: bool = False,
+    judge_model: str | None = None,
+    max_iterations: int = DEFAULT_MAX_ITERATIONS,
+    quality_threshold: float = DEFAULT_QUALITY_THRESHOLD,
+    web_fetch: bool = True,
+    port: int | None = None,
+    verbose: bool = False,
+) -> GenerationResult:
+    """Generate a Shiny app with optional iterative refinement.
+
+    This is the primary orchestration function. It:
+    1. Generates an app using an LLM agent in a Docker sandbox.
+    2. Extracts the generated code from the eval log.
+    3. Optionally takes screenshots of the running app.
+    4. Optionally judges quality with an LLM and refines.
+    5. Copies the final app to the output directory.
+
+    Args:
+        prompt: Natural language description of the desired app.
+        model: Model alias or full model ID (e.g., "claude-sonnet").
+        framework: Target framework ("shiny_python" or "shiny_r").
+        output_dir: Where to save the final app.
+        skills_dir: Path to custom skill files to inject.
+        data_files: Dict of {filename: content} for data files.
+        screenshot: Whether to take screenshots for visual evaluation.
+        judge_model: Model to use for quality judging.
+        max_iterations: Maximum refinement iterations.
+        quality_threshold: Minimum composite score to accept (1-10 scale).
+        web_fetch: Allow web search tools in the sandbox (default: True).
+        port: Port for running the app during screenshots.
+        verbose: Enable verbose logging.
+
+    Returns:
+        GenerationResult with the final app and metadata.
+    """
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    # Resolve configuration
+    framework_key = resolve_framework(framework)
+    agent, model_id = resolve_model(model)
+
+    # Pre-flight: Docker running + API key present
+    preflight_checks(agent)
+
+    if judge_model:
+        _, judge_model = resolve_model(judge_model)
+    fw = FRAMEWORKS[framework_key]
+    artifact_name = fw["primary_artifact"]
+    effective_port = port or find_free_port()
+
+    result = GenerationResult()
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Load skills
+    from .skills import load_default_skills, load_skill_files
+
+    skill_files: dict[str, str] = {}
+    skill_files.update(load_default_skills(framework_key, agent))
+    if skills_dir:
+        skill_files.update(load_skill_files(Path(skills_dir), agent))
+
+    logger.info(
+        "Starting generation: model=%s, agent=%s, framework=%s",
+        model_id,
+        agent,
+        framework_key,
+    )
+
+    current_prompt = prompt
+    best_code: str | None = None
+    best_score: float = 0.0
+    best_feedback: dict | None = None
+
+    for iteration in range(1, max_iterations + 1):
+        logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
+        result.iterations = iteration
+
+        # --- Step 1: Generate (with retry on no-code-extracted) ---
+        code: str | None = None
+        generation_usage_rows: list[dict[str, object]] = []
+        max_retries = 2
+        for attempt in range(1, max_retries + 1):
+            with Timer() as gen_timer:
+                code, generation_usage_rows = _run_generation(
+                    current_prompt,
+                    agent,
+                    model_id,
+                    framework_key,
+                    data_files,
+                    skill_files,
+                    web_fetch,
+                    iteration,
+                    screenshot,
+                    output_path,
+                )
+            result.usage.add_time("generate", gen_timer.elapsed)
+            for row in generation_usage_rows:
+                result.usage.add(
+                    stage="generate",
+                    model=str(row.get("model", model_id)),
+                    input_tokens=int(row.get("input_tokens", 0) or 0),
+                    output_tokens=int(row.get("output_tokens", 0) or 0),
+                    elapsed=0.0,
+                    iteration=iteration,
+                    cost_override=row.get("cost_override"),
+                    cache_write_tokens=int(row.get("cache_write_tokens", 0) or 0),
+                    cache_read_tokens=int(row.get("cache_read_tokens", 0) or 0),
+                )
+            if code is not None:
+                break
+            if attempt < max_retries:
+                logger.warning(
+                    "Iteration %d: No code extracted (attempt %d/%d), retrying...",
+                    iteration, attempt, max_retries,
+                )
+
+        if code is None:
+            logger.warning("Iteration %d: No code extracted", iteration)
+            if best_code:
+                break
+            if iteration == max_iterations:
+                result.error = "Failed to extract app code from any iteration"
+                break
+            continue
+
+        logger.info("Iteration %d: Extracted %d chars of code", iteration, len(code))
+
+        # --- Step 2: Write to temp dir for evaluation ---
+        eval_dir = Path(tempfile.mkdtemp(prefix=f"shinygen_eval_{iteration}_"))
+        (eval_dir / artifact_name).write_text(code, encoding="utf-8")
+
+        # Copy data files alongside
+        if data_files:
+            for fname, content in data_files.items():
+                (eval_dir / fname).write_text(content, encoding="utf-8")
+
+        # --- Step 3: Screenshots (host-side, for external judge) ---
+        screenshot_paths: list[Path] = []
+        if screenshot:
+            try:
+                import concurrent.futures
+
+                from .screenshot import take_screenshots
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        take_screenshots, eval_dir, framework_key, effective_port
+                    )
+                    try:
+                        shot = future.result(timeout=90)
+                    except concurrent.futures.TimeoutError:
+                        raise TimeoutError("Host-side screenshot timed out")
+                    if shot and shot.exists():
+                        screenshot_paths.append(shot)
+                    logger.info(
+                        "Iteration %d: Captured %d screenshots",
+                        iteration,
+                        len(screenshot_paths),
+                    )
+            except Exception as exc:
+                logger.warning("Screenshot failed (continuing without): %s", exc)
+
+        # --- Step 4: Judge ---
+        if judge_model:
+            try:
+                from .judge import judge_app_with_api
+
+                with Timer() as judge_timer:
+                    judge_result = judge_app_with_api(
+                        code,
+                        judge_model,
+                        screenshot_paths or None,
+                        prompt,
+                    )
+                result.usage.add(
+                    stage="judge",
+                    model=judge_model,
+                    input_tokens=judge_result.input_tokens,
+                    output_tokens=judge_result.output_tokens,
+                    elapsed=judge_timer.elapsed,
+                    iteration=iteration,
+                )
+                score = judge_result.composite
+                logger.info(
+                    "Iteration %d: Quality score = %.2f (threshold = %.2f)",
+                    iteration,
+                    score,
+                    quality_threshold,
+                )
+
+                if score > best_score:
+                    best_score = score
+                    best_code = code
+                    best_feedback = judge_result.feedback_dict()
+                    result.screenshot_paths = screenshot_paths
+
+                if score >= quality_threshold:
+                    logger.info("Quality threshold met! Accepting app.")
+                    result.score = score
+                    result.judge_feedback = judge_result.feedback_dict()
+                    result.passed = True
+                    break
+
+                # Prepare refinement prompt for next iteration
+                if iteration < max_iterations:
+                    from .prompts import build_refinement_prompt
+
+                    current_prompt = build_refinement_prompt(
+                        prompt,
+                        judge_result.feedback_dict(),
+                        iteration,
+                        previous_code=code,
+                    )
+                    logger.info("Preparing refinement prompt for next iteration")
+
+            except Exception as exc:
+                logger.warning("Judge failed: %s", exc)
+                best_code = code
+                best_score = 0.0
+        else:
+            # No judge — accept first successful generation
+            best_code = code
+            best_score = 10.0
+            result.passed = True
+            result.score = 10.0
+            result.screenshot_paths = screenshot_paths
+            break
+
+    # --- Step 5: Copy final app to output ---
+    if best_code:
+        final_app = output_path / artifact_name
+        final_app.write_text(best_code, encoding="utf-8")
+
+        # Copy data files
+        if data_files:
+            for fname, content in data_files.items():
+                (output_path / fname).write_text(content, encoding="utf-8")
+
+        # Copy screenshots and update paths to point to output dir
+        output_screenshots: list[Path] = []
+        for sp in result.screenshot_paths:
+            if sp.exists():
+                dest = output_path / sp.name
+                shutil.copy2(sp, dest)
+                output_screenshots.append(dest)
+        result.screenshot_paths = output_screenshots
+
+        result.app_dir = output_path
+        result.source_code = best_code
+        if not result.passed:
+            result.score = best_score
+            result.judge_feedback = best_feedback
+
+        logger.info(
+            "Final app written to %s (score=%.2f, iterations=%d)",
+            output_path,
+            result.score,
+            result.iterations,
+        )
+    else:
+        if result.error is None:
+            result.error = "No valid app code generated in any iteration"
+
+    _write_run_summary(
+        output_path,
+        result,
+        prompt=prompt,
+        requested_model=model,
+        resolved_model_id=model_id,
+        agent=agent,
+        framework_key=framework_key,
+        artifact_name=artifact_name,
+        judge_model=judge_model,
+        data_file_names=list(data_files or {}),
+    )
+
+    return result
+
+
+def _run_generation(
+    prompt: str,
+    agent: str,
+    model_id: str,
+    framework_key: str,
+    data_files: dict[str, str] | None,
+    skill_files: dict[str, str],
+    web_fetch: bool,
+    iteration: int,
+    screenshot: bool = False,
+    output_path: Path | None = None,
+) -> tuple[str | None, list[dict[str, object]]]:
+    """Run a single generation via Inspect AI and extract the code."""
+    from inspect_ai import eval as inspect_eval
+
+    from .extract import extract_from_log
+    from .generate import build_generation_task, stage_docker_context
+
+    fw = FRAMEWORKS[framework_key]
+    artifact_name = fw["primary_artifact"]
+
+    docker_dir = stage_docker_context(framework_key)
+    try:
+        task = build_generation_task(
+            user_prompt=prompt,
+            agent=agent,
+            framework_key=framework_key,
+            docker_context_dir=docker_dir,
+            data_files=data_files,
+            skill_files=skill_files,
+            web_fetch=web_fetch,
+            screenshot=screenshot,
+        )
+
+        # Use reasoning_effort for Anthropic Claude 4.6+ models so the
+        # provider sends thinking.type=adaptive instead of the deprecated
+        # thinking.type=enabled.
+        extra_config: dict[str, object] = {}
+        if agent == "claude_code":
+            extra_config["reasoning_effort"] = "high"
+
+        logs = inspect_eval(
+            task,
+            model=model_id,
+            log_dir=str(docker_dir / "logs"),
+            **extra_config,
+        )
+
+        if not logs:
+            logger.warning("Iteration %d: No eval logs produced", iteration)
+            return None, []
+
+        log = logs[0]
+        generation_usage_rows = _extract_generation_usage_rows(log)
+
+        # Strategy 1: Read artifact from the results volume (most reliable).
+        # The scorer copies sandbox files to docker_dir/results/<sample_id>/.
+        results_dir = docker_dir / "results"
+        if results_dir.exists():
+            for artifact_path in results_dir.rglob(artifact_name):
+                code = artifact_path.read_text(encoding="utf-8")
+                if code.strip():
+                    logger.info(
+                        "Iteration %d: Read %d chars from results volume",
+                        iteration,
+                        len(code),
+                    )
+                    return code, generation_usage_rows
+
+        # Strategy 2: Extract from eval log messages (fallback).
+        log_path = getattr(log, "location", None)
+        if log_path:
+            code_map = extract_from_log(Path(log_path))
+            if code_map:
+                if len(code_map) == 1:
+                    return next(iter(code_map.values())), generation_usage_rows
+                if "shinygen/generate" in code_map:
+                    return code_map["shinygen/generate"], generation_usage_rows
+                return next(iter(code_map.values())), generation_usage_rows
+
+        logger.warning("Iteration %d: No code extracted", iteration)
+
+        return None, generation_usage_rows
+
+    except Exception as exc:
+        logger.error("Generation failed in iteration %d: %s", iteration, exc)
+        return None, []
+    finally:
+        # Copy eval logs to output directory before cleanup
+        if output_path is not None:
+            logs_dir = docker_dir / "logs"
+            if logs_dir.exists():
+                eval_logs_dest = output_path / "eval_logs"
+                eval_logs_dest.mkdir(parents=True, exist_ok=True)
+                for log_file in logs_dir.rglob("*"):
+                    if log_file.is_file():
+                        dest = eval_logs_dest / log_file.relative_to(logs_dir)
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(log_file, dest)
+                logger.info("Eval logs copied to %s", eval_logs_dest)
+        shutil.rmtree(docker_dir, ignore_errors=True)

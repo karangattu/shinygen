@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Inspect AI eval logs
+eval_logs/
+
+# Test / scratch outputs
+test_output/
+batch_outputs/
+/README_files
+/test_gt3_files

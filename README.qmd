@@ -1,0 +1,500 @@
+---
+title: "shinygen"
+subtitle: "Generate, evaluate, and refine Shiny apps using LLM agents in Docker sandboxes"
+jupyter: shinygen
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    code-copy: true
+    code-overflow: wrap
+    smooth-scroll: true
+    anchor-sections: true
+    fontsize: 1.05em
+    mainfont: "Inter, system-ui, sans-serif"
+    highlight-style: github
+    css: |
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.2rem;
+        margin: 1.5rem 0;
+      }
+      .feature-card {
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .feature-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+      .feature-card h4 {
+        margin-top: 0;
+        color: var(--bs-primary);
+      }
+---
+
+::: {.lead}
+**shinygen** turns a text prompt into a production-quality [Shiny](https://shiny.posit.co) dashboard — generated, screenshot-tested, and quality-scored — all inside an isolated Docker sandbox.
+:::
+
+---
+
+## {{< fa bolt >}} Quick Install
+
+```bash
+git clone https://github.com/karangathe/shinygen.git
+cd shinygen
+pip install -e .
+```
+
+For screenshot-based evaluation, install the optional extra:
+
+```bash
+pip install -e ".[screenshot]"
+```
+
+::: {.callout-tip}
+Docker images with Shiny, Playwright, and Chromium are pulled automatically on first run.
+:::
+
+---
+
+## {{< fa diagram-project >}} Architecture
+
+Three stages: **generate → evaluate → refine**.
+
+```{mermaid}
+%%| fig-width: 9
+flowchart TD
+    A[User Prompt] --> B[shinygen CLI / API]
+    B --> C
+
+    subgraph C[Docker Sandbox]
+        direction TB
+        D[LLM Agent]
+        D --> E[Generate app.py / app.R]
+        E --> F{--screenshot?}
+        F -- Yes --> G[Run App on :8000]
+        G --> H[Playwright Screenshot]
+        H --> I[Agent Reviews Screenshot]
+        I --> J{Visual OK?}
+        J -- No --> E
+        J -- Yes --> K[Final Code]
+        F -- No --> K
+    end
+
+    K --> L{--judge-model?}
+    L -- Yes --> M[External LLM Judge]
+    M --> N{Score ≥ threshold?}
+    N -- No --> D
+    N -- Yes --> O[Output Directory]
+    L -- No --> O
+
+    style A fill:#6c5ce7,color:#fff,stroke:none
+    style B fill:#0984e3,color:#fff,stroke:none
+    style C fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px
+    style D fill:#00b894,color:#fff,stroke:none
+    style E fill:#fdcb6e,color:#2d3436,stroke:none
+    style K fill:#00cec9,color:#fff,stroke:none
+    style M fill:#e17055,color:#fff,stroke:none
+    style O fill:#00b894,color:#fff,stroke:none
+```
+
+### How it works
+
+::: {.callout-note collapse="true"}
+## Step-by-step walkthrough (click to expand)
+
+1. **You run a command** — provide a prompt, pick a model, optionally enable `--screenshot` and `--judge-model`.
+2. **Docker sandbox spins up** — isolated container with Shiny, Playwright, and Chromium.
+3. **LLM agent generates** `app.py` or `app.R` inside the sandbox.
+4. **Visual self-evaluation** — agent starts the app, takes a Playwright screenshot, reviews it, and fixes layout/styling issues.
+5. **External quality judge** — a separate LLM scores on functionality, design, code quality, and UX. If below threshold, the agent refines.
+6. **Final output** — app, screenshots, and stats are copied to your output directory.
+:::
+
+::: {.callout-tip}
+## Iteration by Feedback
+
+With `max_iterations > 1`, each round runs in a fresh sandbox. The refinement prompt carries forward judge feedback **and** the previous code, so the agent can improve incrementally rather than starting from scratch.
+
+**Original prompt (iteration 1):**
+
+```text
+Create a Shiny dashboard for clinical trials with filters, a trend chart, and a summary table.
+```
+
+**Refinement prompt (iteration 2):**
+
+```text
+Create a Shiny dashboard for clinical trials with filters, a trend chart, and a summary table.
+
+--- PREVIOUS CODE ---
+<the full app.py from the previous iteration>
+
+--- REFINEMENT (iteration 1) ---
+
+A previous version of this app was evaluated and received the following scores.
+Please improve the app to address the feedback:
+
+  - Functionality: 7.0/10 — Filters work as expected.
+  - Design: 5.5/10 — Layout is cramped and spacing is inconsistent.
+  - Code Quality: 6.0/10 — Repeated logic in multiple places.
+  - Ux: 6.2/10 — Table readability is weak.
+
+Focus on improving the lowest-scoring areas while maintaining what already works well.
+Produce the complete, improved app file.
+```
+:::
+
+---
+
+## {{< fa boxes-stacked >}} What You Get
+
+```
+my-dashboard/
+├── app.py                  # The generated Shiny app
+├── screenshot_before.png   # Initial render (if --screenshot)
+├── screenshot_after.png    # After interaction (if --screenshot)
+└── data.csv                # Your data file (if provided)
+```
+
+The CLI prints a results summary:
+
+```
+Score: 8.25 / 10.00 (after 2 iterations)
+Time:  45.2s total (38.1s generate, 7.1s judge)
+Tokens: 12,340 input / 3,210 output
+Cost:  $0.1842
+```
+
+---
+
+## {{< fa star >}} Features
+
+::: {.feature-grid}
+
+::: {.feature-card}
+#### {{< fa robot >}} Multiple LLM Agents
+Claude Code (Anthropic) and Codex CLI (OpenAI) — pick the model that fits your budget and quality needs.
+:::
+
+::: {.feature-card}
+#### {{< fa brands docker >}} Docker Sandboxes
+Every generation runs in an isolated container via [Inspect AI](https://inspect.ai-safety-institute.org.uk/). No side effects on your host.
+:::
+
+::: {.feature-card}
+#### {{< fa brands python >}} {{< fa brands r-project >}} R and Python
+Generate Shiny for Python (`app.py`) or Shiny for R (`app.R`) from the same CLI.
+:::
+
+::: {.feature-card}
+#### {{< fa camera-retro >}} Visual Self-Evaluation
+The agent takes Playwright screenshots *inside* the sandbox, reviews them, and self-corrects layout/styling issues.
+:::
+
+::: {.feature-card}
+#### {{< fa scale-balanced >}} External LLM Judge
+A separate model scores apps on functionality, design, code quality, and UX — then triggers refinement if needed.
+:::
+
+::: {.feature-card}
+#### {{< fa arrows-rotate >}} Iterative Refinement
+Automatically re-generate until the quality threshold is met, up to `--max-iterations`.
+:::
+
+::: {.feature-card}
+#### {{< fa book >}} Skills Injection
+Pass custom skill files into the agent sandbox to control coding style, component choices, and best practices.
+:::
+
+::: {.feature-card}
+#### {{< fa globe >}} Web Fetch
+Enabled by default. Allows the agent to search the web during generation for up-to-date API docs and examples. Use `--no-web-fetch` to disable.
+:::
+
+::: {.feature-card}
+#### {{< fa coins >}} Cost & Time Tracking
+Token usage, dollar costs, and timing breakdowns reported per run.
+:::
+
+:::
+
+---
+
+## {{< fa terminal >}} Quick Start
+
+### CLI
+
+::: {.panel-tabset}
+
+#### Basic
+
+```bash
+# Generate a Shiny for Python app with Claude Sonnet
+shinygen generate \
+    --prompt "Create a sales dashboard with filters by region and product category" \
+    --model claude-sonnet \
+    --output ./my-dashboard
+```
+
+#### With Screenshot + Judge
+
+```bash
+# Screenshot-based quality evaluation and iteration
+shinygen generate \
+    --prompt "Create a clinical trials dashboard" \
+    --model claude-opus \
+    --output ./trials-app \
+    --screenshot \
+    --judge-model claude-sonnet \
+    --max-iterations 5
+```
+
+#### Shiny for R
+
+```bash
+shinygen generate \
+    --prompt "Create an interactive data explorer" \
+    --model claude-sonnet \
+    --framework shiny-r \
+    --output ./r-app
+```
+
+#### With Data + Skills
+
+```bash
+shinygen generate \
+    --prompt "Build a dashboard for this dataset" \
+    --model gpt54 \
+    --output ./my-app \
+    --skills-dir ./my-skills/ \
+    --csv-file ./sales.csv
+```
+
+`web_fetch` is enabled by default. Use `--no-web-fetch` to disable web search.
+
+:::
+
+### Python API
+
+```python
+import shinygen
+
+result = shinygen.generate(
+    prompt="Create a sales dashboard with regional filters",
+    model="claude-sonnet",
+    output_dir="./my-dashboard",
+    framework="shiny-python",
+    data_csv="./sales.csv",
+    screenshot=True,
+    judge_model="claude-sonnet",
+    max_iterations=5,
+)
+
+print(result.app_dir)       # ./my-dashboard
+print(result.score)          # 4.5
+print(result.iterations)    # 2
+```
+
+### Batch Generation
+
+Run the **same prompt across multiple models** (or different prompts with different settings) in a single command. Each job gets its own output directory.
+
+::: {.panel-tabset}
+
+#### CLI
+
+Create a JSON config file. Each object is one job — same keys as the Python API. You can mix models, frameworks, and prompts freely.
+
+```{.json filename="batch.json"}
+[
+  {
+    "prompt": "Create a clinical trials dashboard with enrollment trends and status filters",
+    "model": "claude-sonnet",
+    "output_dir": "./batch/sonnet",
+    "csv_file": "./test_data_csv_files/trials_short_50.csv",
+    "screenshot": true,
+    "judge_model": "claude-sonnet",
+    "max_iterations": 3
+  },
+  { "model": "gpt54",       "output_dir": "./batch/gpt54", "..." : "same prompt/settings" },
+  { "model": "claude-opus",  "output_dir": "./batch/opus",  "..." : "same prompt/settings" }
+]
+```
+
+Then run:
+
+```bash
+shinygen batch --config batch.json
+```
+
+Output:
+
+```
+Starting batch run with 3 job(s)...
+
+Batch complete: 3 succeeded, 0 failed
+  [job 1] ./batch/sonnet  score=8.50  iterations=2  passed=True
+  [job 2] ./batch/gpt54   score=7.25  iterations=3  passed=True
+  [job 3] ./batch/opus    score=9.00  iterations=1  passed=True
+```
+
+#### Python API
+
+```python
+import shinygen
+
+results = shinygen.batch([
+    {
+        "prompt": "Clinical trials dashboard with filters and charts",
+        "model": "claude-sonnet",
+        "output_dir": "./batch/sonnet",
+        "data_csv": "./test_data_csv_files/trials_short_50.csv",
+        "screenshot": True,
+        "judge_model": "claude-sonnet",
+    },
+    # Add more jobs with different models/prompts...
+])
+
+print(f"{results.succeeded} succeeded, {results.failed} failed")
+for r in results.results:
+    print(f"  {r.app_dir}  score={r.score:.2f}")
+```
+
+:::
+
+::: {.callout-tip}
+## Batch tips
+
+- Jobs run **sequentially** (no Docker resource contention).
+- A failed job doesn't stop the rest.
+- Use different `output_dir` values per job.
+- Relative paths resolve from the config file's directory.
+:::
+
+---
+
+## {{< fa microchip >}} Supported Models
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+models = pl.DataFrame({
+    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
+    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI"],
+    "Model ID": ["`claude-opus-4-6`", "`claude-sonnet-4-6`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`"],
+    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI"],
+})
+
+(
+    GT(models)
+    .tab_header(title="Supported Models")
+    .fmt_markdown(columns=["Alias", "Model ID"])
+    .cols_align(align="left")
+    .opt_stylize(style=1, color="blue")
+)
+```
+
+---
+
+## {{< fa chart-bar >}} Cost Comparison
+
+Per 1M tokens. Actual cost per dashboard is typically **$0.01–$0.30** depending on model, prompt complexity, and iterations.
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+costs = pl.DataFrame({
+    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
+    "Input": [15.00, 3.00, 2.50, 0.30, 2.50],
+    "Output": [75.00, 15.00, 10.00, 1.20, 10.00],
+})
+
+(
+    GT(costs)
+    .tab_header(
+        title="Cost per 1M Tokens",
+        subtitle="USD pricing by model",
+    )
+    .fmt_markdown(columns="Model")
+    .fmt_currency(columns=["Input", "Output"], currency="USD")
+    .cols_label(Input="Input ($/1M tokens)", Output="Output ($/1M tokens)")
+    .cols_align(align="right", columns=["Input", "Output"])
+    .cols_align(align="left", columns="Model")
+    .data_color(
+        columns="Output",
+        palette=["#d4edda", "#f8d7da"],
+    )
+    .opt_stylize(style=1, color="blue")
+)
+```
+
+---
+
+## {{< fa database >}} Data Inputs
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+data_inputs = pl.DataFrame({
+    "Option": ["Single CSV", "Multiple files"],
+    "CLI": ["`--csv-file`", "`--data-file` (repeatable)"],
+    "Python API": ["`data_csv`", "`data_files`"],
+    "Notes": ["Convenience shorthand", "Any file type"],
+})
+
+(
+    GT(data_inputs)
+    .tab_header(title="Data Input Options")
+    .fmt_markdown(columns=["CLI", "Python API"])
+    .cols_align(align="left")
+    .opt_stylize(style=1, color="blue")
+    .tab_source_note(md("If both provide the same filename, `--csv-file` takes precedence."))
+)
+```
+
+---
+
+## {{< fa list-check >}} Requirements
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+reqs = pl.DataFrame({
+    "Requirement": ["Python", "Docker", "API Key"],
+    "Details": ["3.10+", "Running daemon", "ANTHROPIC_API_KEY or OPENAI_API_KEY"],
+})
+
+(
+    GT(reqs)
+    .tab_header(title="Prerequisites")
+    .cols_align(align="left")
+    .opt_stylize(style=1, color="blue")
+    .tab_source_note(
+        md("`export ANTHROPIC_API_KEY='sk-ant-...'` or `export OPENAI_API_KEY='sk-...'`")
+    )
+)
+```
+
+---
+
+## {{< fa scale-balanced >}} License
+
+[MIT](LICENSE)
