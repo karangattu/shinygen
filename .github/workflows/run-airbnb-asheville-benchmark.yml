@@ -51,10 +51,10 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload per-model benchmark artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shinygen-asheville-benchmark-${{ github.run_id }}-${{ matrix.idx }}-${{ matrix.slug }}
           path: ${{ env.OUTPUT_DIR }}
@@ -187,7 +187,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Download all per-model benchmark artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: shinygen-asheville-benchmark-${{ github.run_id }}-*
           path: gha_runs/aggregate-${{ github.run_id }}
@@ -298,7 +298,7 @@ jobs:
 
       - name: Upload aggregate benchmark artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shinygen-asheville-benchmark-${{ github.run_id }}-aggregate
           path: gha_runs/aggregate-${{ github.run_id }}
