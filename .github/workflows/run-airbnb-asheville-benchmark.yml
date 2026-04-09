@@ -2,14 +2,25 @@ name: Run Asheville Airbnb benchmark
 
 on:
   workflow_dispatch:
+    inputs:
+      quality_threshold:
+        description: "Minimum quality score"
+        default: "7.0"
+      max_iterations:
+        description: "Max iteration count"
+        default: "3"
+
+concurrency:
+  group: asheville-benchmark
+  cancel-in-progress: false
 
 env:
   BENCHMARK_PROMPT: >-
     Build a professional-grade Shiny dashboard featuring an interactive map and comparative performance metrics to visualize how property type and neighborhood dynamics influence pricing and ratings across Asheville.
   BENCHMARK_DATASET: test_data_csv_files/airbnb-asheville-short.csv
   BENCHMARK_JUDGE_MODEL: anthropic/claude-sonnet-4-6
-  BENCHMARK_MAX_ITERATIONS: "3"
-  BENCHMARK_QUALITY_THRESHOLD: "7.0"
+  BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
+  BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
 
 jobs:
   run:
@@ -25,30 +36,22 @@ jobs:
         model:
           - idx: "01"
             name: claude-opus-4-6
-            slug: claude-opus-4-6
           - idx: "02"
             name: claude-sonnet-4-6
-            slug: claude-sonnet-4-6
           - idx: "03"
             name: claude-sonnet-4-5
-            slug: claude-sonnet-4-5
           - idx: "04"
             name: claude-haiku-4-5
-            slug: claude-haiku-4-5
           - idx: "05"
             name: gpt-5.4
-            slug: gpt-5.4
           - idx: "06"
             name: gpt-5.4-mini
-            slug: gpt-5.4-mini
           - idx: "07"
             name: gpt-5.4-nano
-            slug: gpt-5.4-nano
           - idx: "08"
             name: gpt-5.3-codex
-            slug: gpt-5.3-codex
     env:
-      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.slug }}
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
@@ -59,6 +62,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Validate benchmark inputs and required API key secrets
         shell: bash
@@ -83,6 +87,15 @@ jobs:
             exit 1
           fi
 
+      - name: Cache R packages
+        if: matrix.framework == 'shiny_r'
+        uses: actions/cache@v4
+        with:
+          path: ~/R/library
+          key: r-packages-${{ runner.os }}-${{ hashFiles('.github/workflows/run-airbnb-asheville-benchmark.yml') }}
+          restore-keys: |
+            r-packages-${{ runner.os }}-
+
       - name: Install shinygen and screenshot runtime dependencies
         shell: bash
         run: |
@@ -98,6 +111,10 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y r-base
             fi
+
+            R_LIBS_USER="${HOME}/R/library"
+            mkdir -p "${R_LIBS_USER}"
+            echo "R_LIBS_USER=${R_LIBS_USER}" >> "${GITHUB_ENV}"
 
             Rscript -e 'install.packages(c(
               "shiny", "bslib", "bsicons", "ggplot2", "dplyr", "readr",
@@ -134,6 +151,10 @@ jobs:
           OUTPUT_DIR="${OUTPUT_DIR}" \
           MODEL="${{ matrix.model.name }}" \
           FRAMEWORK="${{ matrix.framework }}" \
+          GHA_RUN_ID="${{ github.run_id }}" \
+          GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
+          GHA_WORKFLOW="${{ github.workflow }}" \
+          GHA_JOB="${{ github.job }}" \
           python - <<'PY'
           import json
           import os
@@ -148,10 +169,10 @@ jobs:
 
           lines = [
               "shinygen Asheville benchmark summary",
-              f"run_id: ${{ github.run_id }}",
-              f"run_attempt: ${{ github.run_attempt }}",
-              f"workflow: ${{ github.workflow }}",
-              f"job: ${{ github.job }}",
+              f"run_id: {os.environ['GHA_RUN_ID']}",
+              f"run_attempt: {os.environ['GHA_RUN_ATTEMPT']}",
+              f"workflow: {os.environ['GHA_WORKFLOW']}",
+              f"job: {os.environ['GHA_JOB']}",
               f"model: {model}",
               f"framework: {framework}",
               "timestamp_utc: "
@@ -194,7 +215,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-asheville-benchmark-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.slug }}
+          name: shinygen-asheville-benchmark-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.name }}
           path: ${{ env.OUTPUT_DIR }}
           if-no-files-found: warn
 
@@ -205,7 +226,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Download all per-model benchmark artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v6
         with:
           pattern: shinygen-asheville-benchmark-${{ github.run_id }}-*
           path: gha_runs/aggregate-${{ github.run_id }}
@@ -218,7 +239,11 @@ jobs:
           root="gha_runs/aggregate-${{ github.run_id }}"
           mkdir -p "${root}"
 
-          AGGREGATE_ROOT="${root}" python - <<'PY'
+          AGGREGATE_ROOT="${root}" \
+          GHA_RUN_ID="${{ github.run_id }}" \
+          GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
+          BENCHMARK_PROMPT="${BENCHMARK_PROMPT}" \
+          python - <<'PY'
           import json
           import os
           from pathlib import Path
@@ -239,7 +264,7 @@ jobs:
               rows.append(
                   {
                       "artifact_dir": artifact_dir.name,
-                    "framework": summary.get("framework"),
+                      "framework": summary.get("framework"),
                       "model": model.get("requested"),
                       "resolved_model_id": model.get("resolved_id"),
                       "agent": model.get("agent"),
@@ -256,7 +281,7 @@ jobs:
 
           summary_json = {
               "benchmark": "airbnb-asheville-short",
-              "prompt": "Build a professional-grade Shiny dashboard featuring an interactive map and comparative performance metrics to visualize how property type and neighborhood dynamics influence pricing and ratings across Asheville.",
+              "prompt": os.environ["BENCHMARK_PROMPT"],
               "rows": rows,
               "missing_artifacts": missing,
           }
@@ -278,8 +303,8 @@ jobs:
           lines = [
               "# Asheville Airbnb benchmark",
               "",
-              f"Run ID: ${{ github.run_id }}",
-              f"Run attempt: ${{ github.run_attempt }}",
+              f"Run ID: {os.environ['GHA_RUN_ID']}",
+              f"Run attempt: {os.environ['GHA_RUN_ATTEMPT']}",
               "",
               "| Framework | Model | Agent | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
               "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
