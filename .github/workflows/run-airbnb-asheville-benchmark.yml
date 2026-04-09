@@ -7,7 +7,6 @@ env:
   BENCHMARK_PROMPT: >-
     Build a professional-grade Shiny dashboard featuring an interactive map and comparative performance metrics to visualize how property type and neighborhood dynamics influence pricing and ratings across Asheville.
   BENCHMARK_DATASET: test_data_csv_files/airbnb-asheville-short.csv
-  BENCHMARK_FRAMEWORK: shiny_python
   BENCHMARK_JUDGE_MODEL: anthropic/claude-sonnet-4-6
   BENCHMARK_MAX_ITERATIONS: "3"
   BENCHMARK_QUALITY_THRESHOLD: "7.0"
@@ -18,35 +17,38 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix:
-        include:
+        framework:
+          - shiny_python
+          - shiny_r
+        model:
           - idx: "01"
-            model: claude-opus-4-6
+            name: claude-opus-4-6
             slug: claude-opus-4-6
           - idx: "02"
-            model: claude-sonnet-4-6
+            name: claude-sonnet-4-6
             slug: claude-sonnet-4-6
           - idx: "03"
-            model: claude-sonnet-4-5
+            name: claude-sonnet-4-5
             slug: claude-sonnet-4-5
           - idx: "04"
-            model: claude-haiku-4-5
+            name: claude-haiku-4-5
             slug: claude-haiku-4-5
           - idx: "05"
-            model: gpt-5.4
+            name: gpt-5.4
             slug: gpt-5.4
           - idx: "06"
-            model: gpt-5.4-mini
+            name: gpt-5.4-mini
             slug: gpt-5.4-mini
           - idx: "07"
-            model: gpt-5.4-nano
+            name: gpt-5.4-nano
             slug: gpt-5.4-nano
           - idx: "08"
-            model: gpt-5.3-codex
+            name: gpt-5.3-codex
             slug: gpt-5.3-codex
     env:
-      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ matrix.idx }}-${{ matrix.slug }}
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.slug }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
@@ -87,8 +89,21 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           python -m pip install -e ".[screenshot]"
-          python -m pip install shiny plotly faicons pandas matplotlib seaborn
           python -m playwright install --with-deps chromium
+
+          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
+            python -m pip install shiny shinywidgets plotly faicons pandas numpy matplotlib seaborn folium
+          else
+            if ! command -v Rscript >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y r-base
+            fi
+
+            Rscript -e 'install.packages(c(
+              "shiny", "bslib", "bsicons", "ggplot2", "dplyr", "readr",
+              "plotly", "DT", "leaflet"
+            ), repos = "https://cloud.r-project.org")'
+          fi
 
       - name: Run shinygen benchmark generation
         shell: bash
@@ -98,8 +113,8 @@ jobs:
 
           shinygen generate \
             --prompt "${BENCHMARK_PROMPT}" \
-            --model "${{ matrix.model }}" \
-            --framework "${BENCHMARK_FRAMEWORK}" \
+            --model "${{ matrix.model.name }}" \
+            --framework "${{ matrix.framework }}" \
             --output "${OUTPUT_DIR}" \
             --csv-file "${BENCHMARK_DATASET}" \
             --screenshot \
@@ -117,7 +132,8 @@ jobs:
           mkdir -p "${OUTPUT_DIR}"
 
           OUTPUT_DIR="${OUTPUT_DIR}" \
-          MODEL="${{ matrix.model }}" \
+          MODEL="${{ matrix.model.name }}" \
+          FRAMEWORK="${{ matrix.framework }}" \
           python - <<'PY'
           import json
           import os
@@ -126,6 +142,7 @@ jobs:
 
           output_dir = Path(os.environ["OUTPUT_DIR"])
           model = os.environ["MODEL"]
+          framework = os.environ["FRAMEWORK"]
           summary_path = output_dir / "run_summary.json"
           metrics_path = output_dir / "run_metrics.txt"
 
@@ -136,8 +153,9 @@ jobs:
               f"workflow: ${{ github.workflow }}",
               f"job: ${{ github.job }}",
               f"model: {model}",
-                "timestamp_utc: "
-                + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              f"framework: {framework}",
+              "timestamp_utc: "
+              + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "",
           ]
 
@@ -176,7 +194,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-asheville-benchmark-${{ github.run_id }}-${{ matrix.idx }}-${{ matrix.slug }}
+          name: shinygen-asheville-benchmark-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.slug }}
           path: ${{ env.OUTPUT_DIR }}
           if-no-files-found: warn
 
@@ -221,6 +239,7 @@ jobs:
               rows.append(
                   {
                       "artifact_dir": artifact_dir.name,
+                    "framework": summary.get("framework"),
                       "model": model.get("requested"),
                       "resolved_model_id": model.get("resolved_id"),
                       "agent": model.get("agent"),
@@ -262,13 +281,14 @@ jobs:
               f"Run ID: ${{ github.run_id }}",
               f"Run attempt: ${{ github.run_attempt }}",
               "",
-              "| Model | Agent | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Agent | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
 
           for row in rows:
               lines.append(
-                  "| {model} | {agent} | {passed} | {score} | {iterations} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
+                "| {framework} | {model} | {agent} | {passed} | {score} | {iterations} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
+                  framework=row.get("framework") or "n/a",
                       model=row.get("model") or "n/a",
                       agent=row.get("agent") or "n/a",
                       passed="yes" if row.get("passed") else "no",
@@ -295,6 +315,10 @@ jobs:
 
           (root / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
+
+          if [[ -n "${GITHUB_STEP_SUMMARY:-}" && -f "${root}/INDEX.md" ]]; then
+            cat "${root}/INDEX.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
 
       - name: Upload aggregate benchmark artifact
         if: always()
