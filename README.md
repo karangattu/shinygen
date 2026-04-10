@@ -6,49 +6,64 @@ Generate, evaluate, and refine Shiny apps using LLM agents (Claude Code, Codex C
 
 ```mermaid
 flowchart TD
-    A["👤 User Prompt"] --> B["shinygen CLI / API"]
-    B --> C["Docker Sandbox"]
+    A["👤 User Prompt + flags"] --> B["shinygen CLI / API"]
+    B --> C["Pre-flight checks\nDocker + API key"]
+    C --> D["Load framework defaults,\ndata files, and skills"]
+    D --> E["Iteration loop"]
 
-    subgraph C["Docker Sandbox (isolated container)"]
-        D["LLM Agent\n(Claude Code / Codex CLI)"]
-        D --> E["Generate app.py / app.R"]
-        E --> F{"--screenshot?"}
-        F -- Yes --> G["Run App on :8000"]
-        G --> H["Playwright Screenshot"]
-        H --> I["Agent Views Screenshot"]
-        I --> J{"Visual OK?"}
-        J -- No --> E
-        J -- Yes --> K["Final Code"]
-        F -- No --> K
+    subgraph F["Fresh Docker sandbox per iteration"]
+        G["Stage Docker context\n+ Inspect AI task"]
+        H["LLM Agent\n(Claude Code / Codex CLI)"]
+        I["Generate app.py / app.R"]
+        J{"--screenshot?"}
+        K["Run app on :8000\ninside sandbox"]
+        L["screenshot_helper.py\nwaits 7s and captures screenshot.png"]
+        M["Agent reviews screenshot\nand refines in sandbox"]
+        N["Scorer copies project files\nto results volume"]
+        O["Eval log + usage rows"]
+
+        E --> G --> H --> I --> J
+        J -- Yes --> K --> L --> M --> N
+        J -- No --> N
+        N --> O
     end
 
-    K --> L{"--judge-model?"}
-    L -- Yes --> M["External LLM Judge\n(scores 1–10)"]
-    M --> N{"Score ≥ threshold?"}
-    N -- No --> D
-    N -- Yes --> O["✅ Output Directory"]
-    L -- No --> O
+    O --> P["Extract code from results volume\nor eval log"]
+    O --> Q["Copy agent_last_screenshot.png\nfrom results or eval attachment"]
+    P --> R{"--judge-model?"}
+    R -- Yes --> S["Run extracted app on host temp dir"]
+    S --> T["Host Playwright screenshot"]
+    T --> U["External LLM judge\n(scores 4 criteria)"]
+    U --> V{"Score ≥ threshold?"}
+    V -- No --> W["Refinement prompt includes\njudge feedback + previous code"]
+    W --> E
+    V -- Yes --> X["✅ Output directory"]
+    R -- No --> X
 
-    O --> P["Artifacts:\n• app.py / app.R\n• screenshot_before.png\n• screenshot_after.png\n• cost & time stats"]
+    Q --> X
+    X --> Y["Artifacts:\n• app.py / app.R\n• data files\n• screenshot.png\n• agent_last_screenshot.png\n• eval_logs/*.eval\n• run_summary.json"]
 ```
 
 ### How It Works
 
-1. **You run a command** — provide a prompt, pick a model, and (optionally) enable `--screenshot` and `--judge-model`.
-2. **A Docker sandbox spins up** — an isolated container with Shiny, Playwright, and Chromium pre-installed.
-3. **The LLM agent generates the app** inside the sandbox, writing `app.py` (Python) or `app.R` (R).
-4. **Visual self-evaluation** (when `--screenshot` is enabled) — the agent starts the app inside the container, takes a Playwright screenshot, reviews the visual output, and fixes any layout/styling issues. This loop runs entirely inside the sandbox.
-5. **External quality judge** (when `--judge-model` is set) — a separate LLM evaluates the code and optional screenshots, scoring on functionality, design, code quality, and UX. If the score is below the threshold, the agent refines and tries again.
-6. **Final output** — the app, screenshots, and stats are copied to your output directory.
+1. **You run a command** — provide a prompt, pick a model, and optionally enable `--screenshot` and `--judge-model`.
+2. **Pre-flight + setup** — shinygen checks Docker/API access, resolves the framework and model, and loads bundled skills, custom skills, and any data files.
+3. **Fresh sandbox generation** — each iteration stages a fresh Docker sandbox, installs agent skills in the agent's native home, and asks Claude Code or Codex CLI to generate `app.py` or `app.R`.
+4. **Agent self-evaluation** (when `--screenshot` is enabled) — inside the sandbox, the agent runs the app, uses `screenshot_helper.py`, waits 7 seconds before capture, reviews the screenshot, and refines visually before submission.
+5. **Extraction + optional external judge** — shinygen extracts the app from the results volume or eval log, preserves the final in-agent screenshot as `agent_last_screenshot.png`, and, if `--judge-model` is set, runs the extracted app on the host for a separate Playwright screenshot and external LLM score. Failed scores feed a refinement prompt that includes both judge feedback and the previous code.
+6. **Final output** — the final app, screenshots, eval logs, and structured run summary are written to your output directory.
 
 ### What You Get
 
 ```
 my-dashboard/
-├── app.py                  # The generated Shiny app
-├── screenshot_before.png   # Initial render (if --screenshot)
-├── screenshot_after.png    # After interaction (if --screenshot)
-└── data.csv                # Your data file (if provided)
+├── app.py                  # Or app.R for Shiny for R
+├── data.csv                # Your data file (if provided)
+├── screenshot.png          # Host-side screenshot used by the external judge
+├── agent_last_screenshot.png
+├── eval_logs/
+│   └── *.eval
+└── run_summary.json        # Structured score, usage, and artifact metadata
 ```
 
 The CLI also prints a summary:

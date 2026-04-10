@@ -44,7 +44,8 @@ SYSTEM_PROMPT_VISUAL_QA = """\
 VISUAL SELF-EVALUATION (screenshot mode is ON):
 After creating your app, you MUST visually verify it:
 1. Start the app: nohup python -m shiny run app.py --port 8000 > /tmp/app.log 2>&1 &
-2. Wait 3 seconds, then take a screenshot: python /home/user/project/.tools/screenshot_helper.py
+2. Once the app is up, take a screenshot with: python /home/user/project/.tools/screenshot_helper.py
+    The helper waits 7 seconds before capturing so late-loading dashboard sections can render.
 3. View the screenshot to check the visual output.
 4. Evaluate: layout correctness, chart visibility, text readability, colours, styling.
 5. Fix any visual issues, then re-screenshot to confirm.
@@ -58,7 +59,8 @@ SYSTEM_PROMPT_VISUAL_QA_R = """\
 VISUAL SELF-EVALUATION (screenshot mode is ON):
 After creating your app, you MUST visually verify it:
 1. Start the app: nohup Rscript -e "shiny::runApp('app.R', port=8000, launch.browser=FALSE)" > /tmp/app.log 2>&1 &
-2. Wait 3 seconds, then take a screenshot: python3 /home/user/project/.tools/screenshot_helper.py
+2. Once the app is up, take a screenshot with: python3 /home/user/project/.tools/screenshot_helper.py
+    The helper waits 7 seconds before capturing so late-loading dashboard sections can render.
 3. View the screenshot to check the visual output.
 4. Evaluate: layout correctness, chart visibility, text readability, colours, styling.
 5. Fix any visual issues, then re-screenshot to confirm.

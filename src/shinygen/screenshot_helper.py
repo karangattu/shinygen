@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 # Shared viewport/wait constants (mirrored from config.py for standalone use)
 DEFAULT_VIEWPORT = (1920, 1080)
-DEFAULT_WAIT = 5.0
+DEFAULT_WAIT = 7.0
 SHINY_CONNECT_TIMEOUT = 20000  # ms
 SHINY_BUSY_TIMEOUT = 10000  # ms
 
@@ -91,6 +91,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Take a screenshot of a running Shiny app")
     parser.add_argument("--port", type=int, default=8000, help="App port (default: 8000)")
     parser.add_argument("--output", default="/home/user/project/screenshot.png", help="Output path")
-    parser.add_argument("--wait", type=float, default=5.0, help="Seconds to wait after load")
+    parser.add_argument("--wait", type=float, default=DEFAULT_WAIT, help="Seconds to wait after load")
     args = parser.parse_args()
     take_screenshot(port=args.port, output=args.output, wait=args.wait)

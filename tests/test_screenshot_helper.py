@@ -14,6 +14,11 @@ class TestConstants:
 
         assert DEFAULT_VIEWPORT == SCREENSHOT_VIEWPORT
 
+    def test_default_wait_matches_config(self):
+        from shinygen.config import PAGE_LOAD_WAIT
+
+        assert DEFAULT_WAIT == PAGE_LOAD_WAIT == 7.0
+
     def test_default_wait_positive(self):
         assert DEFAULT_WAIT > 0
 

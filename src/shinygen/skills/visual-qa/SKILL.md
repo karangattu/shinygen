@@ -20,11 +20,12 @@ pre-installed in this environment.
    # R
    # nohup Rscript -e "shiny::runApp('app.R', port=8000, launch.browser=FALSE)" > /tmp/app.log 2>&1 &
    ```
-3. **Wait** a few seconds for the server to start, then **take a screenshot**:
+3. **Take a screenshot** once the server is up:
    ```bash
    python /home/user/project/.tools/screenshot_helper.py
    ```
    This saves a full-page screenshot to `/home/user/project/screenshot.png`.
+   The helper waits 7 seconds before capturing so slower dashboard sections can finish rendering.
 4. **View the screenshot** to evaluate the visual output.
 5. **Evaluate** the screenshot against these criteria:
    - Does the layout render correctly (no blank pages, no overlapping elements)?
