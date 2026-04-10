@@ -17,6 +17,7 @@ from inspect_ai.dataset import MemoryDataset, Sample
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser
 from inspect_ai.scorer import Score, Target, scorer
 from inspect_ai.solver import TaskState
+from inspect_ai.tool import Skill
 from inspect_swe import claude_code, codex_cli
 
 if TYPE_CHECKING:
@@ -29,7 +30,6 @@ from .config import (
     SANDBOX_WORK_DIR,
 )
 from .prompts import build_system_prompt, build_user_prompt
-from .skills import load_default_skills, load_skill_files
 from .validation import validate_framework_artifact
 
 logger = logging.getLogger(__name__)
@@ -246,7 +246,7 @@ def build_generation_task(
     framework_key: str,
     docker_context_dir: Path,
     data_files: dict[str, str] | None = None,
-    skill_files: dict[str, str] | None = None,
+    skills: list[Skill] | None = None,
     web_fetch: bool = True,
     screenshot: bool = False,
 ) -> Task:
@@ -258,7 +258,7 @@ def build_generation_task(
         framework_key: "shiny_python" or "shiny_r".
         docker_context_dir: Path to staged Docker context.
         data_files: Dict of {filename: content} for data files.
-        skill_files: Dict of {sandbox_path: content} for skill files.
+        skills: Agent skills to install inside the sandbox.
         web_fetch: Whether to allow web search tools.
         screenshot: Whether to inject visual self-evaluation tools.
 
@@ -272,21 +272,24 @@ def build_generation_task(
     # Build data file names list for system prompt
     data_file_names = list(data_files.keys()) if data_files else None
 
-    sys_prompt = build_system_prompt(framework_key, data_file_names, screenshot=screenshot)
+    sys_prompt = build_system_prompt(
+        framework_key,
+        data_file_names,
+        screenshot=screenshot,
+    )
     full_user_prompt = build_user_prompt(user_prompt, framework_key)
+    resolved_skills = list(skills or [])
 
     # Merge sample files
     sample_files: dict[str, str] = {}
     if data_files:
         sample_files.update(data_files)
-    if skill_files:
-        sample_files.update(skill_files)
 
     # Inject visual self-evaluation tools when screenshot mode is on
     if screenshot:
         from .skills import load_visual_qa_skills
 
-        sample_files.update(load_visual_qa_skills(agent))
+        resolved_skills.extend(load_visual_qa_skills())
 
         # Inject the screenshot helper script
         helper_script = (Path(__file__).parent / "screenshot_helper.py").read_text()
@@ -312,9 +315,17 @@ def build_generation_task(
 
     # Select solver
     if agent == "claude_code":
-        solver = claude_code(cwd=SANDBOX_WORK_DIR, attempts=1)
+        solver = claude_code(
+            cwd=SANDBOX_WORK_DIR,
+            attempts=1,
+            skills=resolved_skills or None,
+        )
     else:
-        solver = codex_cli(cwd=SANDBOX_WORK_DIR, attempts=1)
+        solver = codex_cli(
+            cwd=SANDBOX_WORK_DIR,
+            attempts=1,
+            skills=resolved_skills or None,
+        )
 
     return Task(
         dataset=dataset,

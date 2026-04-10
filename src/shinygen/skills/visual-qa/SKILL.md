@@ -1,3 +1,8 @@
+---
+name: visual-qa
+description: Visually verify a generated Shiny app by taking a screenshot, reviewing the rendered UI, and iterating on layout or styling problems before finishing.
+---
+
 # Visual Self-Evaluation Skill
 
 After creating your Shiny app, you MUST visually verify it by taking a

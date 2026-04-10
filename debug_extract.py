@@ -21,7 +21,7 @@ def main():
     agent, model_id = resolve_model(model)
     fw = FRAMEWORKS[framework_key]
     
-    skill_files = load_default_skills(framework_key, agent)
+    skills = load_default_skills(framework_key)
 
     docker_dir = stage_docker_context(framework_key)
     
@@ -30,7 +30,7 @@ def main():
         agent=agent,
         framework_key=framework_key,
         docker_context_dir=docker_dir,
-        skill_files=skill_files,
+        skills=skills,
     )
 
     from inspect_ai import eval as inspect_eval

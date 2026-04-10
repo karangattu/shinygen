@@ -6,7 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import AGENT_SKILLS_DIR, FRAMEWORKS, PACKAGE_DIR
+from inspect_ai.tool import Skill, read_skills
+
+from .config import FRAMEWORKS, PACKAGE_DIR
 
 # Default bundled skills
 BUNDLED_SKILLS_DIR = PACKAGE_DIR / "skills"
@@ -14,59 +16,43 @@ BUNDLED_SKILLS_DIR = PACKAGE_DIR / "skills"
 
 def load_skill_files(
     skill_dir: Path,
-    agent: str,
-) -> dict[str, str]:
-    """Load skill files from a directory, mapped to agent-appropriate paths.
+)-> list[Skill]:
+    """Load agent skills from a skill directory.
 
-    The skill directory should contain a SKILL.md and optionally a
-    references/ subdirectory with additional markdown files.
+    The skill directory must contain a valid SKILL.md and may also contain
+    scripts/, references/, and assets/ subdirectories.
 
     Args:
         skill_dir: Path to the skill directory on the host.
-        agent: Agent name ("claude_code" or "codex_cli").
 
     Returns:
-        Dict of {sandbox_relative_path: file_content} suitable for
-        merging into an Inspect AI Sample's files dict.
+        Parsed skills ready to install with the agent's native skill loader.
     """
-    target_prefix = AGENT_SKILLS_DIR[agent]
-    files: dict[str, str] = {}
+    if not skill_dir.exists():
+        return []
 
-    skill_name = skill_dir.name
-
-    skill_md = skill_dir / "SKILL.md"
-    if skill_md.exists():
-        files[f"{target_prefix}/{skill_name}/SKILL.md"] = skill_md.read_text()
-
-    refs_dir = skill_dir / "references"
-    if refs_dir.exists():
-        for ref in sorted(refs_dir.glob("*.md")):
-            files[f"{target_prefix}/{skill_name}/references/{ref.name}"] = ref.read_text()
-
-    return files
+    return read_skills([skill_dir])
 
 
 def load_default_skills(
     framework_key: str,
-    agent: str,
-) -> dict[str, str]:
+)-> list[Skill]:
     """Load the bundled default skills for a framework.
 
     Args:
         framework_key: "shiny_python" or "shiny_r"
-        agent: Agent name ("claude_code" or "codex_cli").
 
     Returns:
-        Dict of {sandbox_relative_path: file_content}.
+        Parsed skills ready to install with the agent's native skill loader.
     """
     fw = FRAMEWORKS[framework_key]
     skill_dir_name = fw["skill_dir"]
     skill_dir = BUNDLED_SKILLS_DIR / skill_dir_name
 
     if not skill_dir.exists():
-        return {}
+        return []
 
-    return load_skill_files(skill_dir, agent)
+    return load_skill_files(skill_dir)
 
 
 def load_skill_context_text(
@@ -104,15 +90,12 @@ def load_skill_context_text(
 VISUAL_QA_SKILL_DIR = BUNDLED_SKILLS_DIR / "visual-qa"
 
 
-def load_visual_qa_skills(agent: str) -> dict[str, str]:
+def load_visual_qa_skills() -> list[Skill]:
     """Load the visual self-evaluation skill files.
 
-    Args:
-        agent: Agent name ("claude_code" or "codex_cli").
-
     Returns:
-        Dict of {sandbox_relative_path: file_content}.
+        Parsed skills ready to install with the agent's native skill loader.
     """
     if not VISUAL_QA_SKILL_DIR.exists():
-        return {}
-    return load_skill_files(VISUAL_QA_SKILL_DIR, agent)
+        return []
+    return load_skill_files(VISUAL_QA_SKILL_DIR)

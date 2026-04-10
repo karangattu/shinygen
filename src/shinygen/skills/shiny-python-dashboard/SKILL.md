@@ -1,4 +1,3 @@
-````skill
 ---
 name: shiny-python-dashboard
 description: Build polished Shiny for Python dashboards and analytical apps. Use when creating or refactoring Shiny for Python apps, dashboards, KPI layouts, sidebar or navbar navigation, cards, value boxes, responsive grids, reactive filtering, charts, data tables, or when choosing between Core and Express APIs.
@@ -267,4 +266,3 @@ def fmt_large(number):
 - [references/styling-and-data.md](references/styling-and-data.md) — project structure, data loading, formatting, styling, and themes
 - [references/icons-and-maps.md](references/icons-and-maps.md) — icon rules, accessibility, and map container patterns
 - [references/core-vs-express.md](references/core-vs-express.md) — API selection and side-by-side equivalents
-````

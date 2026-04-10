@@ -110,7 +110,7 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 16
+      max-parallel: 12
       matrix:
         framework:
           - shiny_python
@@ -121,17 +121,11 @@ jobs:
           - idx: "02"
             name: claude-sonnet-4-6
           - idx: "03"
-            name: claude-sonnet-4-5
-          - idx: "04"
-            name: claude-haiku-4-5
-          - idx: "05"
             name: gpt-5.4
-          - idx: "06"
+          - idx: "04"
             name: gpt-5.4-mini
-          - idx: "07"
+          - idx: "05"
             name: gpt-5.4-nano
-          - idx: "08"
-            name: gpt-5.3-codex
     env:
       BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
       BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}

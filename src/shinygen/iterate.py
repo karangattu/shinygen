@@ -25,6 +25,7 @@ from .pricing import Timer, UsageStats
 
 if TYPE_CHECKING:
     from inspect_ai.log import EvalLog
+    from inspect_ai.tool import Skill
 
 logger = logging.getLogger(__name__)
 AGENT_LAST_SCREENSHOT_NAME = "agent_last_screenshot.png"
@@ -235,10 +236,10 @@ def generate_and_refine(
     # Load skills
     from .skills import load_default_skills, load_skill_files
 
-    skill_files: dict[str, str] = {}
-    skill_files.update(load_default_skills(framework_key, agent))
+    skills: list[Skill] = []
+    skills.extend(load_default_skills(framework_key))
     if skills_dir:
-        skill_files.update(load_skill_files(Path(skills_dir), agent))
+        skills.extend(load_skill_files(Path(skills_dir)))
 
     logger.info(
         "Starting generation: model=%s, agent=%s, framework=%s",
@@ -268,7 +269,7 @@ def generate_and_refine(
                     model_id,
                     framework_key,
                     data_files,
-                    skill_files,
+                    skills,
                     web_fetch,
                     iteration,
                     screenshot,
@@ -464,7 +465,7 @@ def _run_generation(
     model_id: str,
     framework_key: str,
     data_files: dict[str, str] | None,
-    skill_files: dict[str, str],
+    skills: list[Skill],
     web_fetch: bool,
     iteration: int,
     screenshot: bool = False,
@@ -488,7 +489,7 @@ def _run_generation(
             framework_key=framework_key,
             docker_context_dir=docker_dir,
             data_files=data_files,
-            skill_files=skill_files,
+            skills=skills,
             web_fetch=web_fetch,
             screenshot=screenshot,
         )
