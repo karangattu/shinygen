@@ -1,10 +1,13 @@
 """Tests for shinygen.iterate internal helpers."""
 
+import base64
 import json
+import zipfile
 from pathlib import Path
 
 from shinygen.iterate import (
     GenerationResult,
+    _copy_agent_screenshot_artifact,
     _extract_generation_usage_rows,
     _write_run_summary,
 )
@@ -136,3 +139,72 @@ class TestWriteRunSummary:
         assert summary["usage"]["total_cost"] == result.usage.total_cost
         assert summary["usage"]["total_input_tokens"] == 2_600
         assert summary["usage"]["total_output_tokens"] == 700
+
+
+class TestCopyAgentScreenshotArtifact:
+    def test_prefers_full_page_screenshot_from_results_volume(self, tmp_path):
+        results_dir = tmp_path / "results" / "sample"
+        results_dir.mkdir(parents=True)
+        (results_dir / "screenshot_bottom_final.png").write_bytes(b"crop")
+        (results_dir / "screenshot.png").write_bytes(b"full-page")
+
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+
+        copied = _copy_agent_screenshot_artifact(
+            output_path,
+            results_dir=tmp_path / "results",
+            log_path=None,
+        )
+
+        assert copied == output_path / "agent_last_screenshot.png"
+        assert copied.read_bytes() == b"full-page"
+
+    def test_falls_back_to_last_eval_log_image_attachment(self, tmp_path):
+        log_path = tmp_path / "sample.eval"
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        last_image = b"last-image"
+
+        sample = {
+            "id": "shinygen/generate",
+            "attachments": {
+                "first": "data:image/png;base64,"
+                + base64.b64encode(b"first-image").decode("ascii"),
+                "last": "data:image/png;base64,"
+                + base64.b64encode(last_image).decode("ascii"),
+            },
+            "messages": [
+                {
+                    "content": [
+                        {
+                            "type": "image",
+                            "image": "attachment://first",
+                            "detail": "auto",
+                        }
+                    ]
+                },
+                {
+                    "content": [
+                        {
+                            "type": "image",
+                            "image": "attachment://last",
+                            "detail": "auto",
+                        }
+                    ]
+                },
+            ],
+            "metadata": {},
+        }
+
+        with zipfile.ZipFile(log_path, "w") as archive:
+            archive.writestr("samples/shinygen/generate_epoch_1.json", json.dumps(sample))
+
+        copied = _copy_agent_screenshot_artifact(
+            output_path,
+            results_dir=tmp_path / "missing-results",
+            log_path=log_path,
+        )
+
+        assert copied == output_path / "agent_last_screenshot.png"
+        assert copied.read_bytes() == last_image

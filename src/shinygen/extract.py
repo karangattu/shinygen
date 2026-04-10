@@ -5,6 +5,7 @@ Extract generated app code from Inspect AI eval logs.
 from __future__ import annotations
 
 import ast
+import base64
 import json
 import re
 import zipfile
@@ -16,6 +17,7 @@ from .validation import validate_framework_artifact
 CODE_PATTERN_PYTHON = re.compile(r"```python\s*\n(.*?)```", re.DOTALL)
 CODE_PATTERN_R = re.compile(r"```r\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 APP_ARTIFACTS = ("app.py", "app.R")
+ATTACHMENT_PREFIX = "attachment://"
 
 
 def strip_line_numbers(text: str) -> str:
@@ -203,6 +205,66 @@ def find_app_code_in_messages(
         return max(candidates, key=lambda x: _candidate_score(x, artifact_name))
 
     return None
+
+
+def _decode_image_attachment(attachment: object) -> bytes | None:
+    """Decode an Inspect image attachment payload if it is base64 data."""
+    if isinstance(attachment, dict):
+        for key in ("data", "content", "bytes"):
+            if key in attachment:
+                attachment = attachment[key]
+                break
+
+    if not isinstance(attachment, str) or not attachment.startswith("data:"):
+        return None
+
+    _header, separator, payload = attachment.partition(",")
+    if not separator:
+        return None
+
+    try:
+        return base64.b64decode(payload)
+    except (ValueError, TypeError):
+        return None
+
+
+def extract_last_image_attachment(log_path: Path, output_path: Path) -> Path | None:
+    """Write the last image attachment in an Inspect eval log to disk."""
+    last_image: bytes | None = None
+
+    with zipfile.ZipFile(log_path) as z:
+        sample_files = sorted(
+            n for n in z.namelist() if n.startswith("samples/") and n.endswith(".json")
+        )
+
+        for sample_file in sample_files:
+            sample = json.loads(z.read(sample_file))
+            attachments = sample.get("attachments") or {}
+            messages = sample.get("messages") or []
+
+            for msg in messages:
+                content = msg.get("content")
+                if not isinstance(content, list):
+                    continue
+
+                for part in content:
+                    if not isinstance(part, dict) or part.get("type") != "image":
+                        continue
+
+                    image_ref = part.get("image")
+                    if not isinstance(image_ref, str):
+                        continue
+
+                    attachment_id = image_ref.removeprefix(ATTACHMENT_PREFIX)
+                    decoded = _decode_image_attachment(attachments.get(attachment_id))
+                    if decoded:
+                        last_image = decoded
+
+    if last_image is None:
+        return None
+
+    output_path.write_bytes(last_image)
+    return output_path
 
 
 def extract_from_log(log_path: Path) -> dict[str, str]:

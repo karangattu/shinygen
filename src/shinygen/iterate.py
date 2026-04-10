@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from inspect_ai.log import EvalLog
 
 logger = logging.getLogger(__name__)
+AGENT_LAST_SCREENSHOT_NAME = "agent_last_screenshot.png"
 
 
 @dataclass
@@ -113,6 +114,58 @@ def _extract_generation_usage_rows(log: "EvalLog") -> list[dict[str, object]]:
         )
 
     return rows
+
+
+def _latest_path(paths: list[Path]) -> Path | None:
+    """Return the most recently modified path from a non-empty list."""
+    if not paths:
+        return None
+    return max(paths, key=lambda path: (path.stat().st_mtime_ns, str(path)))
+
+
+def _find_agent_screenshot_in_results(results_dir: Path | None) -> Path | None:
+    """Find the raw agent screenshot copied from the sandbox results volume."""
+    if results_dir is None or not results_dir.exists():
+        return None
+
+    full_page_matches = [path for path in results_dir.rglob("screenshot.png") if path.is_file()]
+    preferred = _latest_path(full_page_matches)
+    if preferred is not None:
+        return preferred
+
+    fallback_matches = [
+        path
+        for path in results_dir.rglob("screenshot*.png")
+        if path.is_file()
+    ]
+    return _latest_path(fallback_matches)
+
+
+def _copy_agent_screenshot_artifact(
+    output_path: Path,
+    *,
+    results_dir: Path | None,
+    log_path: Path | None,
+) -> Path | None:
+    """Copy the latest coding-agent screenshot into the model artifact directory."""
+    destination = output_path / AGENT_LAST_SCREENSHOT_NAME
+
+    source = _find_agent_screenshot_in_results(results_dir)
+    if source is not None:
+        shutil.copy2(source, destination)
+        return destination
+
+    if log_path is not None and log_path.exists():
+        from .extract import extract_last_image_attachment
+
+        extracted = extract_last_image_attachment(log_path, destination)
+        if extracted is not None:
+            return extracted
+
+    if destination.exists():
+        return destination
+
+    return None
 
 
 def generate_and_refine(
@@ -427,6 +480,7 @@ def _run_generation(
     artifact_name = fw["primary_artifact"]
 
     docker_dir = stage_docker_context(framework_key)
+    log_path: Path | None = None
     try:
         task = build_generation_task(
             user_prompt=prompt,
@@ -458,6 +512,9 @@ def _run_generation(
             return None, []
 
         log = logs[0]
+        location = getattr(log, "location", None)
+        if location:
+            log_path = Path(location)
         generation_usage_rows = _extract_generation_usage_rows(log)
 
         # Strategy 1: Read artifact from the results volume (most reliable).
@@ -475,9 +532,8 @@ def _run_generation(
                     return code, generation_usage_rows
 
         # Strategy 2: Extract from eval log messages (fallback).
-        log_path = getattr(log, "location", None)
         if log_path:
-            code_map = extract_from_log(Path(log_path))
+            code_map = extract_from_log(log_path)
             if code_map:
                 if len(code_map) == 1:
                     return next(iter(code_map.values())), generation_usage_rows
@@ -493,8 +549,16 @@ def _run_generation(
         logger.error("Generation failed in iteration %d: %s", iteration, exc)
         return None, []
     finally:
-        # Copy eval logs to output directory before cleanup
         if output_path is not None:
+            copied_agent_screenshot = _copy_agent_screenshot_artifact(
+                output_path,
+                results_dir=docker_dir / "results",
+                log_path=log_path,
+            )
+            if copied_agent_screenshot is not None:
+                logger.info("Agent screenshot copied to %s", copied_agent_screenshot)
+
+            # Copy eval logs to output directory before cleanup
             logs_dir = docker_dir / "logs"
             if logs_dir.exists():
                 eval_logs_dest = output_path / "eval_logs"
