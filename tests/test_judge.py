@@ -2,7 +2,13 @@
 
 import json
 
-from shinygen.judge import CRITERIA, JudgeResult, parse_judge_response
+from shinygen.judge import (
+    CRITERIA,
+    JUDGE_SYSTEM,
+    JudgeResult,
+    _build_judge_message,
+    parse_judge_response,
+)
 
 
 class TestParseJudgeResponse:
@@ -74,3 +80,25 @@ class TestJudgeResult:
         feedback = result.feedback_dict()
         assert feedback["requirement_fidelity"]["score"] == 7.0
         assert feedback["requirement_fidelity"]["rationale"] == "Good"
+
+
+class TestJudgePrompt:
+    def test_visual_ux_rubric_requires_design_best_practices(self):
+        for phrase in [
+            "visual hierarchy",
+            "spacing and alignment",
+            "typography",
+            "contrast and readability",
+            "responsive",
+            "accessibility basics",
+            "chart and table legibility",
+            "empty, loading, and error states",
+        ]:
+            assert phrase in JUDGE_SYSTEM
+
+    def test_judge_message_requests_design_principle_based_evaluation(self):
+        message = _build_judge_message("print('hello')")
+
+        assert "good UI design practices" in message
+        assert "design principle" in message
+        assert "lower confidence" in message

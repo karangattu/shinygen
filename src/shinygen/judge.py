@@ -53,6 +53,22 @@ CRITERIA = [
 ]
 
 
+VISUAL_UX_DESIGN_GUIDELINES = """\
+For visual_ux_quality, judge against good UI design practices rather than taste alone.
+Check for:
+- clear visual hierarchy
+- consistent spacing and alignment
+- typography, contrast and readability
+- responsive layout behavior and sensible sizing
+- accessibility basics such as clear labels, semantic controls, focus visibility, and non-color-only cues
+- chart and table legibility, including titles, labels, and readable density
+- empty, loading, and error states that avoid broken or confusing UI
+- cohesive component styling, restrained color usage, and polished dashboard structure
+
+Prefer screenshot evidence when available. If screenshots are unavailable, infer from the code and structure with lower confidence.
+"""
+
+
 # ---------------------------------------------------------------------------
 # Judge prompt
 # ---------------------------------------------------------------------------
@@ -74,6 +90,9 @@ in that dimension — essentially unreachable for generated code.
 - Do NOT give 9+ unless the app genuinely excels beyond what a senior \
 developer would produce by hand.
 - A composite average above 9.0 should be virtually impossible.
+
+UI DESIGN EVALUATION RULES:
+{visual_ux_design_guidelines}
 
 Response format (strict JSON):
 {
@@ -122,6 +141,7 @@ Scoring rubric:
  1 = Failing: incomprehensible, no structure whatsoever
 
 ## Visual & UX Quality (how polished does the dashboard look?)
+Judge this criterion against the UI design principles above, including hierarchy, spacing, readability, responsive behavior, accessibility basics, and chart/table clarity.
 10 = Unimprovable: award-winning design, pixel-perfect, delightful animations, accessibility-first — essentially impossible
  9 = Exceptional: professional-grade polish, excellent color palette, responsive, thoughtful micro-interactions, great typography
  8 = Strong: polished layout, good color choices, clear labels, minor visual refinements possible
@@ -144,7 +164,7 @@ Scoring rubric:
  3 = Weak: very little defensive coding, will crash on many edge cases
  2 = Poor: essentially no error handling, fragile
  1 = Failing: will crash immediately on any unexpected input
-"""
+""".replace("{visual_ux_design_guidelines}", VISUAL_UX_DESIGN_GUIDELINES)
 
 
 def _build_judge_message(
@@ -167,7 +187,15 @@ def _build_judge_message(
             f"\n{len(screenshot_paths)} screenshot(s) are attached as images.\n"
         )
     else:
-        parts.append("\nNo screenshots available — evaluate based on code alone.\n")
+        parts.append(
+            "\nNo screenshots available — evaluate based on code alone with "
+            "lower confidence for purely visual claims.\n"
+        )
+
+    parts.append(
+        "\nEvaluate visual_ux_quality using good UI design practices. Cite the "
+        "most important design principle followed or violated in the rationale.\n"
+    )
 
     parts.append(
         "\nNow score this application on the 4 criteria. Respond with JSON only."
