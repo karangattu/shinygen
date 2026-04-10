@@ -1,29 +1,111 @@
-name: Run Asheville Airbnb benchmark
+name: Run benchmark matrix
 
 on:
   workflow_dispatch:
     inputs:
+      challenge:
+        description: "Short benchmark label used in artifact names and summaries"
+        required: true
+        default: "airbnb-asheville"
+      dataset:
+        description: "CSV dataset in test_data_csv_files/ (basename or relative path)"
+        required: true
+        default: "airbnb-asheville-short.csv"
+      benchmark_prompt:
+        description: "Prompt passed to shinygen generate for every matrix entry"
+        required: true
+        default: >-
+          Build a professional-grade Shiny dashboard featuring an interactive map and comparative performance metrics to visualize how property type and neighborhood dynamics influence pricing and ratings across Asheville.
       quality_threshold:
         description: "Minimum quality score"
+        required: true
         default: "7.0"
       max_iterations:
         description: "Max iteration count"
+        required: true
         default: "3"
 
 concurrency:
-  group: asheville-benchmark
+  group: benchmark-${{ github.workflow }}-${{ inputs.challenge || 'benchmark' }}
   cancel-in-progress: false
 
 env:
-  BENCHMARK_PROMPT: >-
-    Build a professional-grade Shiny dashboard featuring an interactive map and comparative performance metrics to visualize how property type and neighborhood dynamics influence pricing and ratings across Asheville.
-  BENCHMARK_DATASET: test_data_csv_files/airbnb-asheville-short.csv
   BENCHMARK_JUDGE_MODEL: anthropic/claude-sonnet-4-6
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      benchmark_challenge: ${{ steps.normalize.outputs.benchmark_challenge }}
+      benchmark_dataset: ${{ steps.normalize.outputs.benchmark_dataset }}
+      benchmark_dataset_basename: ${{ steps.normalize.outputs.benchmark_dataset_basename }}
+      benchmark_dataset_stem: ${{ steps.normalize.outputs.benchmark_dataset_stem }}
+      benchmark_prompt: ${{ steps.normalize.outputs.benchmark_prompt }}
+      benchmark_slug: ${{ steps.normalize.outputs.benchmark_slug }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Normalize benchmark inputs
+        id: normalize
+        shell: bash
+        env:
+          RAW_BENCHMARK_PROMPT: ${{ inputs.benchmark_prompt }}
+          RAW_CHALLENGE: ${{ inputs.challenge }}
+          RAW_DATASET: ${{ inputs.dataset }}
+        run: |
+          set -euo pipefail
+
+          dataset_input="${RAW_DATASET#./}"
+          if [[ "${dataset_input}" != test_data_csv_files/* ]]; then
+            dataset_path="test_data_csv_files/${dataset_input}"
+          else
+            dataset_path="${dataset_input}"
+          fi
+
+          if [[ ! "${dataset_path}" =~ ^test_data_csv_files/.+\.csv$ ]]; then
+            echo "Dataset must point to a CSV inside test_data_csv_files/." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${dataset_path}" ]]; then
+            echo "Missing benchmark dataset: ${dataset_path}" >&2
+            exit 1
+          fi
+
+          dataset_basename="$(basename "${dataset_path}")"
+          dataset_stem="${dataset_basename%.csv}"
+
+          challenge="${RAW_CHALLENGE}"
+          if [[ -z "$(printf '%s' "${challenge}" | tr -d '[:space:]')" ]]; then
+            challenge="${dataset_stem}"
+          fi
+
+          if [[ -z "$(printf '%s' "${RAW_BENCHMARK_PROMPT}" | tr -d '[:space:]')" ]]; then
+            echo "Benchmark prompt must not be empty." >&2
+            exit 1
+          fi
+
+          benchmark_slug="$(printf '%s' "${challenge}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
+          if [[ -z "${benchmark_slug}" ]]; then
+            benchmark_slug="${dataset_stem}"
+          fi
+
+          {
+            echo "benchmark_challenge=${challenge}"
+            echo "benchmark_dataset=${dataset_path}"
+            echo "benchmark_dataset_basename=${dataset_basename}"
+            echo "benchmark_dataset_stem=${dataset_stem}"
+            echo "benchmark_slug=${benchmark_slug}"
+            echo "benchmark_prompt<<EOF"
+            printf '%s\n' "${RAW_BENCHMARK_PROMPT}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
   run:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -51,7 +133,12 @@ jobs:
           - idx: "08"
             name: gpt-5.3-codex
     env:
-      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}
+      BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
+      BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
+      BENCHMARK_DATASET_BASENAME: ${{ needs.prepare.outputs.benchmark_dataset_basename }}
+      BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
+      BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
@@ -168,11 +255,13 @@ jobs:
           metrics_path = output_dir / "run_metrics.txt"
 
           lines = [
-              "shinygen Asheville benchmark summary",
+              "shinygen benchmark summary",
               f"run_id: {os.environ['GHA_RUN_ID']}",
               f"run_attempt: {os.environ['GHA_RUN_ATTEMPT']}",
               f"workflow: {os.environ['GHA_WORKFLOW']}",
               f"job: {os.environ['GHA_JOB']}",
+              f"benchmark_challenge: {os.environ['BENCHMARK_CHALLENGE']}",
+              f"benchmark_dataset: {os.environ['BENCHMARK_DATASET']}",
               f"model: {model}",
               f"framework: {framework}",
               "timestamp_utc: "
@@ -215,20 +304,27 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-asheville-benchmark-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.name }}
+          name: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.name }}
           path: ${{ env.OUTPUT_DIR }}
           if-no-files-found: warn
 
   aggregate:
-    needs: run
+    needs:
+      - prepare
+      - run
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
+      BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
+      BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
+      BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
     steps:
       - name: Download all per-model benchmark artifacts
         uses: actions/download-artifact@v7
         with:
-          pattern: shinygen-asheville-benchmark-${{ github.run_id }}-*
+          pattern: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-*
           path: gha_runs/aggregate-${{ github.run_id }}
           merge-multiple: false
 
@@ -242,6 +338,8 @@ jobs:
           AGGREGATE_ROOT="${root}" \
           GHA_RUN_ID="${{ github.run_id }}" \
           GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
+          BENCHMARK_CHALLENGE="${BENCHMARK_CHALLENGE}" \
+          BENCHMARK_DATASET="${BENCHMARK_DATASET}" \
           BENCHMARK_PROMPT="${BENCHMARK_PROMPT}" \
           python - <<'PY'
           import json
@@ -280,7 +378,8 @@ jobs:
               )
 
           summary_json = {
-              "benchmark": "airbnb-asheville-short",
+              "benchmark": os.environ["BENCHMARK_CHALLENGE"],
+              "dataset": os.environ["BENCHMARK_DATASET"],
               "prompt": os.environ["BENCHMARK_PROMPT"],
               "rows": rows,
               "missing_artifacts": missing,
@@ -301,7 +400,9 @@ jobs:
               return f"{value:.2f}"
 
           lines = [
-              "# Asheville Airbnb benchmark",
+              f"# Benchmark: {os.environ['BENCHMARK_CHALLENGE']}",
+              "",
+              f"Dataset: {os.environ['BENCHMARK_DATASET']}",
               "",
               f"Run ID: {os.environ['GHA_RUN_ID']}",
               f"Run attempt: {os.environ['GHA_RUN_ATTEMPT']}",
@@ -349,6 +450,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-asheville-benchmark-${{ github.run_id }}-aggregate
+          name: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-aggregate
           path: gha_runs/aggregate-${{ github.run_id }}
           if-no-files-found: warn
