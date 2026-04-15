@@ -524,6 +524,36 @@ def generate_and_refine(
     return result
 
 
+def _run_copilot_sdk_generation(
+    prompt: str,
+    model_id: str,
+    framework_key: str,
+    data_files: dict[str, str] | None,
+    screenshot: bool,
+    iteration: int,
+) -> tuple[str | None, list[dict[str, object]], bool]:
+    """Run a generation via the Copilot SDK agent (no Docker sandbox)."""
+    from .copilot_agent import run_copilot_generation
+
+    reasoning = _generation_extra_config("copilot_sdk").get("reasoning_effort")
+    code, usage_rows = run_copilot_generation(
+        prompt=prompt,
+        model_id=model_id,
+        framework_key=framework_key,
+        data_files=data_files,
+        screenshot=screenshot,
+        reasoning_effort=reasoning,
+    )
+    if code is None:
+        logger.warning("Iteration %d: Copilot SDK returned no code", iteration)
+    else:
+        logger.info(
+            "Iteration %d: Copilot SDK generated %d chars", iteration, len(code)
+        )
+    # Copilot SDK doesn't produce eval logs, so no token-limit detection
+    return code, usage_rows, False
+
+
 def _run_generation(
     prompt: str,
     agent: str,
@@ -536,7 +566,14 @@ def _run_generation(
     screenshot: bool = False,
     output_path: Path | None = None,
 ) -> tuple[str | None, list[dict[str, object]], bool]:
-    """Run a single generation via Inspect AI and extract the code."""
+    """Run a single generation via Inspect AI (or Copilot SDK) and extract the code."""
+
+    # --- Copilot SDK path: bypass Inspect AI entirely ---
+    if agent == "copilot_sdk":
+        return _run_copilot_sdk_generation(
+            prompt, model_id, framework_key, data_files, screenshot, iteration,
+        )
+
     from inspect_ai import eval as inspect_eval
 
     from .extract import extract_from_log

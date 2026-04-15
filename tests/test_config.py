@@ -58,6 +58,21 @@ class TestResolveModel:
         assert agent == "codex_cli"
         assert model_id == "openai/gpt-5.3-codex"
 
+    def test_copilot_sdk_alias(self):
+        agent, model_id = resolve_model("copilot-claude-sonnet")
+        assert agent == "copilot_sdk"
+        assert model_id == "anthropic/claude-sonnet-4-6"
+
+    def test_copilot_sdk_gpt_alias(self):
+        agent, model_id = resolve_model("copilot-gpt54")
+        assert agent == "copilot_sdk"
+        assert model_id == "openai/gpt-5.4"
+
+    def test_copilot_prefix_model_id(self):
+        agent, model_id = resolve_model("copilot/claude-opus-4-6")
+        assert agent == "copilot_sdk"
+        assert model_id == "claude-opus-4-6"
+
     def test_unknown_raises(self):
         with pytest.raises(ValueError, match="Unknown model"):
             resolve_model("nonexistent-model")
@@ -171,6 +186,23 @@ class TestCheckAPIKey:
         with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}):
             check_api_key("codex_cli")  # should not raise
 
+    def test_copilot_token_missing(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(APIKeyMissingError, match="GitHub token"):
+                check_api_key("copilot_sdk")
+
+    def test_copilot_token_via_gh_token(self):
+        with patch.dict("os.environ", {"GH_TOKEN": "ghp_test"}, clear=True):
+            check_api_key("copilot_sdk")  # should not raise
+
+    def test_copilot_token_via_github_token(self):
+        with patch.dict("os.environ", {"GITHUB_TOKEN": "ghp_test"}, clear=True):
+            check_api_key("copilot_sdk")  # should not raise
+
+    def test_copilot_token_via_copilot_github_token(self):
+        with patch.dict("os.environ", {"COPILOT_GITHUB_TOKEN": "ghp_test"}, clear=True):
+            check_api_key("copilot_sdk")  # should not raise
+
 
 class TestPreflightChecks:
     def test_preflight_checks_docker_first(self):
@@ -178,3 +210,10 @@ class TestPreflightChecks:
         with patch("shinygen.config.shutil.which", return_value=None):
             with pytest.raises(DockerNotAvailableError):
                 preflight_checks("claude_code")
+
+    def test_copilot_sdk_skips_docker_check(self):
+        """Copilot SDK runs on host, no Docker needed."""
+        with patch.dict("os.environ", {"GH_TOKEN": "ghp_test"}, clear=True):
+            with patch("shinygen.config.shutil.which", return_value=None):
+                # Should NOT raise DockerNotAvailableError
+                preflight_checks("copilot_sdk")

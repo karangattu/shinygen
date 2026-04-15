@@ -30,6 +30,15 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "gpt-5.4-nano": ("codex_cli", "openai/gpt-5.4-nano"),
     "codex-gpt53": ("codex_cli", "openai/gpt-5.3-codex"),
     "gpt-5.3-codex": ("codex_cli", "openai/gpt-5.3-codex"),
+    # Copilot SDK — same models routed through GitHub Copilot
+    "copilot-claude-opus": ("copilot_sdk", "anthropic/claude-opus-4-6"),
+    "copilot-claude-sonnet": ("copilot_sdk", "anthropic/claude-sonnet-4-6"),
+    "copilot-claude-sonnet-4-5": ("copilot_sdk", "anthropic/claude-sonnet-4-5"),
+    "copilot-claude-haiku-4-5": ("copilot_sdk", "anthropic/claude-haiku-4-5"),
+    "copilot-gpt54": ("copilot_sdk", "openai/gpt-5.4"),
+    "copilot-gpt54-mini": ("copilot_sdk", "openai/gpt-5.4-mini-2026-03-17"),
+    "copilot-gpt54-nano": ("copilot_sdk", "openai/gpt-5.4-nano"),
+    "copilot-gpt53-codex": ("copilot_sdk", "openai/gpt-5.3-codex"),
 }
 
 # ---------------------------------------------------------------------------
@@ -83,12 +92,14 @@ FRAMEWORK_ALIASES: dict[str, str] = {
 WEB_SEARCH_TOOL_NAME: dict[str, str] = {
     "claude_code": "WebSearch",
     "codex_cli": "web_search",
+    "copilot_sdk": "web_search",  # Copilot CLI has built-in web search
 }
 
 # Agent → skill directory path inside sandbox
 AGENT_SKILLS_DIR: dict[str, str] = {
     "claude_code": ".claude/skills",
     "codex_cli": ".agents/skills",
+    "copilot_sdk": ".copilot/skills",
 }
 
 # Framework → compose file
@@ -131,6 +142,8 @@ def resolve_model(alias: str) -> tuple[str, str]:
     if key in MODEL_ALIASES:
         return MODEL_ALIASES[key]
     # Allow passing a full model ID directly — infer agent from prefix
+    if key.startswith("copilot/"):
+        return ("copilot_sdk", alias.split("/", 1)[1])
     if key.startswith("anthropic/"):
         return ("claude_code", alias)
     if key.startswith("openai/"):
@@ -212,6 +225,19 @@ def check_api_key(agent: str) -> None:
                 "Get your API key from https://platform.openai.com/api-keys and run:\n"
                 "  export OPENAI_API_KEY='sk-...'"
             )
+    elif agent == "copilot_sdk":
+        token = (
+            os.environ.get("COPILOT_GITHUB_TOKEN")
+            or os.environ.get("GH_TOKEN")
+            or os.environ.get("GITHUB_TOKEN")
+        )
+        if not token:
+            raise APIKeyMissingError(
+                "No GitHub token found for Copilot SDK.\n"
+                "Set one of: COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN\n"
+                "The token needs Copilot access. See:\n"
+                "  https://github.com/github/copilot-sdk#authentication"
+            )
 
 
 def preflight_checks(agent: str) -> None:
@@ -219,5 +245,7 @@ def preflight_checks(agent: str) -> None:
 
     Raises DockerNotAvailableError or APIKeyMissingError on failure.
     """
-    check_docker()
+    # Copilot SDK runs on the host, no Docker needed for generation
+    if agent != "copilot_sdk":
+        check_docker()
     check_api_key(agent)
