@@ -1,0 +1,31 @@
+measurement_date,station_name,aqi,aqi_category,pm2_5_ugm3,pm10_ugm3,ozone_ppb,no2_ppb,co_ppm,temperature_f,relative_humidity_pct,wind_speed_mph,wind_direction,weather_condition,health_advisory_issued,wildfire_smoke_flag
+2024-01-01,Airport Corridor,139,Unhealthy for Sensitive Groups,35.4,68.6,89.0,10.1,2.92,88,49,6.2,NE,Partly Cloudy,Yes,No
+2024-01-13,West Hills,58,Moderate,16.3,21.2,51.3,40.2,1.18,62,58,15.7,NW,Clear,No,No
+2024-01-25,University District,102,Unhealthy for Sensitive Groups,20.8,32.1,61.6,53.0,0.83,55,50,14.4,S,Partly Cloudy,Yes,Yes
+2024-02-06,University District,41,Good,7.7,17.2,79.0,60.2,1.72,77,60,15.5,S,Rain,No,No
+2024-02-18,West Hills,160,Unhealthy,40.3,52.6,72.4,40.8,0.2,62,24,22.0,S,Rain,Yes,Yes
+2024-03-01,University District,260,Unhealthy,60.6,86.5,50.7,21.0,3.79,75,84,21.3,NW,Overcast,Yes,No
+2024-03-13,Port/Industrial,135,Unhealthy for Sensitive Groups,28.3,58.6,42.4,46.3,1.17,73,26,10.3,SW,Overcast,Yes,No
+2024-03-25,Airport Corridor,66,Moderate,11.9,26.2,79.0,4.1,3.32,77,74,1.7,SW,Rain,No,No
+2024-04-06,East Residential,206,Unhealthy,50.2,109.8,58.6,60.6,1.72,92,84,3.1,SE,Haze,Yes,No
+2024-04-18,Downtown Core,114,Unhealthy for Sensitive Groups,26.6,32.4,34.6,55.3,0.52,55,41,11.2,S,Rain,Yes,No
+2024-04-30,Port/Industrial,104,Unhealthy for Sensitive Groups,23.8,54.4,51.8,12.8,0.81,86,87,16.5,E,Clear,Yes,No
+2024-05-12,Airport Corridor,257,Unhealthy,61.3,141.6,37.8,4.2,2.79,85,84,19.1,NW,Rain,Yes,No
+2024-05-24,West Hills,129,Unhealthy for Sensitive Groups,29.2,56.0,51.7,23.6,0.8,92,52,12.8,SE,Fog,Yes,Yes
+2024-06-05,West Hills,132,Unhealthy for Sensitive Groups,27.1,49.2,46.6,44.5,3.14,57,85,21.2,E,Rain,Yes,No
+2024-06-17,West Hills,135,Unhealthy for Sensitive Groups,28.2,37.5,25.4,59.5,0.16,57,74,19.2,E,Clear,Yes,No
+2024-06-29,University District,269,Unhealthy,62.0,95.8,47.4,8.9,1.32,91,70,21.0,NW,Rain,Yes,Yes
+2024-07-11,East Residential,219,Unhealthy,49.6,74.7,91.8,49.6,1.71,54,34,10.0,S,Clear,Yes,Yes
+2024-07-23,East Residential,116,Unhealthy for Sensitive Groups,27.6,35.1,49.9,18.9,1.62,91,45,4.2,NE,Rain,Yes,No
+2024-08-04,Airport Corridor,228,Unhealthy,49.8,75.4,28.6,32.1,1.04,64,23,19.8,NW,Overcast,Yes,No
+2024-08-16,East Residential,206,Unhealthy,44.3,57.4,91.1,22.2,3.66,92,54,10.3,S,Partly Cloudy,Yes,No
+2024-08-28,Airport Corridor,285,Unhealthy,67.4,90.2,44.6,22.0,2.69,49,72,6.4,N,Rain,Yes,No
+2024-09-09,Port/Industrial,169,Unhealthy,40.6,96.4,62.9,25.5,2.46,87,54,15.1,E,Haze,Yes,Yes
+2024-09-21,West Hills,297,Unhealthy,71.1,145.1,20.5,26.3,0.59,66,63,16.6,E,Partly Cloudy,Yes,No
+2024-10-03,Airport Corridor,262,Unhealthy,62.3,145.7,55.1,20.6,0.71,78,59,16.6,SW,Clear,Yes,No
+2024-10-15,Port/Industrial,300,Unhealthy,75.6,104.6,81.7,48.2,3.73,83,68,2.4,W,Clear,Yes,No
+2024-10-27,University District,194,Unhealthy,43.6,78.1,67.8,39.7,3.14,71,35,15.0,NW,Clear,Yes,No
+2024-11-08,Airport Corridor,300,Unhealthy,69.7,134.5,34.4,7.9,3.15,92,60,14.5,NE,Partly Cloudy,Yes,Yes
+2024-11-20,Downtown Core,300,Unhealthy,74.4,118.7,25.2,58.1,0.6,77,69,14.9,W,Rain,Yes,No
+2024-12-02,Downtown Core,252,Unhealthy,57.8,135.9,79.7,41.6,3.57,65,26,15.3,SE,Fog,Yes,No
+2024-12-14,University District,300,Unhealthy,74.7,172.7,45.2,59.0,2.49,51,72,6.4,NE,Fog,Yes,Yes

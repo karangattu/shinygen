@@ -1,0 +1,31 @@
+visit_date,hospital,patient_age,chief_complaint,esi_acuity,door_to_provider_min,length_of_stay_hrs,disposition,payer,total_charges_usd,readmit_30day,left_without_being_seen,staff_rn_on_shift,beds_occupied_pct,patient_satisfaction_score
+2024-01-01,UCSF Medical Center,21,Fracture,2,36,5.2,Discharged,Kaiser HMO,36541,Yes,1,4,59.2,2.7
+2024-01-13,CPMC Van Ness,21,Stroke Symptoms,2,91,20.1,Left AMA,Medi-Cal,30239,No,0,16,93.6,4.3
+2024-01-25,Zuckerberg SF General,72,Headache,3,27,7.2,Transferred,Medicare,6878,No,0,9,92.7,3.9
+2024-02-06,UCSF Medical Center,76,Stroke Symptoms,1,56,3.6,Transferred,Kaiser HMO,41335,No,0,15,60.9,4.0
+2024-02-18,Kaiser SF,28,Laceration,1,56,8.9,Transferred,Medi-Cal,25060,No,0,14,68.9,4.8
+2024-03-01,UCSF Medical Center,39,Stroke Symptoms,2,28,13.7,Transferred,Kaiser HMO,37300,No,0,17,89.5,2.3
+2024-03-13,UCSF Medical Center,58,Altered Mental Status,3,16,7.1,Expired,Kaiser HMO,21422,No,1,10,94.3,4.0
+2024-03-25,Zuckerberg SF General,51,Abdominal Pain,2,79,15.8,Expired,Aetna,39042,No,0,7,98.9,2.5
+2024-04-06,St. Mary's Medical,29,Chest Pain,1,27,18.1,Left AMA,Uninsured,4963,No,1,13,98.8,3.6
+2024-04-18,CPMC Van Ness,19,Shortness of Breath,5,42,21.9,Transferred,Medicare,20034,No,0,11,58.1,4.2
+2024-04-30,Kaiser SF,82,Abdominal Pain,5,21,24.6,Transferred,Kaiser HMO,34070,No,0,6,73.3,2.6
+2024-05-12,CPMC Van Ness,18,Overdose,3,70,2.0,Transferred,Blue Cross,16492,Yes,0,18,81.3,2.3
+2024-05-24,St. Mary's Medical,26,Stroke Symptoms,2,24,19.0,Expired,Medi-Cal,18170,No,1,7,96.1,4.3
+2024-06-05,Zuckerberg SF General,57,Altered Mental Status,3,64,25.3,Left AMA,Medicare,17046,No,0,9,58.9,3.7
+2024-06-17,CPMC Van Ness,46,Chest Pain,1,88,3.1,Discharged,Medicare,22454,Yes,0,8,85.4,2.7
+2024-06-29,Zuckerberg SF General,91,Overdose,4,39,22.3,Left AMA,Medi-Cal,6981,Yes,1,9,75.4,3.5
+2024-07-11,UCSF Medical Center,30,Chest Pain,4,51,22.7,Discharged,Medi-Cal,13356,No,1,6,75.3,2.9
+2024-07-23,Zuckerberg SF General,27,Sepsis,5,20,2.8,Expired,Medicare,6912,No,0,10,77.9,2.7
+2024-08-04,St. Mary's Medical,25,Abdominal Pain,4,8,27.6,Transferred,Aetna,19494,No,1,6,65.8,2.7
+2024-08-16,UCSF Medical Center,92,Stroke Symptoms,1,48,3.0,Expired,Aetna,33754,No,0,4,97.4,2.3
+2024-08-28,Zuckerberg SF General,26,Overdose,1,94,24.3,Left AMA,Medicare,38134,No,0,13,61.4,4.0
+2024-09-09,CPMC Van Ness,84,Headache,3,34,19.2,Transferred,Medi-Cal,18207,No,0,14,84.5,3.4
+2024-09-21,UCSF Medical Center,19,Sepsis,5,80,27.9,Discharged,Uninsured,14769,No,0,6,96.3,4.7
+2024-10-03,Zuckerberg SF General,65,Fracture,2,64,23.6,Transferred,Uninsured,35464,Yes,0,18,85.2,4.8
+2024-10-15,Zuckerberg SF General,51,Shortness of Breath,1,78,5.6,Transferred,Uninsured,14603,No,0,14,84.0,2.9
+2024-10-27,St. Mary's Medical,50,Chest Pain,1,89,12.7,Transferred,Medicare,1032,No,0,14,98.2,2.6
+2024-11-08,St. Mary's Medical,88,Altered Mental Status,5,9,4.5,Admitted,Uninsured,3161,No,0,10,63.2,3.0
+2024-11-20,UCSF Medical Center,63,Laceration,2,93,4.2,Expired,Aetna,41475,No,0,17,64.7,4.4
+2024-12-02,Zuckerberg SF General,70,Chest Pain,2,50,22.2,Left AMA,Kaiser HMO,17063,No,0,16,86.8,3.2
+2024-12-14,UCSF Medical Center,78,Laceration,2,66,10.8,Admitted,Medi-Cal,2350,No,1,9,69.4,2.3

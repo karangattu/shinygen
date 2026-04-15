@@ -1,0 +1,31 @@
+station_name,latitude,longitude,neighborhood,network_operator,num_ports,connector_type,status,utilization_pct,avg_session_kwh,sessions_per_day,avg_session_duration_min,revenue_daily_usd,uptime_pct_30day,outage_incidents_90day,user_rating,ev_parking_only,last_inspection_date
+Salesforce Transit Center,37.7894,-122.3966,SoMa/Financial,Tesla Supercharger,10,CCS,Offline,33.8,23.7,41,49,419.75,79.0,3,3.7,Yes,2023-11-13
+Caltrain 4th & King,37.7762,-122.3942,SoMa/Financial,Blink,16,J1772,Online,34.8,38.9,32,43,489.68,74.3,0,3.4,Yes,2023-10-18
+Ferry Building Lot,37.7956,-122.3935,Embarcadero,EVgo,8,CHAdeMO,Online,96.2,42.9,69,31,1361.79,88.8,11,3.2,No,2023-07-23
+Fisherman's Wharf Garage,37.8085,-122.4152,Fisherman's Wharf,Blink,12,CCS,Online,70.2,16.0,11,27,65.96,94.8,4,4.2,No,2023-12-06
+UCSF Mission Bay,37.768,-122.3914,Mission Bay,Electrify America,12,J1772,Offline,50.0,62.6,137,48,3499.83,84.3,0,3.1,Yes,2023-07-16
+Chase Center Garage,37.768,-122.3877,Mission Bay,Tesla Supercharger,4,J1772,Online,25.6,21.8,31,49,213.23,76.0,3,4.7,Yes,2023-11-19
+Moscone Center,37.7839,-122.4013,SoMa/Financial,EVgo,16,NACS,Offline,23.7,29.5,85,42,726.01,78.0,6,4.6,Yes,2024-02-20
+Stonestown Galleria,37.7274,-122.4762,West Portal/Sunset,ChargePoint,8,J1772,Online,75.0,35.5,67,31,814.12,90.2,11,4.3,Yes,2023-11-08
+Westfield SF Centre,37.7843,-122.4067,Union Square,EVgo,10,NACS,Online,77.4,18.3,66,52,571.0,79.1,2,4.8,Yes,2023-10-15
+Union Square Garage,37.788,-122.4074,Union Square,Electrify America,10,NACS,Maintenance,94.5,58.6,29,39,604.63,90.9,3,3.6,Yes,2023-06-02
+SFO International Terminal,37.6213,-122.3789,SFO,Blink,6,J1772,Online,88.4,50.1,112,43,1864.02,83.6,0,3.0,Yes,2024-05-22
+Oakland Airport BART,37.7213,-122.2208,East Bay,EVgo,8,NACS,Online,93.0,66.8,139,47,3549.02,94.4,8,4.0,Yes,2024-02-10
+Emeryville Bay Street,37.8345,-122.2924,East Bay,Electrify America,4,CCS,Online,81.7,18.1,12,43,63.35,80.3,6,4.5,Yes,2023-09-30
+Berkeley Shattuck,37.8715,-122.273,East Bay,EVgo,6,J1772,Online,87.4,62.7,123,31,3230.81,82.8,4,3.8,No,2024-02-18
+Stanford Shopping Center,37.4434,-122.1685,Peninsula,Blink,12,CCS,Online,88.5,62.0,71,25,1381.77,74.1,5,4.6,Yes,2023-12-03
+San Jose Diridon,37.3297,-121.9018,South Bay,Electrify America,16,CHAdeMO,Online,18.3,50.8,44,55,631.22,80.9,0,3.7,Yes,2023-11-29
+Santana Row,37.3206,-121.9494,South Bay,Electrify America,6,CCS,Online,61.9,29.8,119,49,1033.72,93.5,2,3.4,Yes,2024-04-16
+Walnut Creek BART,37.9054,-122.0668,East Bay,Electrify America,6,CHAdeMO,Online,79.3,23.4,55,27,607.45,86.9,8,3.0,No,2024-02-27
+Marin City Hub,37.8726,-122.5149,North Bay,Blink,16,CHAdeMO,Degraded,36.3,46.8,136,37,1987.23,93.5,2,4.4,Yes,2023-09-11
+Sausalito Ferry,37.859,-122.4817,North Bay,Tesla Supercharger,12,NACS,Online,75.7,14.7,58,23,355.04,74.7,2,4.7,Yes,2023-10-08
+Half Moon Bay Downtown,37.4636,-122.4286,Coastside,EVgo,8,J1772,Online,42.8,16.5,60,36,336.73,76.4,1,3.9,Yes,2024-05-02
+Redwood City Caltrain,37.4855,-122.2317,Peninsula,Blink,6,J1772,Online,65.9,31.1,52,32,558.57,95.0,8,3.1,Yes,2023-12-27
+Palo Alto University Ave,37.4459,-122.1598,Peninsula,Electrify America,10,J1772,Online,58.5,62.7,38,28,916.88,99.6,9,3.0,Yes,2023-08-07
+Mountain View Castro St,37.3894,-122.0819,South Bay,Tesla Supercharger,6,NACS,Online,28.4,65.5,91,27,1741.98,96.5,0,4.9,Yes,2023-09-08
+Sunnyvale Murphy Ave,37.376,-122.0288,South Bay,EVgo,10,CHAdeMO,Online,23.8,45.8,53,32,743.8,97.5,11,4.1,Yes,2024-04-01
+Fremont BART,37.5574,-121.9763,East Bay,Electrify America,12,CCS,Online,33.9,57.2,26,33,635.97,78.9,3,4.0,No,2023-11-02
+Hayward City Hall,37.6688,-122.0808,East Bay,ChargePoint,12,NACS,Online,23.7,27.5,109,21,1039.65,77.3,5,3.2,Yes,2023-06-18
+Concord BART,37.973,-122.0292,East Bay,ChargePoint,6,CHAdeMO,Degraded,39.2,63.8,42,40,1059.65,80.2,6,3.1,Yes,2023-08-25
+Napa Downtown,38.2975,-122.2869,North Bay,ChargePoint,6,J1772,Offline,53.7,65.0,12,38,254.53,88.9,6,3.3,Yes,2024-04-15
+Santa Rosa SMART Station,38.4404,-122.7141,North Bay,Blink,4,CCS,Online,31.9,26.0,90,45,1011.13,74.0,1,4.3,Yes,2023-09-11

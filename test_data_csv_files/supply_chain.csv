@@ -1,0 +1,31 @@
+po_date,sku_name,distribution_center,retailer,carrier,units_ordered,units_received,fill_rate_pct,transit_days_actual,transit_days_promised,on_time_delivery,freight_cost_usd,damage_claims_usd,out_of_stock_days,shelf_velocity_units_per_day,invoice_accuracy_pct
+2024-01-01,Olive Oil Extra Virgin 1L,Dallas DC,Whole Foods,XPO Logistics,2486,2397,96.4,6,5,No,1235.86,109.71,9,84.9,91.2
+2024-01-12,Oat Flour 3lb,Columbus DC,Costco,FedEx Freight,1088,1012,93.0,4,4,Yes,184.66,377.79,3,25.5,96.5
+2024-01-23,Oat Flour 3lb,Columbus DC,Whole Foods,GEODIS,213,197,92.5,7,3,No,82.63,278.62,1,64.5,91.6
+2024-02-03,Vegan Protein Bar 12pk,Dallas DC,Costco,J.B. Hunt,2733,2563,93.8,4,4,Yes,553.41,279.27,6,61.0,98.8
+2024-02-14,Coconut Aminos 10oz,Dallas DC,Target,Ryder,4862,4708,96.8,4,2,No,2226.19,254.8,5,43.2,93.3
+2024-02-25,Grass-Fed Butter 1lb,Dallas DC,Costco,FedEx Freight,1950,1820,93.3,4,3,No,515.06,343.74,3,60.6,90.7
+2024-03-07,Almond Flour 5lb,Columbus DC,Costco,XPO Logistics,1831,1794,98.0,1,2,Yes,578.28,372.18,9,20.5,96.4
+2024-03-18,Organic Oat Milk 32oz,Fresno DC,Sprouts,J.B. Hunt,4249,4045,95.2,2,3,Yes,831.24,402.35,8,43.1,94.7
+2024-03-29,Olive Oil Extra Virgin 1L,Atlanta DC,Costco,GEODIS,1194,1136,95.1,2,5,Yes,631.05,374.4,9,72.5,98.7
+2024-04-09,Bone Broth 32oz,Columbus DC,Kroger,J.B. Hunt,3695,3415,92.4,4,3,No,1777.82,116.47,8,44.8,90.9
+2024-04-20,Almond Flour 5lb,Dallas DC,Kroger,GEODIS,3803,3764,99.0,6,4,No,1916.72,33.84,2,23.6,96.3
+2024-05-01,Oat Flour 3lb,Atlanta DC,Sprouts,Ryder,1952,1936,99.2,4,5,Yes,286.5,349.81,6,80.0,95.0
+2024-05-12,Bone Broth 32oz,Fresno DC,Kroger,GEODIS,360,333,92.5,7,5,No,159.84,358.45,6,49.3,96.8
+2024-05-23,Vegan Protein Bar 12pk,Columbus DC,Whole Foods,Ryder,2006,1882,93.8,2,4,Yes,530.66,285.24,6,64.9,98.1
+2024-06-03,Vegan Protein Bar 12pk,Atlanta DC,Costco,XPO Logistics,1245,1166,93.7,5,2,No,194.34,180.02,7,19.4,91.1
+2024-06-14,Oat Flour 3lb,Columbus DC,Kroger,Ryder,2881,2827,98.1,4,4,Yes,658.24,34.4,0,67.0,88.6
+2024-06-25,Organic Oat Milk 32oz,Fresno DC,Target,J.B. Hunt,3066,3009,98.1,6,2,No,1474.34,260.96,3,14.8,96.0
+2024-07-06,Oat Flour 3lb,Portland DC,Costco,FedEx Freight,4820,4709,97.7,4,4,Yes,2575.84,301.71,2,85.0,89.3
+2024-07-17,Vegan Protein Bar 12pk,Portland DC,Whole Foods,FedEx Freight,410,391,95.4,5,5,Yes,170.96,263.44,1,62.6,91.6
+2024-07-28,Oat Flour 3lb,Atlanta DC,Sprouts,GEODIS,1191,1119,94.0,7,2,No,178.23,271.97,0,75.4,97.9
+2024-08-08,Cold Brew Concentrate 48oz,Columbus DC,Target,FedEx Freight,1064,1009,94.8,3,5,Yes,569.4,113.43,8,69.1,93.6
+2024-08-19,Grass-Fed Butter 1lb,Dallas DC,Sprouts,J.B. Hunt,2398,2316,96.6,7,3,No,1061.61,239.34,6,32.4,93.9
+2024-08-30,Oat Flour 3lb,Dallas DC,Kroger,GEODIS,2862,2816,98.4,4,3,No,1426.81,294.5,4,50.8,94.2
+2024-09-10,Bone Broth 32oz,Atlanta DC,Target,Ryder,1765,1744,98.8,2,5,Yes,702.01,206.14,0,12.0,90.7
+2024-09-21,Bone Broth 32oz,Atlanta DC,Costco,GEODIS,2193,2115,96.4,6,4,No,664.41,313.29,5,33.7,93.4
+2024-10-02,Almond Flour 5lb,Dallas DC,Whole Foods,FedEx Freight,2711,2647,97.6,2,2,Yes,1433.79,289.87,3,22.3,93.8
+2024-10-13,Almond Flour 5lb,Dallas DC,Target,GEODIS,4497,4192,93.2,3,2,No,886.63,5.94,8,14.8,88.5
+2024-10-24,Bone Broth 32oz,Fresno DC,Whole Foods,FedEx Freight,646,611,94.6,3,3,Yes,156.5,201.06,5,19.6,88.6
+2024-11-04,Vegan Protein Bar 12pk,Columbus DC,Whole Foods,FedEx Freight,4113,4055,98.6,7,2,No,1606.79,22.52,2,72.2,99.4
+2024-11-15,Sparkling Water 12pk,Atlanta DC,Costco,J.B. Hunt,897,866,96.5,1,5,Yes,406.83,159.76,7,29.1,95.1
