@@ -3,6 +3,7 @@
 from shinygen.prompts import (
     build_refinement_prompt,
     build_system_prompt,
+    build_truncation_retry_prompt,
     build_user_prompt,
 )
 
@@ -13,6 +14,11 @@ class TestBuildSystemPrompt:
         assert "Python" in prompt
         assert "app.py" in prompt
         assert "R" in prompt  # "DO NOT use R" should be in there
+
+    def test_python_prompt_prioritizes_writing_over_recon(self):
+        prompt = build_system_prompt("shiny_python")
+        assert "package version checks" in prompt
+        assert "write the best complete working app.py immediately" in prompt
 
     def test_r_prompt(self):
         prompt = build_system_prompt("shiny_r")
@@ -50,6 +56,17 @@ class TestBuildUserPrompt:
     def test_contains_framework_label(self):
         prompt = build_user_prompt("Make a chart", "shiny_python")
         assert "Shiny for Python" in prompt
+
+
+class TestBuildTruncationRetryPrompt:
+    def test_focuses_retry_on_direct_artifact_write(self):
+        prompt = build_truncation_retry_prompt(
+            "Build a dashboard for penguins",
+            "shiny_python",
+        )
+        assert "previous attempt hit the output token limit" in prompt
+        assert "/home/user/project/app.py" in prompt
+        assert "Do not repeat reconnaissance" in prompt
 
 
 class TestBuildRefinementPrompt:

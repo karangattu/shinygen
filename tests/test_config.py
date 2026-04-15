@@ -90,6 +90,12 @@ class TestFrameworks:
         assert fw["primary_artifact"] == "app.R"
         assert fw["language"] == "R"
 
+    def test_r_install_command_includes_visual_qa_runtime_packages(self):
+        install_command = FRAMEWORKS["shiny_r"]["install_command"]
+
+        assert '"scales"' in install_command
+        assert '"thematic"' in install_command
+
     def test_all_frameworks_have_required_keys(self):
         required = {
             "label",

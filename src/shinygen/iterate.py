@@ -8,6 +8,7 @@ import json
 import logging
 import shutil
 import tempfile
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -115,6 +116,52 @@ def _extract_generation_usage_rows(log: "EvalLog") -> list[dict[str, object]]:
         )
 
     return rows
+
+
+def _generation_extra_config(agent: str) -> dict[str, object]:
+    """Return provider-specific generation settings."""
+    if agent == "claude_code":
+        # Medium reasoning keeps Claude 4.6 on adaptive thinking without
+        # pushing generation into long reconnaissance-heavy runs.
+        return {"reasoning_effort": "medium"}
+    return {}
+
+
+def _log_hit_output_token_limit(log_path: Path | None) -> bool:
+    """Return True when an eval log shows a token-limit continuation prompt."""
+    if log_path is None or not log_path.exists():
+        return False
+
+    try:
+        with zipfile.ZipFile(log_path) as archive:
+            sample_files = sorted(
+                name
+                for name in archive.namelist()
+                if name.startswith("samples/") and name.endswith(".json")
+            )
+
+            for sample_file in sample_files:
+                sample = json.loads(archive.read(sample_file))
+                for message in sample.get("messages", []):
+                    content = message.get("content")
+                    if isinstance(content, str):
+                        texts = [content]
+                    elif isinstance(content, list):
+                        texts = [
+                            part.get("text", "")
+                            for part in content
+                            if isinstance(part, dict)
+                            and isinstance(part.get("text"), str)
+                        ]
+                    else:
+                        texts = []
+
+                    if any("Output token limit hit" in text for text in texts):
+                        return True
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        logger.debug("Failed to inspect eval log %s for token limits: %s", log_path, exc)
+
+    return False
 
 
 def _latest_path(paths: list[Path]) -> Path | None:
@@ -258,13 +305,17 @@ def generate_and_refine(
         result.iterations = iteration
 
         # --- Step 1: Generate (with retry on no-code-extracted) ---
+        from .prompts import build_truncation_retry_prompt
+
         code: str | None = None
         generation_usage_rows: list[dict[str, object]] = []
         max_retries = 2
+        prompt_for_attempt = current_prompt
+        hit_output_token_limit = False
         for attempt in range(1, max_retries + 1):
             with Timer() as gen_timer:
-                code, generation_usage_rows = _run_generation(
-                    current_prompt,
+                code, generation_usage_rows, hit_output_token_limit = _run_generation(
+                    prompt_for_attempt,
                     agent,
                     model_id,
                     framework_key,
@@ -290,6 +341,15 @@ def generate_and_refine(
                 )
             if code is not None:
                 break
+            if hit_output_token_limit and attempt < max_retries:
+                logger.warning(
+                    "Iteration %d: Output token limit hit before artifact creation; retrying with direct-write prompt",
+                    iteration,
+                )
+                prompt_for_attempt = build_truncation_retry_prompt(
+                    current_prompt,
+                    framework_key,
+                )
             if attempt < max_retries:
                 logger.warning(
                     "Iteration %d: No code extracted (attempt %d/%d), retrying...",
@@ -303,6 +363,11 @@ def generate_and_refine(
             if iteration == max_iterations:
                 result.error = "Failed to extract app code from any iteration"
                 break
+            if hit_output_token_limit:
+                current_prompt = build_truncation_retry_prompt(
+                    current_prompt,
+                    framework_key,
+                )
             continue
 
         logger.info("Iteration %d: Extracted %d chars of code", iteration, len(code))
@@ -470,7 +535,7 @@ def _run_generation(
     iteration: int,
     screenshot: bool = False,
     output_path: Path | None = None,
-) -> tuple[str | None, list[dict[str, object]]]:
+) -> tuple[str | None, list[dict[str, object]], bool]:
     """Run a single generation via Inspect AI and extract the code."""
     from inspect_ai import eval as inspect_eval
 
@@ -497,9 +562,7 @@ def _run_generation(
         # Use reasoning_effort for Anthropic Claude 4.6+ models so the
         # provider sends thinking.type=adaptive instead of the deprecated
         # thinking.type=enabled.
-        extra_config: dict[str, object] = {}
-        if agent == "claude_code":
-            extra_config["reasoning_effort"] = "high"
+        extra_config = _generation_extra_config(agent)
 
         logs = inspect_eval(
             task,
@@ -510,7 +573,7 @@ def _run_generation(
 
         if not logs:
             logger.warning("Iteration %d: No eval logs produced", iteration)
-            return None, []
+            return None, [], False
 
         log = logs[0]
         location = getattr(log, "location", None)
@@ -530,25 +593,25 @@ def _run_generation(
                         iteration,
                         len(code),
                     )
-                    return code, generation_usage_rows
+                    return code, generation_usage_rows, False
 
         # Strategy 2: Extract from eval log messages (fallback).
         if log_path:
             code_map = extract_from_log(log_path)
             if code_map:
                 if len(code_map) == 1:
-                    return next(iter(code_map.values())), generation_usage_rows
+                    return next(iter(code_map.values())), generation_usage_rows, False
                 if "shinygen/generate" in code_map:
-                    return code_map["shinygen/generate"], generation_usage_rows
-                return next(iter(code_map.values())), generation_usage_rows
+                    return code_map["shinygen/generate"], generation_usage_rows, False
+                return next(iter(code_map.values())), generation_usage_rows, False
 
         logger.warning("Iteration %d: No code extracted", iteration)
 
-        return None, generation_usage_rows
+        return None, generation_usage_rows, _log_hit_output_token_limit(log_path)
 
     except Exception as exc:
         logger.error("Generation failed in iteration %d: %s", iteration, exc)
-        return None, []
+        return None, [], False
     finally:
         if output_path is not None:
             copied_agent_screenshot = _copy_agent_screenshot_artifact(

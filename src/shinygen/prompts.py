@@ -119,6 +119,16 @@ def build_system_prompt(
         template = SYSTEM_PROMPT_PYTHON
 
     prompt = template.format(install_command=fw["install_command"])
+    artifact = fw["primary_artifact"]
+
+    prompt += (
+        "\n\nEXECUTION PRIORITY:\n"
+        "- Do not spend time on package version checks, repeated filesystem "
+        "exploration, or broad reconnaissance.\n"
+        f"- Read only the files you need, then create /home/user/project/{artifact} early.\n"
+        f"- If time or output tokens are running low, stop analysis and write "
+        f"the best complete working {artifact} immediately.\n"
+    )
 
     if screenshot:
         if framework_key == "shiny_r":
@@ -157,6 +167,30 @@ def build_user_prompt(
         f"IMPORTANT: Build this using {label}. "
         f"Write {language} code and save it as `{artifact}`. "
         f"The app must be runnable with: {fw['run_command'].format(port=8000)}"
+    )
+
+
+def build_truncation_retry_prompt(
+    user_prompt: str,
+    framework_key: str,
+) -> str:
+    """Build a focused retry prompt after an output-token truncation."""
+    if "previous attempt hit the output token limit" in user_prompt:
+        return user_prompt
+
+    fw = FRAMEWORKS[framework_key]
+    artifact = fw["primary_artifact"]
+    label = fw["label"]
+    language = fw["language"]
+
+    return (
+        f"{user_prompt}\n\n"
+        "IMPORTANT: The previous attempt hit the output token limit before "
+        f"producing {artifact}. Do not repeat reconnaissance, package version "
+        "checks, or skill-file exploration. Immediately write a complete "
+        f"working {artifact} to /home/user/project/{artifact} using {label} "
+        f"and {language} code. If you need data context, inspect only the "
+        f"required columns or a small sample, then finish {artifact}."
     )
 
 

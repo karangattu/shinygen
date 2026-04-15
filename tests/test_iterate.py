@@ -9,6 +9,7 @@ from shinygen.iterate import (
     GenerationResult,
     _copy_agent_screenshot_artifact,
     _extract_generation_usage_rows,
+    _generation_extra_config,
     _write_run_summary,
 )
 
@@ -73,6 +74,16 @@ class TestExtractGenerationUsageRows:
         rows = _extract_generation_usage_rows(MockLog())
         assert len(rows) == 1
         assert rows[0]["cost_override"] is None
+
+
+class TestGenerationExtraConfig:
+    def test_claude_generation_uses_medium_reasoning_effort(self):
+        assert _generation_extra_config("claude_code") == {
+            "reasoning_effort": "medium"
+        }
+
+    def test_codex_generation_uses_default_config(self):
+        assert _generation_extra_config("codex_cli") == {}
 
 
 class TestWriteRunSummary:

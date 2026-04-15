@@ -41,6 +41,16 @@ class TestLoadDefaultSkills:
         assert "visually verify" in skills[0].description.lower()
         assert "screenshot" in skills[0].instructions.lower()
 
+    def test_visual_qa_skill_includes_r_screenshot_workflow(self):
+        skills = load_visual_qa_skills()
+
+        assert len(skills) == 1
+        instructions = skills[0].instructions
+
+        assert "nohup Rscript -e \"shiny::runApp('app.R', port=8000, launch.browser=FALSE)\"" in instructions
+        assert "python3 /home/user/project/.tools/screenshot_helper.py" in instructions
+        assert "pkill -f \"Rscript\" || true" in instructions
+
 
 class TestBuildGenerationTask:
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
