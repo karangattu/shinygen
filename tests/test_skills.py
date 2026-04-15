@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from shinygen.config import SANDBOX_TIME_LIMIT_BY_FRAMEWORK
 from shinygen.generate import build_generation_task
 from shinygen.skills import load_default_skills, load_visual_qa_skills
 
@@ -87,3 +88,38 @@ class TestBuildGenerationTask:
 
         sample_files = task.dataset.samples[0].files or {}
         assert sample_files == {"sales.csv": "x,y\n1,2\n"}
+
+    @pytest.mark.parametrize(
+        ("framework_key", "expected_limit"),
+        [
+            (
+                "shiny_python",
+                SANDBOX_TIME_LIMIT_BY_FRAMEWORK["shiny_python"],
+            ),
+            ("shiny_r", SANDBOX_TIME_LIMIT_BY_FRAMEWORK["shiny_r"]),
+        ],
+    )
+    def test_applies_framework_specific_time_limits(
+        self,
+        tmp_path,
+        monkeypatch,
+        framework_key,
+        expected_limit,
+    ):
+        sentinel_solver = object()
+
+        def fake_solver(**kwargs):
+            return sentinel_solver
+
+        monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="codex_cli",
+            framework_key=framework_key,
+            docker_context_dir=tmp_path,
+        )
+
+        assert task.solver is sentinel_solver
+        assert task.time_limit == expected_limit
+        assert task.working_limit == expected_limit
