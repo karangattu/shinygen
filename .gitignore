@@ -38,5 +38,7 @@ eval_logs/
 # Test / scratch outputs
 test_output/
 batch_outputs/
-/README_files
 /test_gt3_files
+/shinygen-asheville-benchmark-24174772989-aggregate
+/shinygen-ev-charging-stations-24437537017-aggregate
+/shinygen-benchmark-apr-9
