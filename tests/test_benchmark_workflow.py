@@ -74,6 +74,13 @@ def test_benchmark_workflow_installs_scales_for_r_runs():
     assert '"scales", "thematic", "htmltools", "htmlwidgets"' in workflow
 
 
+def test_benchmark_workflow_runs_both_opus_generations_for_comparison():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert 'name: claude-opus-4-6' in workflow
+    assert 'name: claude-opus-4-7' in workflow
+
+
 def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
     batch_config = json.loads(BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
 

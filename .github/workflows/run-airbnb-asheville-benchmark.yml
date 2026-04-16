@@ -119,12 +119,14 @@ jobs:
           - idx: "01"
             name: claude-opus-4-6
           - idx: "02"
-            name: claude-sonnet-4-6
+            name: claude-opus-4-7
           - idx: "03"
-            name: gpt-5.4
+            name: claude-sonnet-4-6
           - idx: "04"
-            name: gpt-5.4-mini
+            name: gpt-5.4
           - idx: "05"
+            name: gpt-5.4-mini
+          - idx: "06"
             name: gpt-5.4-nano
     env:
       BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
