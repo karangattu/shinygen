@@ -321,7 +321,7 @@ Create a JSON config file. Each object is one job — same keys as the Python AP
     "output_dir": "./batch/sonnet",
     "csv_file": "./test_data_csv_files/trials_short_50.csv",
     "screenshot": true,
-    "judge_model": "claude-sonnet",
+        "judge_model": "openai/gpt-5.4-mini-2026-03-17",
     "max_iterations": 3
   },
   { "model": "gpt54",       "output_dir": "./batch/gpt54", "..." : "same prompt/settings" },
@@ -358,7 +358,7 @@ results = shinygen.batch([
         "output_dir": "./batch/sonnet",
         "data_csv": "./test_data_csv_files/trials_short_50.csv",
         "screenshot": True,
-        "judge_model": "claude-sonnet",
+        "judge_model": "openai/gpt-5.4-mini-2026-03-17",
     },
     # Add more jobs with different models/prompts...
 ])
