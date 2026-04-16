@@ -10,6 +10,10 @@ class TestGetPricing:
         assert isinstance(result, tuple)
         assert len(result) == 2
 
+    def test_new_claude_opus_release_returns_expected_price(self):
+        result = get_pricing("anthropic/claude-opus-4-7")
+        assert result == (5.00, 25.00)
+
     def test_unknown_model_returns_none(self):
         result = get_pricing("unknown/mystery-model")
         assert result is None

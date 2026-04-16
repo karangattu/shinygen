@@ -17,7 +17,8 @@ PACKAGE_DIR = Path(__file__).parent
 # ---------------------------------------------------------------------------
 
 MODEL_ALIASES: dict[str, tuple[str, str]] = {
-    "claude-opus": ("claude_code", "anthropic/claude-opus-4-6"),
+    "claude-opus": ("claude_code", "anthropic/claude-opus-4-7"),
+    "claude-opus-4-7": ("claude_code", "anthropic/claude-opus-4-7"),
     "claude-opus-4-6": ("claude_code", "anthropic/claude-opus-4-6"),
     "claude-sonnet": ("claude_code", "anthropic/claude-sonnet-4-6"),
     "claude-sonnet-4-6": ("claude_code", "anthropic/claude-sonnet-4-6"),
