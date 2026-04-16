@@ -391,7 +391,7 @@ import polars as pl
 models = pl.DataFrame({
     "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
     "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI"],
-    "Model ID": ["`claude-opus-4-6`", "`claude-sonnet-4-6`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`"],
+    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`"],
     "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI"],
 })
 

@@ -17,7 +17,8 @@ PACKAGE_DIR = Path(__file__).parent
 # ---------------------------------------------------------------------------
 
 MODEL_ALIASES: dict[str, tuple[str, str]] = {
-    "claude-opus": ("claude_code", "anthropic/claude-opus-4-6"),
+    "claude-opus": ("claude_code", "anthropic/claude-opus-4-7"),
+    "claude-opus-4-7": ("claude_code", "anthropic/claude-opus-4-7"),
     "claude-opus-4-6": ("claude_code", "anthropic/claude-opus-4-6"),
     "claude-sonnet": ("claude_code", "anthropic/claude-sonnet-4-6"),
     "claude-sonnet-4-6": ("claude_code", "anthropic/claude-sonnet-4-6"),
@@ -117,6 +118,12 @@ DEFAULT_MAX_ITERATIONS = 3
 DEFAULT_QUALITY_THRESHOLD = 7.0
 SANDBOX_WORK_DIR = "/home/user/project"
 SANDBOX_TIME_LIMIT = 10 * 60  # 10 minutes
+# Shiny for R generations are generally slower due heavier startup and
+# package/runtime validation, so give them a larger execution budget.
+SANDBOX_TIME_LIMIT_BY_FRAMEWORK: dict[str, int] = {
+    "shiny_python": SANDBOX_TIME_LIMIT,
+    "shiny_r": 20 * 60,
+}
 BASE_PORT = 18801
 STARTUP_TIMEOUT = 25
 PAGE_LOAD_WAIT = 7
@@ -131,6 +138,11 @@ def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         return s.getsockname()[1]
+
+
+def sandbox_time_limit_for_framework(framework_key: str) -> int:
+    """Return sandbox time limit (seconds) for a framework."""
+    return SANDBOX_TIME_LIMIT_BY_FRAMEWORK.get(framework_key, SANDBOX_TIME_LIMIT)
 
 
 def resolve_model(alias: str) -> tuple[str, str]:

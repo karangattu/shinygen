@@ -247,7 +247,7 @@ Each per-model artifact includes generated app outputs, `eval_logs/`, `run.log`,
 
 | Alias | Agent | Model ID |
 |-------|-------|----------|
-| `claude-opus` | Claude Code | `anthropic/claude-opus-4-6` |
+| `claude-opus` | Claude Code | `anthropic/claude-opus-4-7` |
 | `claude-sonnet` | Claude Code | `anthropic/claude-sonnet-4-6` |
 | `gpt54` | Codex CLI | `openai/gpt-5.4` |
 | `gpt54-mini` | Codex CLI | `openai/gpt-5.4-mini-2026-03-17` |

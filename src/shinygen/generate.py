@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 from .config import (
     FRAMEWORK_COMPOSE,
     FRAMEWORKS,
-    SANDBOX_TIME_LIMIT,
     SANDBOX_WORK_DIR,
+    sandbox_time_limit_for_framework,
 )
 from .prompts import build_system_prompt, build_user_prompt
 from .validation import validate_framework_artifact
@@ -327,11 +327,13 @@ def build_generation_task(
             skills=resolved_skills or None,
         )
 
+    time_limit = sandbox_time_limit_for_framework(framework_key)
+
     return Task(
         dataset=dataset,
         solver=solver,
         scorer=app_created_scorer(),
         sandbox=("docker", str(docker_context_dir / compose_file)),
-        time_limit=SANDBOX_TIME_LIMIT,
-        working_limit=SANDBOX_TIME_LIMIT,
+        time_limit=time_limit,
+        working_limit=time_limit,
     )
