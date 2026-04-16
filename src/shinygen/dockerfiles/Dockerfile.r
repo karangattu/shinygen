@@ -7,6 +7,7 @@ FROM rocker/r-ver:4.4.2
 # Includes build tooling (cmake, pkg-config) required by recent CRAN packages
 # such as `fs` (libuv) and geospatial stack deps (gdal, udunits, proj, geos)
 # required by leaflet -> sf -> s2/units/terra.
+# and gh CLI (used by codex for GitHub OAuth — avoids OPENAI_API_KEY)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -34,6 +35,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
     libxrandr2 libgbm1 libpango-1.0-0 libcairo2 \
     libasound2t64 libnspr4 libdbus-1-3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y gh \
+    && gh extension install github/copilot-cli --force \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Pre-install R packages
@@ -58,7 +68,8 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     itables \
     htmltools \
     shinywidgets \
-    playwright
+    playwright \
+    github-copilot-sdk
 
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
 RUN playwright install chromium

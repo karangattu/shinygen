@@ -8,3 +8,7 @@ services:
     init: true
     volumes:
       - ./results:/output
+    environment:
+      # Route claude-code / codex through GitHub Copilot (avoids direct API keys)
+      # Accepts GH_TOKEN, GITHUB_TOKEN, or COPILOT_GITHUB_TOKEN
+      - COPILOT_GITHUB_TOKEN

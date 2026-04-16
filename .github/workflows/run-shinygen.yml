@@ -18,6 +18,10 @@ on:
           - gpt54
           - gpt54-mini
           - codex-gpt53
+          - copilot-claude-opus
+          - copilot-claude-sonnet
+          - copilot-gpt54
+          - copilot-gpt54-mini
       framework:
         description: "Target framework"
         required: true
@@ -70,6 +74,9 @@ jobs:
     timeout-minutes: 90
     env:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      COPILOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Direct API keys — only required when NOT using copilot_sdk models
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
@@ -81,21 +88,28 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate required API key secrets
+      - name: Validate required secrets for non-copilot models
         shell: bash
         run: |
           set -euo pipefail
+          # Models starting with "copilot-" route through GitHub Copilot via GH_TOKEN
+          # and do NOT require direct ANTHROPIC_API_KEY / OPENAI_API_KEY
+          model="${{ inputs.model }}"
+          if [[ "$model" == copilot-* ]]; then
+            echo "Using copilot model — GH_TOKEN is sufficient, skipping direct API key check."
+            exit 0
+          fi
           missing=0
           if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-            echo "Missing required secret: ANTHROPIC_API_KEY" >&2
+            echo "Missing required secret: ANTHROPIC_API_KEY (needed for model: $model)" >&2
             missing=1
           fi
           if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-            echo "Missing required secret: OPENAI_API_KEY" >&2
+            echo "Missing required secret: OPENAI_API_KEY (needed for model: $model)" >&2
             missing=1
           fi
           if [[ "${missing}" -ne 0 ]]; then
-            echo "Configure both repository secrets before running this workflow." >&2
+            echo "For copilot- models, no API key secrets are required." >&2
             exit 1
           fi
 
