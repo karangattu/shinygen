@@ -4,7 +4,14 @@
 FROM rocker/r-ver:4.4.2
 
 # System deps for R packages, Python, and Chromium (Playwright)
+# Includes build tooling (cmake, pkg-config) required by recent CRAN packages
+# such as `fs` (libuv) and geospatial stack deps (gdal, udunits, proj, geos)
+# required by leaflet -> sf -> s2/units/terra.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    git \
     python3 \
     python3-pip \
     python3-venv \
@@ -18,6 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg-dev \
     libharfbuzz-dev \
     libfribidi-dev \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    libudunits2-dev \
+    libsqlite3-dev \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
     libxrandr2 libgbm1 libpango-1.0-0 libcairo2 \
@@ -30,7 +42,7 @@ RUN Rscript -e ' \
         "shiny", "bslib", "bsicons", \
         "ggplot2", "dplyr", "readr", "tidyr", "stringr", "lubridate", \
         "plotly", "DT", "leaflet", \
-        "thematic", "htmltools", "htmlwidgets" \
+        "scales", "thematic", "htmltools", "htmlwidgets" \
     ), repos = "https://cloud.r-project.org") \
 '
 

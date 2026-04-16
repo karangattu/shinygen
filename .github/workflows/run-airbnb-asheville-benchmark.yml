@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BENCHMARK_JUDGE_MODEL: anthropic/claude-sonnet-4-6
+  BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
 
@@ -193,13 +193,37 @@ jobs:
               sudo apt-get install -y r-base
             fi
 
+            # System libraries required by R packages used by generated apps
+            # (cmake/build-essential for libuv builds in `fs`, and the geo
+            # stack for leaflet -> sf -> s2/units/terra). Without these, host
+            # screenshot runs fail to load shiny/leaflet.
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends \
+              build-essential \
+              cmake \
+              pkg-config \
+              libcurl4-openssl-dev \
+              libssl-dev \
+              libxml2-dev \
+              libfontconfig1-dev \
+              libfreetype6-dev \
+              libharfbuzz-dev \
+              libfribidi-dev \
+              libgdal-dev \
+              libgeos-dev \
+              libproj-dev \
+              libudunits2-dev \
+              libsqlite3-dev
+
             export R_LIBS_USER="${HOME}/R/library"
             mkdir -p "${R_LIBS_USER}"
             echo "R_LIBS_USER=${R_LIBS_USER}" >> "${GITHUB_ENV}"
 
             Rscript -e 'install.packages(c(
               "shiny", "bslib", "bsicons", "ggplot2", "dplyr", "readr",
-              "plotly", "DT", "leaflet"
+              "tidyr", "stringr", "lubridate",
+              "plotly", "DT", "leaflet",
+              "scales", "thematic", "htmltools", "htmlwidgets"
             ), repos = "https://cloud.r-project.org")'
           fi
 

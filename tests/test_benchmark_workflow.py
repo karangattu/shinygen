@@ -1,5 +1,6 @@
 """Static checks for the benchmark GitHub Actions workflow."""
 
+import json
 from pathlib import Path
 
 
@@ -9,6 +10,8 @@ WORKFLOW_PATH = (
     / "workflows"
     / "run-airbnb-asheville-benchmark.yml"
 )
+
+BATCH_CONFIG_PATH = Path(__file__).resolve().parents[1] / "batch.json"
 
 
 def test_benchmark_workflow_covers_python_and_r_with_visual_checks():
@@ -57,3 +60,23 @@ def test_benchmark_workflow_uses_generic_benchmark_metadata():
     assert 'shinygen-${{ needs.prepare.outputs.benchmark_slug }}' in workflow
     assert 'benchmark": os.environ["BENCHMARK_CHALLENGE"]' in workflow
     assert '# Benchmark:' in workflow
+
+
+def test_benchmark_workflow_pins_gpt54_mini_judge_model():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert 'BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17' in workflow
+
+
+def test_benchmark_workflow_installs_scales_for_r_runs():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert '"scales", "thematic", "htmltools", "htmlwidgets"' in workflow
+
+
+def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
+    batch_config = json.loads(BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
+
+    assert batch_config
+    for entry in batch_config:
+        assert entry["judge_model"] == "openai/gpt-5.4-mini-2026-03-17"
