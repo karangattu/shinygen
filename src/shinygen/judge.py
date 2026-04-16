@@ -387,6 +387,11 @@ def _judge_with_openai(
 
     client = openai.OpenAI()
     model_name = model.removeprefix("openai/")
+    token_limit_arg = (
+        {"max_completion_tokens": 2048}
+        if model_name.startswith("gpt-5")
+        else {"max_tokens": 2048}
+    )
 
     user_text = _build_judge_message(code, screenshot_paths, user_prompt)
 
@@ -408,7 +413,7 @@ def _judge_with_openai(
 
     response = client.chat.completions.create(
         model=model_name,
-        max_tokens=2048,
+        **token_limit_arg,
         messages=[
             {"role": "system", "content": JUDGE_SYSTEM},
             {"role": "user", "content": content},

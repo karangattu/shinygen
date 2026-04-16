@@ -1,12 +1,15 @@
 """Tests for shinygen.judge"""
 
 import json
+import sys
+import types
 
 from shinygen.judge import (
     CRITERIA,
     JUDGE_SYSTEM,
     JudgeResult,
     _build_judge_message,
+    _judge_with_openai,
     parse_judge_response,
 )
 
@@ -102,3 +105,56 @@ class TestJudgePrompt:
         assert "good UI design practices" in message
         assert "design principle" in message
         assert "lower confidence" in message
+
+
+class TestOpenAIJudgeRequest:
+    def test_gpt5_uses_max_completion_tokens(self, monkeypatch):
+        captured: dict[str, object] = {}
+
+        class FakeUsage:
+            prompt_tokens = 123
+            completion_tokens = 45
+
+        class FakeMessage:
+            content = json.dumps(
+                {
+                    "requirement_fidelity": {"score": 7, "rationale": "Good"},
+                    "code_maintainability": {"score": 7, "rationale": "Clean"},
+                    "visual_ux_quality": {"score": 7, "rationale": "Solid"},
+                    "code_robustness": {"score": 7, "rationale": "Robust"},
+                }
+            )
+
+        class FakeChoice:
+            message = FakeMessage()
+
+        class FakeResponse:
+            choices = [FakeChoice()]
+            usage = FakeUsage()
+
+        class FakeCompletions:
+            def create(self, **kwargs):
+                captured.update(kwargs)
+                return FakeResponse()
+
+        class FakeChat:
+            completions = FakeCompletions()
+
+        class FakeOpenAIClient:
+            def __init__(self):
+                self.chat = FakeChat()
+
+        fake_openai_module = types.SimpleNamespace(OpenAI=FakeOpenAIClient)
+        monkeypatch.setitem(sys.modules, "openai", fake_openai_module)
+
+        result = _judge_with_openai(
+            "print('hello')",
+            "openai/gpt-5.4-mini-2026-03-17",
+            None,
+            "",
+        )
+
+        assert result.composite == 7.0
+        assert captured["model"] == "gpt-5.4-mini-2026-03-17"
+        assert captured["max_completion_tokens"] == 2048
+        assert "max_tokens" not in captured
