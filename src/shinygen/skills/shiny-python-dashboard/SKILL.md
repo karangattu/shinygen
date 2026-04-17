@@ -10,15 +10,17 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 ## Critical rules
 
 1. Never use emoji characters as icons. Use `faicons.icon_svg()` or Bootstrap Icons SVG instead.
-2. Keep value boxes to 3 to 4 per row and wrap their container with `fill=False` so they do not stretch vertically.
-3. Use `fillable=True` on dashboard page layouts and `full_screen=True` on chart or table cards.
-4. Give every card a title with `ui.card_header("Title")`.
-5. Prefer `ui.layout_column_wrap()` for uniform cards and `ui.layout_columns()` when you need explicit proportions.
-6. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
-7. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot` to avoid backend issues.
-8. Format all displayed numbers for readability with commas, currency symbols, percentages, or compact abbreviations.
-9. Keep the default dashboard hierarchy: value boxes at the top, charts in the middle, and the detailed table below.
-10. Use breakpoint-aware `col_widths` so the layout still works on mobile.
+2. Keep value boxes to 3 to 4 per row and use `ui.layout_column_wrap(..., width="240px", fill=False)` or breakpoint-aware columns so they wrap before the layout gets cramped.
+3. Use `fillable=False` for dense dashboards with a KPI row plus multiple chart, map, or table rows. Reserve `fillable=True` for pages with only one or two large fillable panels.
+4. Give every chart, map, and table card a readable floor such as `min_height="320px"` so plots do not collapse into shallow strips.
+5. Do not place more than 2 medium or large visualization cards in a row. Split dense content into more rows, tabs, or pages instead.
+6. Give every card a title with `ui.card_header("Title")`.
+7. Prefer `ui.layout_column_wrap()` for uniform cards and `ui.layout_columns()` when you need explicit proportions.
+8. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
+9. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot` to avoid backend issues.
+10. Format all displayed numbers for readability with commas, currency symbols, percentages, or compact abbreviations.
+11. Keep the default dashboard hierarchy: value boxes at the top, charts in the middle, and the detailed table below.
+12. Use breakpoint-aware `col_widths` so the layout still works on mobile.
 
 ## Quick Start
 
@@ -39,7 +41,7 @@ app_ui = ui.page_sidebar(
         ui.input_select("metric", "Metric", choices=list(df.columns)),
         open="desktop",
     ),
-    ui.layout_columns(
+    ui.layout_column_wrap(
         ui.value_box(
             "Rows",
             ui.output_text("row_count"),
@@ -52,6 +54,7 @@ app_ui = ui.page_sidebar(
             showcase=icon_svg("chart-line"),
             theme="info",
         ),
+        width="240px",
         fill=False,
     ),
     ui.layout_columns(
@@ -59,16 +62,24 @@ app_ui = ui.page_sidebar(
             ui.card_header("Distribution"),
             ui.output_plot("distribution"),
             full_screen=True,
+            min_height="320px",
         ),
         ui.card(
-            ui.card_header("Preview"),
-            ui.output_data_frame("preview"),
+            ui.card_header("Summary"),
+            ui.output_text_verbatim("summary"),
             full_screen=True,
+            min_height="320px",
         ),
-        col_widths=[6, 6],
+        col_widths={"sm": 12, "xl": [6, 6]},
+    ),
+    ui.card(
+        ui.card_header("Preview"),
+        ui.output_data_frame("preview"),
+        full_screen=True,
+        min_height="420px",
     ),
     title="Dashboard",
-    fillable=True,
+    fillable=False,
 )
 
 
@@ -84,6 +95,14 @@ def server(input, output, session):
     @render.text
     def avg_value():
         return f"{series().mean():,.1f}"
+
+    @render.text
+    def summary():
+        return (
+            f"Min: {series().min():,.1f}\n"
+            f"Median: {series().median():,.1f}\n"
+            f"Max: {series().max():,.1f}"
+        )
 
     @render.plot
     def distribution():
@@ -135,6 +154,7 @@ app_ui = ui.page_navbar(
 
 - `ui.page_sidebar()` is the default for single-page dashboards with one shared set of controls.
 - `ui.page_navbar()` is the default for multi-page apps with distinct sections.
+- Use `fillable=False` for dense dashboards so stacked rows of cards stay readable instead of shrinking to fit the viewport.
 - In Express, use `ui.page_opts(title=..., fillable=True)` and then declare `with ui.nav_panel(...):` blocks.
 
 See [references/layout-and-navigation.md](references/layout-and-navigation.md) for layout, sidebar, navigation, and responsive grid patterns.
@@ -200,10 +220,11 @@ See [references/core-vs-express.md](references/core-vs-express.md) for side-by-s
 2. Load the data once at module scope or in `shared.py`, then compute reusable constants for inputs.
 3. Put primary filters in a sidebar with `open="desktop"` so mobile starts collapsed.
 4. Add KPI value boxes in a `fill=False` row near the top.
-5. Arrange cards with `ui.layout_column_wrap()` or `ui.layout_columns()`.
-6. Enable `full_screen=True` on visualizations and detailed tables.
-7. Build the data pipeline through `@reactive.calc` functions, not mutated globals.
-8. Finish with a `render.DataGrid(...)` card and minimal CSS overrides.
+5. Use `fillable=False` for dense dashboards with multiple visualization rows or a large table.
+6. Arrange cards with `ui.layout_column_wrap()` or `ui.layout_columns()`, and give every visualization card `min_height="320px"` or larger.
+7. Enable `full_screen=True` on visualizations and detailed tables.
+8. Build the data pipeline through `@reactive.calc` functions, not mutated globals.
+9. Finish with a `render.DataGrid(...)` card and minimal CSS overrides.
 
 ### Translating or modernizing an existing app
 
@@ -220,24 +241,29 @@ If you are replacing an older Shiny for Python layout or translating an R bslib 
 
 1. Prefer Shiny's page and layout primitives over raw `ui.div()` composition when building dashboards.
 2. Keep one API style per app unless you have a compelling reason to mix Core and Express.
-3. Use `ui.layout_column_wrap()` for uniform groups and `ui.layout_columns()` for precise layout control.
+3. Use `ui.layout_column_wrap(..., width="240px", fill=False)` for KPI rows so they wrap cleanly before cards become cramped.
 4. Wrap dashboard outputs in cards and default to `full_screen=True` on charts, maps, and tables.
-5. Set `fill=False` on KPI rows so value boxes do not consume spare vertical space.
-6. Use responsive `col_widths` such as `{"sm": 12, "md": [6, 6]}` for mobile-safe layouts.
-7. Use named Bootstrap theme colors like `"primary"`, `"success"`, `"info"`, `"warning"`, and `"danger"` for value boxes.
-8. Place imports at the top of the file, except `matplotlib.pyplot` inside `@render.plot`.
-9. Never display raw numbers when a formatted value is more readable.
-10. Guard empty selections and filtered datasets with `req()` before rendering.
-11. Never pass duplicate keys when unpacking Plotly dicts; merge overrides with `{**base, "key": value}` instead.
+5. Use `fillable=False` for dense dashboards with more than one row of visualization cards.
+6. Give plot, map, and table cards a floor like `min_height="320px"`; larger tables often need `min_height="420px"`.
+7. Do not place more than 2 medium or large visualization cards in a row.
+8. Use responsive `col_widths` such as `{"sm": 12, "md": [6, 6]}` for mobile-safe layouts.
+9. Use named Bootstrap theme colors like `"primary"`, `"success"`, `"info"`, `"warning"`, and `"danger"` for value boxes.
+10. Place imports at the top of the file, except `matplotlib.pyplot` inside `@render.plot`.
+11. Never display raw numbers when a formatted value is more readable.
+12. Guard empty selections and filtered datasets with `req()` before rendering.
+13. Never pass duplicate keys when unpacking Plotly dicts; merge overrides with `{**base, "key": value}` instead.
 
 ## Avoid Common Errors
 
 1. Do not omit `fill=False` on KPI rows; otherwise value boxes stretch awkwardly.
-2. Do not wrap `ui.navset_card_*()` content in another `ui.card()`; the navset is already the card container.
-3. Do not import `matplotlib.pyplot` at module scope in dashboard apps.
-4. Do not pass the same key through both `**base_dict` and a keyword override in Plotly layout dictionaries.
-5. Do not assume a sidebar on `ui.page_navbar()` should drive every page; use page-specific controls when sections need different filters.
-6. Do not leave cards untitled or charts unlabeled.
+2. Do not keep a dense dashboard `fillable=True`; that is the fastest way to end up with squished cards and unreadable charts.
+3. Do not place more than 2 medium or large visualization cards in a row.
+4. Do not omit `min_height="320px"` on visualization cards when the page contains multiple rows.
+5. Do not wrap `ui.navset_card_*()` content in another `ui.card()`; the navset is already the card container.
+6. Do not import `matplotlib.pyplot` at module scope in dashboard apps.
+7. Do not pass the same key through both `**base_dict` and a keyword override in Plotly layout dictionaries.
+8. Do not assume a sidebar on `ui.page_navbar()` should drive every page; use page-specific controls when sections need different filters.
+9. Do not leave cards untitled or charts unlabeled.
 
 ## Number formatting
 

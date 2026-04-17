@@ -37,6 +37,7 @@ Best practices:
 
 - Keep inputs in `ui.sidebar()` and outputs in the main page body.
 - Use `open="desktop"` so the sidebar is visible on large screens and collapses on mobile.
+- Use `fillable=False` for dense dashboards with a KPI row plus multiple chart or table rows so cards do not collapse to fit the viewport.
 - Treat the page body as a sequence of value-box rows, chart cards, and table cards.
 
 ### `ui.page_navbar()`
@@ -99,20 +100,21 @@ ui.layout_column_wrap(
     ui.value_box("Users", ui.output_text("users"), showcase=icon_svg("users")),
     ui.value_box("Revenue", ui.output_text("revenue"), showcase=icon_svg("dollar-sign")),
     ui.value_box("Growth", ui.output_text("growth"), showcase=icon_svg("chart-line")),
-    width=1 / 3,
+    ui.value_box("Margin", ui.output_text("margin"), showcase=icon_svg("percent")),
+    width="240px",
     fill=False,
 )
 ```
 
-Use a CSS width like `"280px"` when you want the column count to adapt to screen size automatically.
+Use a CSS width like `"240px"` or `"280px"` when you want the column count to adapt to screen size automatically.
 
 ```python
-ui.layout_column_wrap(card_a, card_b, card_c, width="280px")
+ui.layout_column_wrap(card_a, card_b, card_c, card_d, width="240px", fill=False)
 ```
 
 Guidelines:
 
-- Prefer `width=1 / 3` or `width="280px"` instead of hand-calculated percent strings.
+- Prefer `width=1 / 3`, `width="240px"`, or `width="280px"` instead of hand-calculated percent strings.
 - Use `fill=False` for KPI rows so value boxes keep natural height.
 - Use `ui.layout_column_wrap()` when you want a clean, even dashboard rhythm.
 
@@ -229,19 +231,27 @@ This keeps advanced controls close to the output they affect and avoids overload
 
 The same rule from bslib still applies conceptually: fill behavior only works when the surrounding container has a meaningful height.
 
-- Use `fillable=True` on dashboard pages.
+- Use `fillable=True` only when the page has one or two large fillable regions.
+- Use `fillable=False` for dense dashboards with stacked rows of visualizations or a large data table.
 - Use `full_screen=True` when users may need more space.
 - Use fixed `height`, `min_height`, or chart-specific dimensions when a card would otherwise collapse too far.
+- Give plot and map cards a floor like `min_height="320px"`, and give large table cards more room such as `min_height="420px"`.
+- Do not place more than 2 medium or large visualization cards in a row.
 - Avoid putting non-filling KPI rows inside layouts that should donate space to charts.
 
-A common hybrid pattern is a non-filling KPI row followed by cards that can grow:
+A common anti-squish pattern is a non-filling KPI row followed by readable cards on a scrolling page:
 
 ```python
 ui.page_sidebar(
     ui.sidebar(...),
-    ui.layout_columns(kpi_a, kpi_b, kpi_c, fill=False),
-    ui.layout_columns(chart_a, chart_b, col_widths=[6, 6]),
-    fillable=True,
+    ui.layout_column_wrap(kpi_a, kpi_b, kpi_c, kpi_d, width="240px", fill=False),
+    ui.layout_columns(
+        ui.card(ui.card_header("Chart A"), ui.output_plot("chart_a"), full_screen=True, min_height="320px"),
+        ui.card(ui.card_header("Chart B"), ui.output_plot("chart_b"), full_screen=True, min_height="320px"),
+        col_widths={"sm": 12, "xl": [6, 6]},
+    ),
+    ui.card(ui.card_header("Table"), ui.output_data_frame("table"), full_screen=True, min_height="420px"),
+    fillable=False,
 )
 ```
 
@@ -251,5 +261,7 @@ ui.page_sidebar(
 2. Use `ui.page_navbar()` for separate workflows, not just to hide content overflow.
 3. Prefer `ui.layout_column_wrap()` for evenly sized cards and `ui.layout_columns()` for asymmetric layouts.
 4. Keep KPI rows near the top and mark them `fill=False`.
-5. Put page-specific controls in page-specific sidebars rather than forcing one global sidebar everywhere.
-6. Use `ui.navset_card_underline()` to organize plots, tables, and notes within a single card-sized region.
+5. Use `fillable=False` for dense dashboards so rows can keep readable heights.
+6. Give visualization cards `min_height="320px"` or larger.
+7. Put page-specific controls in page-specific sidebars rather than forcing one global sidebar everywhere.
+8. Use `ui.navset_card_underline()` to organize plots, tables, and notes within a single card-sized region.

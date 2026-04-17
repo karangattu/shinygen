@@ -6,7 +6,11 @@ import pytest
 
 from shinygen.config import SANDBOX_TIME_LIMIT_BY_FRAMEWORK
 from shinygen.generate import build_generation_task
-from shinygen.skills import load_default_skills, load_visual_qa_skills
+from shinygen.skills import (
+    load_default_skills,
+    load_skill_context_text,
+    load_visual_qa_skills,
+)
 
 
 class TestLoadDefaultSkills:
@@ -51,6 +55,14 @@ class TestLoadDefaultSkills:
         assert "nohup Rscript -e \"shiny::runApp('app.R', port=8000, launch.browser=FALSE)\"" in instructions
         assert "python3 /home/user/project/.tools/screenshot_helper.py" in instructions
         assert "pkill -f \"Rscript\" || true" in instructions
+
+    def test_shiny_python_skill_teaches_non_squished_dashboard_layouts(self):
+        instructions = load_skill_context_text("shiny_python")
+
+        assert 'width="240px"' in instructions
+        assert 'Use `fillable=False` for dense dashboards' in instructions
+        assert 'min_height="320px"' in instructions
+        assert 'Do not place more than 2 medium or large visualization cards in a row' in instructions
 
 
 class TestBuildGenerationTask:

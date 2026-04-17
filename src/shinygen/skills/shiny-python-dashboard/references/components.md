@@ -27,8 +27,20 @@ Guidelines:
 
 - Add `ui.card_header()` to every card.
 - Default to `full_screen=True` for charts, maps, and tables.
+- Give visualization cards a floor like `min_height="320px"` so charts stay readable.
+- Use a larger floor such as `min_height="420px"` for detailed tables.
+- Do not place more than 2 medium or large visualization cards in a row.
 - Use `ui.card_footer()` for provenance, notes, or small actions.
 - Keep static text cards shorter than plot cards; large paragraphs belong in scrolling pages, not dashboard grids.
+
+### Preventing squished dashboards
+
+When a dashboard has a KPI row plus multiple rows of charts, maps, or tables, prefer a scrolling page over a fully fillable one.
+
+- Use `fillable=False` for dense dashboards.
+- Keep KPI rows in `ui.layout_column_wrap(..., width="240px", fill=False)`.
+- Give each chart or map card `min_height="320px"` or more.
+- Split crowded content across tabs or pages instead of forcing many shallow cards into one viewport.
 
 ### Card headers with inline controls
 
@@ -56,7 +68,7 @@ Use `ui.value_box()` for KPIs and headline metrics.
 **Core API:**
 
 ```python
-ui.layout_columns(
+ui.layout_column_wrap(
     ui.value_box(
         "Total users",
         ui.output_ui("total_users"),
@@ -69,6 +81,7 @@ ui.layout_columns(
         showcase=icon_svg("wallet"),
         theme="success",
     ),
+    width="240px",
     fill=False,
 )
 ```
@@ -88,6 +101,7 @@ with ui.layout_columns(fill=False):
 Guidelines:
 
 - Keep the row to 3 or 4 boxes.
+- Prefer `ui.layout_column_wrap(..., width="240px", fill=False)` so KPI cards wrap before becoming cramped.
 - Use named themes like `"primary"`, `"success"`, `"info"`, `"warning"`, and `"danger"`.
 - Use icons that reinforce the metric; do not use emojis.
 - Format the displayed value instead of passing a raw float or integer.
