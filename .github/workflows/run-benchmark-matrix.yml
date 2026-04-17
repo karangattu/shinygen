@@ -1,21 +1,29 @@
-name: Run benchmark matrix
+name: Run dataset benchmark matrix
 
 on:
   workflow_dispatch:
     inputs:
       challenge:
-        description: "Short benchmark label used in artifact names and summaries"
+        description: "Optional short benchmark label used in artifact names and summaries"
         required: true
-        default: "airbnb-asheville"
+        default: ""
       dataset:
-        description: "CSV dataset in test_data_csv_files/ (basename or relative path)"
+        description: "Bundled CSV dataset from test_data_csv_files/"
         required: true
         default: "airbnb-asheville-short.csv"
+        type: choice
+        options:
+          - airbnb-asheville-short.csv
+          - air_quality.csv
+          - ed_operations.csv
+          - ev_charging_stations.csv
+          - supply_chain.csv
+          - trials_short_50.csv
       benchmark_prompt:
         description: "Prompt passed to shinygen generate for every matrix entry"
         required: true
         default: >-
-          Build a professional-grade Shiny dashboard featuring an interactive map and comparative performance metrics to visualize how property type and neighborhood dynamics influence pricing and ratings across Asheville.
+          Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.
       quality_threshold:
         description: "Minimum quality score"
         required: true
@@ -141,9 +149,6 @@ jobs:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      # Pre-built sandbox images (with claude-code + codex-cli baked in)
-      # are published to GHCR by `.github/workflows/build-sandbox-images.yml`.
-      # Compose pulls these by tag, falling back to a local build when missing.
       SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
       SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
     steps:
@@ -196,68 +201,13 @@ jobs:
             image="${SHINYGEN_SANDBOX_R_IMAGE}"
           fi
           echo "Pulling sandbox image: ${image}"
-          # Compose will reuse the locally cached image (pull_policy: missing).
-          # If the pull fails we still proceed; compose falls back to building.
           docker pull "${image}" || echo "::warning::Failed to pull ${image}; compose will build from Dockerfile."
 
-      - name: Cache R packages
-        if: matrix.framework == 'shiny_r'
-        uses: actions/cache@v5
-        with:
-          path: ~/R/library
-          key: r-packages-${{ runner.os }}-${{ hashFiles('.github/workflows/run-airbnb-asheville-benchmark.yml') }}
-          restore-keys: |
-            r-packages-${{ runner.os }}-
-
-      - name: Install shinygen and screenshot runtime dependencies
+      - name: Install shinygen CLI on runner
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[screenshot]"
-          python -m playwright install --with-deps chromium
-
-          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
-            python -m pip install shiny shinywidgets plotly faicons pandas numpy matplotlib seaborn folium
-          else
-            if ! command -v Rscript >/dev/null 2>&1; then
-              sudo apt-get update
-              sudo apt-get install -y r-base
-            fi
-
-            # System libraries required by R packages used by generated apps
-            # (cmake/build-essential for libuv builds in `fs`, and the geo
-            # stack for leaflet -> sf -> s2/units/terra). Without these, host
-            # screenshot runs fail to load shiny/leaflet.
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends \
-              build-essential \
-              cmake \
-              pkg-config \
-              libcurl4-openssl-dev \
-              libssl-dev \
-              libxml2-dev \
-              libfontconfig1-dev \
-              libfreetype6-dev \
-              libharfbuzz-dev \
-              libfribidi-dev \
-              libgdal-dev \
-              libgeos-dev \
-              libproj-dev \
-              libudunits2-dev \
-              libsqlite3-dev
-
-            export R_LIBS_USER="${HOME}/R/library"
-            mkdir -p "${R_LIBS_USER}"
-            echo "R_LIBS_USER=${R_LIBS_USER}" >> "${GITHUB_ENV}"
-
-            Rscript -e 'install.packages(c(
-              "shiny", "bslib", "bsicons", "ggplot2", "dplyr", "readr",
-              "tidyr", "stringr", "lubridate",
-              "plotly", "DT", "leaflet",
-              "scales", "thematic", "htmltools", "htmlwidgets"
-            ), repos = "https://cloud.r-project.org")'
-          fi
+          python -m pip install -e .
 
       - name: Run shinygen benchmark generation
         shell: bash

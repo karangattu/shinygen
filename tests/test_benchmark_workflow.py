@@ -8,7 +8,7 @@ WORKFLOW_PATH = (
     Path(__file__).resolve().parents[1]
     / ".github"
     / "workflows"
-    / "run-airbnb-asheville-benchmark.yml"
+    / "run-benchmark-matrix.yml"
 )
 
 BATCH_CONFIG_PATH = Path(__file__).resolve().parents[1] / "batch.json"
@@ -22,8 +22,9 @@ def test_benchmark_workflow_covers_python_and_r_with_visual_checks():
     assert '- shiny_r' in workflow
     assert '--framework "${{ matrix.framework }}"' in workflow
     assert '--screenshot \\' in workflow
-    assert 'Rscript -e' in workflow
-    assert 'install.packages' in workflow
+    assert 'SHINYGEN_SANDBOX_PYTHON_IMAGE' in workflow
+    assert 'SHINYGEN_SANDBOX_R_IMAGE' in workflow
+    assert 'docker pull "${image}"' in workflow
 
 
 def test_benchmark_artifacts_include_framework_dimension():
@@ -46,6 +47,9 @@ def test_benchmark_workflow_accepts_generic_dispatch_inputs():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert 'dataset:' in workflow
+    assert 'type: choice' in workflow
+    assert '- airbnb-asheville-short.csv' in workflow
+    assert '- air_quality.csv' in workflow
     assert 'challenge:' in workflow
     assert 'benchmark_prompt:' in workflow
     assert 'quality_threshold:' in workflow
@@ -68,10 +72,14 @@ def test_benchmark_workflow_pins_gpt54_mini_judge_model():
     assert 'BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17' in workflow
 
 
-def test_benchmark_workflow_installs_scales_for_r_runs():
+def test_benchmark_workflow_uses_runner_minimal_install_after_sandbox_prebuild():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert '"scales", "thematic", "htmltools", "htmlwidgets"' in workflow
+    assert 'Install shinygen CLI on runner' in workflow
+    assert 'python -m pip install -e .' in workflow
+    assert 'python -m pip install -e ".[screenshot]"' not in workflow
+    assert 'python -m playwright install --with-deps chromium' not in workflow
+    assert 'install.packages(c(' not in workflow
 
 
 def test_benchmark_workflow_runs_both_opus_generations_for_comparison():

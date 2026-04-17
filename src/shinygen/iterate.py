@@ -216,6 +216,54 @@ def _copy_agent_screenshot_artifact(
     return None
 
 
+def _resolve_judge_screenshot_paths(
+    output_path: Path,
+    eval_dir: Path,
+    framework_key: str,
+    port: int,
+) -> list[Path]:
+    """Return screenshots for judging, preferring the agent's sandbox capture."""
+    agent_screenshot = output_path / AGENT_LAST_SCREENSHOT_NAME
+    if agent_screenshot.exists():
+        logger.info("Using agent screenshot for judge: %s", agent_screenshot.name)
+        return [agent_screenshot]
+
+    try:
+        import concurrent.futures
+
+        from .screenshot import take_screenshots
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(take_screenshots, eval_dir, framework_key, port)
+            try:
+                shot = future.result(timeout=90)
+            except concurrent.futures.TimeoutError:
+                raise TimeoutError("Host-side screenshot timed out")
+            if shot and shot.exists():
+                logger.info("Using host-side screenshot for judge: %s", shot.name)
+                return [shot]
+    except Exception as exc:
+        logger.warning("Screenshot failed (continuing without): %s", exc)
+
+    return []
+
+
+def _copy_output_screenshots(output_path: Path, screenshot_paths: list[Path]) -> list[Path]:
+    """Copy screenshots into the output directory and return normalized paths."""
+    output_screenshots: list[Path] = []
+
+    for screenshot_path in screenshot_paths:
+        if not screenshot_path.exists():
+            continue
+
+        destination = output_path / screenshot_path.name
+        if screenshot_path.resolve() != destination.resolve():
+            shutil.copy2(screenshot_path, destination)
+        output_screenshots.append(destination)
+
+    return output_screenshots
+
+
 def generate_and_refine(
     prompt: str,
     model: str,
@@ -313,6 +361,9 @@ def generate_and_refine(
         prompt_for_attempt = current_prompt
         hit_output_token_limit = False
         for attempt in range(1, max_retries + 1):
+            if screenshot:
+                (output_path / AGENT_LAST_SCREENSHOT_NAME).unlink(missing_ok=True)
+
             with Timer() as gen_timer:
                 code, generation_usage_rows, hit_output_token_limit = _run_generation(
                     prompt_for_attempt,
@@ -384,28 +435,17 @@ def generate_and_refine(
         # --- Step 3: Screenshots (host-side, for external judge) ---
         screenshot_paths: list[Path] = []
         if screenshot:
-            try:
-                import concurrent.futures
-
-                from .screenshot import take_screenshots
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(
-                        take_screenshots, eval_dir, framework_key, effective_port
-                    )
-                    try:
-                        shot = future.result(timeout=90)
-                    except concurrent.futures.TimeoutError:
-                        raise TimeoutError("Host-side screenshot timed out")
-                    if shot and shot.exists():
-                        screenshot_paths.append(shot)
-                    logger.info(
-                        "Iteration %d: Captured %d screenshots",
-                        iteration,
-                        len(screenshot_paths),
-                    )
-            except Exception as exc:
-                logger.warning("Screenshot failed (continuing without): %s", exc)
+            screenshot_paths = _resolve_judge_screenshot_paths(
+                output_path,
+                eval_dir,
+                framework_key,
+                effective_port,
+            )
+            logger.info(
+                "Iteration %d: Captured %d screenshots",
+                iteration,
+                len(screenshot_paths),
+            )
 
         # --- Step 4: Judge ---
         if judge_model:
@@ -484,13 +524,10 @@ def generate_and_refine(
                 (output_path / fname).write_text(content, encoding="utf-8")
 
         # Copy screenshots and update paths to point to output dir
-        output_screenshots: list[Path] = []
-        for sp in result.screenshot_paths:
-            if sp.exists():
-                dest = output_path / sp.name
-                shutil.copy2(sp, dest)
-                output_screenshots.append(dest)
-        result.screenshot_paths = output_screenshots
+        result.screenshot_paths = _copy_output_screenshots(
+            output_path,
+            result.screenshot_paths,
+        )
 
         result.app_dir = output_path
         result.source_code = best_code

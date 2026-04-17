@@ -8,8 +8,10 @@ from pathlib import Path
 from shinygen.iterate import (
     GenerationResult,
     _copy_agent_screenshot_artifact,
+    _copy_output_screenshots,
     _extract_generation_usage_rows,
     _generation_extra_config,
+    _resolve_judge_screenshot_paths,
     _write_run_summary,
 )
 
@@ -219,3 +221,62 @@ class TestCopyAgentScreenshotArtifact:
 
         assert copied == output_path / "agent_last_screenshot.png"
         assert copied.read_bytes() == last_image
+
+
+class TestResolveJudgeScreenshotPaths:
+    def test_prefers_agent_screenshot_from_output_dir(self, tmp_path):
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        agent_screenshot = output_path / "agent_last_screenshot.png"
+        agent_screenshot.write_bytes(b"agent")
+
+        screenshot_paths = _resolve_judge_screenshot_paths(
+            output_path,
+            tmp_path / "eval",
+            "shiny_python",
+            18801,
+        )
+
+        assert screenshot_paths == [agent_screenshot]
+
+    def test_falls_back_to_host_screenshot_when_agent_one_missing(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        eval_dir = tmp_path / "eval"
+        eval_dir.mkdir()
+        host_screenshot = eval_dir / "screenshot.png"
+        host_screenshot.write_bytes(b"host")
+
+        def fake_take_screenshots(app_dir, framework_key, port):
+            assert app_dir == eval_dir
+            assert framework_key == "shiny_r"
+            assert port == 18888
+            return host_screenshot
+
+        monkeypatch.setattr("shinygen.screenshot.take_screenshots", fake_take_screenshots)
+
+        screenshot_paths = _resolve_judge_screenshot_paths(
+            output_path,
+            eval_dir,
+            "shiny_r",
+            18888,
+        )
+
+        assert screenshot_paths == [host_screenshot]
+
+
+class TestCopyOutputScreenshots:
+    def test_keeps_output_resident_screenshot_without_recopied_same_file(self, tmp_path):
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        screenshot_path = output_path / "agent_last_screenshot.png"
+        screenshot_path.write_bytes(b"agent")
+
+        copied = _copy_output_screenshots(output_path, [screenshot_path])
+
+        assert copied == [screenshot_path]
+        assert screenshot_path.read_bytes() == b"agent"
