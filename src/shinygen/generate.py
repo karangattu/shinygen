@@ -34,6 +34,10 @@ from .validation import validate_framework_artifact
 
 logger = logging.getLogger(__name__)
 
+CODEX_CLI_VERSION = "latest"
+CODEX_CONFIG_OVERRIDES = {"web_search": "live"}
+CODEX_DISALLOWED_TOOLS = ["web_search"]
+
 # Artifact names we search for
 APP_ARTIFACTS = ("app.py", "app.R")
 DIRECT_ARTIFACT_DIRS = ("/home/user/project", "/", "/root")
@@ -325,6 +329,9 @@ def build_generation_task(
             cwd=SANDBOX_WORK_DIR,
             attempts=1,
             skills=resolved_skills or None,
+            version=CODEX_CLI_VERSION,
+            config_overrides=CODEX_CONFIG_OVERRIDES,
+            disallowed_tools=CODEX_DISALLOWED_TOOLS,
         )
 
     time_limit = sandbox_time_limit_for_framework(framework_key)

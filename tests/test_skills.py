@@ -54,6 +54,32 @@ class TestLoadDefaultSkills:
 
 
 class TestBuildGenerationTask:
+    def test_codex_solver_uses_latest_cli_with_live_web_search(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        captured = {}
+        sentinel_solver = object()
+
+        def fake_solver(**kwargs):
+            captured.update(kwargs)
+            return sentinel_solver
+
+        monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="codex_cli",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+        )
+
+        assert task.solver is sentinel_solver
+        assert captured["version"] == "latest"
+        assert captured["config_overrides"] == {"web_search": "live"}
+        assert captured["disallowed_tools"] == ["web_search"]
+
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_passes_skills_to_solver_instead_of_sample_files(
         self,
