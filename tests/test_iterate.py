@@ -5,6 +5,8 @@ import json
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from shinygen.iterate import (
     GenerationResult,
     _copy_agent_screenshot_artifact,
@@ -239,7 +241,7 @@ class TestResolveJudgeScreenshotPaths:
 
         assert screenshot_paths == [agent_screenshot]
 
-    def test_falls_back_to_host_screenshot_when_agent_one_missing(
+    def test_raises_when_agent_screenshot_is_missing_even_if_host_succeeds(
         self,
         tmp_path,
         monkeypatch,
@@ -259,14 +261,13 @@ class TestResolveJudgeScreenshotPaths:
 
         monkeypatch.setattr("shinygen.screenshot.take_screenshots", fake_take_screenshots)
 
-        screenshot_paths = _resolve_judge_screenshot_paths(
-            output_path,
-            eval_dir,
-            "shiny_r",
-            18888,
-        )
-
-        assert screenshot_paths == [host_screenshot]
+        with pytest.raises(RuntimeError, match="Missing sandbox screenshot"):
+            _resolve_judge_screenshot_paths(
+                output_path,
+                eval_dir,
+                "shiny_r",
+                18888,
+            )
 
 
 class TestCopyOutputScreenshots:

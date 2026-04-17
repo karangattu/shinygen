@@ -222,30 +222,17 @@ def _resolve_judge_screenshot_paths(
     framework_key: str,
     port: int,
 ) -> list[Path]:
-    """Return screenshots for judging, preferring the agent's sandbox capture."""
+    """Return sandbox screenshots for judging or raise if they are missing."""
     agent_screenshot = output_path / AGENT_LAST_SCREENSHOT_NAME
     if agent_screenshot.exists():
         logger.info("Using agent screenshot for judge: %s", agent_screenshot.name)
         return [agent_screenshot]
 
-    try:
-        import concurrent.futures
-
-        from .screenshot import take_screenshots
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(take_screenshots, eval_dir, framework_key, port)
-            try:
-                shot = future.result(timeout=90)
-            except concurrent.futures.TimeoutError:
-                raise TimeoutError("Host-side screenshot timed out")
-            if shot and shot.exists():
-                logger.info("Using host-side screenshot for judge: %s", shot.name)
-                return [shot]
-    except Exception as exc:
-        logger.warning("Screenshot failed (continuing without): %s", exc)
-
-    return []
+    raise RuntimeError(
+        "Missing sandbox screenshot: expected "
+        f"{AGENT_LAST_SCREENSHOT_NAME} in {output_path}. "
+        "Refusing to fall back to host-side or code-only judging."
+    )
 
 
 def _copy_output_screenshots(output_path: Path, screenshot_paths: list[Path]) -> list[Path]:
