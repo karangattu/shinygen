@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Pre-built sandbox images on GHCR**: New `.github/workflows/build-sandbox-images.yml` builds and publishes `ghcr.io/<owner>/shinygen-sandbox-python` and `ghcr.io/<owner>/shinygen-sandbox-r` with `claude` and `codex` standalone binaries baked in. Compose files default to pulling these (`pull_policy: missing`) and fall back to local build when missing. Switches `CODEX_CLI_VERSION` to `"auto"` so `inspect_swe` reuses the in-image binary instead of re-downloading per sample.
+- **Benchmark workflows pre-pull sandbox image**: `run-airbnb-asheville-benchmark.yml`, `run-shinygen.yml`, and `run-shinygen-multi.yml` log into GHCR and `docker pull` the framework-appropriate image before running, eliminating the ~10 min Dockerfile build (R) and per-sample CLI downloads. Override the image tag via `SHINYGEN_SANDBOX_PYTHON_IMAGE` / `SHINYGEN_SANDBOX_R_IMAGE`.
+
 ### Fixed
 - **Token truncation recovery**: Detect when Claude hits output token limits before writing artifacts; automatically retry with a focused direct-write prompt instead of repeating the full generation
 - **R screenshot pipeline**: Uncomment R app launch command in visual-QA skill, add `python3` screenshot helper reference for R containers, and add `Rscript` process cleanup

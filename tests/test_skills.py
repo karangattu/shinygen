@@ -54,7 +54,7 @@ class TestLoadDefaultSkills:
 
 
 class TestBuildGenerationTask:
-    def test_codex_solver_uses_latest_cli_with_live_web_search(
+    def test_codex_solver_uses_auto_cli_with_live_web_search(
         self,
         tmp_path,
         monkeypatch,
@@ -76,7 +76,9 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_solver
-        assert captured["version"] == "latest"
+        # `auto` makes inspect_swe prefer the codex binary baked into the
+        # pre-built sandbox image, falling back to a download when missing.
+        assert captured["version"] == "auto"
         assert captured["config_overrides"] == {"web_search": "live"}
         assert captured["disallowed_tools"] == ["web_search"]
 

@@ -34,7 +34,7 @@ from .validation import validate_framework_artifact
 
 logger = logging.getLogger(__name__)
 
-CODEX_CLI_VERSION = "latest"
+CODEX_CLI_VERSION = "auto"
 CODEX_CONFIG_OVERRIDES = {"web_search": "live"}
 CODEX_DISALLOWED_TOOLS = ["web_search"]
 

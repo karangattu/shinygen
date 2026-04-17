@@ -1,7 +1,25 @@
 # Combined R + Python sandbox for Shiny R app generation.
 # Base: rocker/r-ver provides R 4.4; Python 3.12 added on top.
+#
+# Built and published to GitHub Container Registry by
+# `.github/workflows/build-sandbox-images.yml` so benchmark runs reuse a
+# warm image instead of rebuilding (and re-downloading the agent CLIs)
+# on every job.
+#
+# Pre-installed:
+#   - System libraries needed by Chromium (Playwright) and the geo stack
+#   - R + base CRAN packages used by generated Shiny apps
+#   - Python + visualization packages (so the same image works for both
+#     framework variants when needed)
+#   - Playwright + Chromium browser
+#   - `claude` (Anthropic Claude Code) standalone binary on PATH
+#   - `codex` (OpenAI Codex CLI) standalone binary on PATH
 
 FROM rocker/r-ver:4.4.2
+
+ARG TARGETARCH
+ARG CLAUDE_VERSION=2.1.112
+ARG CODEX_VERSION=rust-v0.121.0
 
 # System deps for R packages, Python, and Chromium (Playwright)
 # Includes build tooling (cmake, pkg-config) required by recent CRAN packages
@@ -9,9 +27,12 @@ FROM rocker/r-ver:4.4.2
 # required by leaflet -> sf -> s2/units/terra.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ca-certificates \
     cmake \
     pkg-config \
     git \
+    curl \
+    tar \
     python3 \
     python3-pip \
     python3-venv \
@@ -46,7 +67,8 @@ RUN Rscript -e ' \
     ), repos = "https://cloud.r-project.org") \
 '
 
-# Python packages
+# Python packages (so the image can also exercise Python helpers when
+# needed; keeps a single image surface for both framework variants).
 RUN pip3 install --break-system-packages --no-cache-dir \
     shiny \
     plotly \
@@ -62,6 +84,33 @@ RUN pip3 install --break-system-packages --no-cache-dir \
 
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
 RUN playwright install chromium
+
+# Pre-install Claude Code and Codex CLI standalone binaries.
+# inspect_swe uses `which claude` / `which codex` when version="auto"
+# (the default) and skips downloading when these are already on PATH.
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+        amd64) claude_plat=linux-x64; codex_arch=x86_64 ;; \
+        arm64) claude_plat=linux-arm64; codex_arch=aarch64 ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://downloads.claude.ai/claude-code-releases/${CLAUDE_VERSION}/${claude_plat}/claude" \
+        -o /usr/local/bin/claude; \
+    chmod +x /usr/local/bin/claude; \
+    /usr/local/bin/claude --version || true; \
+    tmp_dir="$(mktemp -d)"; \
+    curl -fsSL "https://github.com/openai/codex/releases/download/${CODEX_VERSION}/codex-${codex_arch}-unknown-linux-musl.tar.gz" \
+        -o "${tmp_dir}/codex.tar.gz"; \
+    tar -xzf "${tmp_dir}/codex.tar.gz" -C "${tmp_dir}"; \
+    install -m 0755 "$(find "${tmp_dir}" -type f -name 'codex-*-unknown-linux-musl' | head -n1)" /usr/local/bin/codex; \
+    rm -rf "${tmp_dir}"; \
+    /usr/local/bin/codex --version || true
+
+LABEL org.opencontainers.image.source="https://github.com/karangattu/shinygen" \
+      org.opencontainers.image.description="shinygen sandbox image (R + Python) with claude-code + codex-cli pre-installed" \
+      org.opencontainers.image.licenses="MIT" \
+      io.shinygen.claude_version="${CLAUDE_VERSION}" \
+      io.shinygen.codex_version="${CODEX_VERSION}"
 
 # Working directory
 RUN mkdir -p /home/user/project

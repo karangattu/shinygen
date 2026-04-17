@@ -68,10 +68,15 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
     env:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
+      SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -98,6 +103,25 @@ jobs:
             echo "Configure both repository secrets before running this workflow." >&2
             exit 1
           fi
+
+      - name: Log in to GHCR (for pulling pre-built sandbox images)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-pull pre-built sandbox image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.framework }}" == "shiny_python" ]]; then
+            image="${SHINYGEN_SANDBOX_PYTHON_IMAGE}"
+          else
+            image="${SHINYGEN_SANDBOX_R_IMAGE}"
+          fi
+          echo "Pulling sandbox image: ${image}"
+          docker pull "${image}" || echo "::warning::Failed to pull ${image}; compose will build from Dockerfile."
 
       - name: Install shinygen
         shell: bash

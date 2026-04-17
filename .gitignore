@@ -42,3 +42,4 @@ batch_outputs/
 /shinygen-asheville-benchmark-24174772989-aggregate
 /shinygen-ev-charging-stations-24437537017-aggregate
 /shinygen-benchmark-apr-9
+*.log

@@ -29,6 +29,10 @@ concurrency:
   group: benchmark-${{ github.workflow }}-${{ inputs.challenge || 'benchmark' }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: read
+
 env:
   BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
@@ -137,6 +141,11 @@ jobs:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Pre-built sandbox images (with claude-code + codex-cli baked in)
+      # are published to GHCR by `.github/workflows/build-sandbox-images.yml`.
+      # Compose pulls these by tag, falling back to a local build when missing.
+      SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
+      SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -169,6 +178,27 @@ jobs:
             echo "Configure both repository secrets before running this workflow." >&2
             exit 1
           fi
+
+      - name: Log in to GHCR (for pulling pre-built sandbox images)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-pull pre-built sandbox image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
+            image="${SHINYGEN_SANDBOX_PYTHON_IMAGE}"
+          else
+            image="${SHINYGEN_SANDBOX_R_IMAGE}"
+          fi
+          echo "Pulling sandbox image: ${image}"
+          # Compose will reuse the locally cached image (pull_policy: missing).
+          # If the pull fails we still proceed; compose falls back to building.
+          docker pull "${image}" || echo "::warning::Failed to pull ${image}; compose will build from Dockerfile."
 
       - name: Cache R packages
         if: matrix.framework == 'shiny_r'

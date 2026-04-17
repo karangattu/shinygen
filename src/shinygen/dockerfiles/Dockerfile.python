@@ -1,16 +1,40 @@
 # Lightweight Python-only sandbox for Shiny Python app generation.
+#
+# Built and published to GitHub Container Registry by
+# `.github/workflows/build-sandbox-images.yml` so benchmark runs reuse a
+# warm image instead of rebuilding (and re-downloading the agent CLIs)
+# on every job.
+#
+# Pre-installed:
+#   - System libraries needed by Chromium (Playwright)
+#   - Shiny + visualization packages used by generated apps
+#   - Playwright + Chromium browser
+#   - `claude` (Anthropic Claude Code) standalone binary on PATH
+#   - `codex` (OpenAI Codex CLI) standalone binary on PATH
+#
+# `inspect_swe`'s claude_code()/codex_cli() solvers default to
+# `version="auto"` which checks `which claude` / `which codex` first and
+# uses the pre-installed binary when present, skipping the per-sample
+# download.
 
 FROM python:3.12-slim
 
+ARG TARGETARCH
+ARG CLAUDE_VERSION=2.1.112
+ARG CODEX_VERSION=rust-v0.121.0
+
 # System deps (includes libraries required by Chromium for Playwright)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    tar \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
     libxrandr2 libgbm1 libpango-1.0-0 libcairo2 \
     libasound2 libnspr4 libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-install Python packages
+# Pre-install Python packages used by generated Shiny apps
 RUN pip install --no-cache-dir \
     shiny \
     plotly \
@@ -22,10 +46,39 @@ RUN pip install --no-cache-dir \
     itables \
     htmltools \
     shinywidgets \
+    folium \
+    numpy \
     playwright
 
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
 RUN playwright install chromium
+
+# Pre-install Claude Code and Codex CLI standalone binaries.
+# inspect_swe uses `which claude` / `which codex` when version="auto"
+# (the default) and skips downloading when these are already on PATH.
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+        amd64) claude_plat=linux-x64; codex_arch=x86_64 ;; \
+        arm64) claude_plat=linux-arm64; codex_arch=aarch64 ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://downloads.claude.ai/claude-code-releases/${CLAUDE_VERSION}/${claude_plat}/claude" \
+        -o /usr/local/bin/claude; \
+    chmod +x /usr/local/bin/claude; \
+    /usr/local/bin/claude --version || true; \
+    tmp_dir="$(mktemp -d)"; \
+    curl -fsSL "https://github.com/openai/codex/releases/download/${CODEX_VERSION}/codex-${codex_arch}-unknown-linux-musl.tar.gz" \
+        -o "${tmp_dir}/codex.tar.gz"; \
+    tar -xzf "${tmp_dir}/codex.tar.gz" -C "${tmp_dir}"; \
+    install -m 0755 "$(find "${tmp_dir}" -type f -name 'codex-*-unknown-linux-musl' | head -n1)" /usr/local/bin/codex; \
+    rm -rf "${tmp_dir}"; \
+    /usr/local/bin/codex --version || true
+
+LABEL org.opencontainers.image.source="https://github.com/karangattu/shinygen" \
+      org.opencontainers.image.description="shinygen sandbox image (Python) with claude-code + codex-cli pre-installed" \
+      org.opencontainers.image.licenses="MIT" \
+      io.shinygen.claude_version="${CLAUDE_VERSION}" \
+      io.shinygen.codex_version="${CODEX_VERSION}"
 
 # Working directory
 RUN mkdir -p /home/user/project

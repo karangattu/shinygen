@@ -1,5 +1,12 @@
 services:
   default:
+    # Pre-built image published to GHCR by
+    # `.github/workflows/build-sandbox-images.yml`. Override at runtime via
+    # `SHINYGEN_SANDBOX_R_IMAGE=<image>` (e.g. to pin a sha-tagged build).
+    # When the image is not available locally and cannot be pulled, docker
+    # compose falls back to building from `Dockerfile.r` in this directory.
+    image: ${SHINYGEN_SANDBOX_R_IMAGE:-ghcr.io/karangattu/shinygen-sandbox-r:latest}
+    pull_policy: missing
     build:
       context: .
       dockerfile: Dockerfile.r
