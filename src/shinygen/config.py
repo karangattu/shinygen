@@ -57,9 +57,7 @@ FRAMEWORKS: dict[str, dict[str, str]] = {
             'launch.browser = FALSE)"'
         ),
         "install_command": (
-            'Rscript -e \'install.packages(c("shiny", "bslib", "bsicons", '
-            '"ggplot2", "dplyr", "readr", "plotly", "DT", "leaflet", '
-            '"scales", "thematic"), '
+            'Rscript -e \'install.packages(c("NEW_PKG_HERE"), '
             'repos = "https://cloud.r-project.org")\''
         ),
         "skill_dir": "shiny-bslib",

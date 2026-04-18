@@ -57,6 +57,27 @@ ARTIFACT_SEARCH_ROOTS = (
 
 DOCKERFILES_DIR = Path(__file__).parent / "dockerfiles"
 
+# Image name env vars and defaults (must match compose.yaml / compose-python.yaml)
+_SANDBOX_IMAGE_DEFAULTS: dict[str, tuple[str, str]] = {
+    "shiny_r": ("SHINYGEN_SANDBOX_R_IMAGE", "ghcr.io/karangattu/shinygen-sandbox-r:latest"),
+    "shiny_python": ("SHINYGEN_SANDBOX_PYTHON_IMAGE", "ghcr.io/karangattu/shinygen-sandbox-python:latest"),
+}
+
+
+def _docker_image_exists_locally(image: str) -> bool:
+    """Return True when *image* is already available in the local Docker daemon."""
+    import subprocess as _sp
+
+    try:
+        result = _sp.run(
+            ["docker", "image", "inspect", image],
+            capture_output=True,
+            timeout=15,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
 
 def stage_docker_context(
     framework_key: str,
@@ -64,18 +85,51 @@ def stage_docker_context(
 ) -> Path:
     """Copy Dockerfiles and compose files to a temp directory for Inspect AI.
 
+    When the pre-built sandbox image is already available locally (e.g.
+    pulled by a CI pre-pull step), the staged compose file omits the
+    ``build:`` section so that ``docker compose build`` (called by
+    Inspect AI) becomes a no-op.  This avoids a 25+ minute rebuild of
+    R packages from source on every benchmark run.
+
     Returns the path to the temp directory (caller should clean up).
     """
+    import os
+    import re
+
     tmp = Path(tempfile.mkdtemp(prefix="shinygen_"))
     compose_file = FRAMEWORK_COMPOSE.get(framework_key, "compose-python.yaml")
 
-    # Copy the relevant compose file and Dockerfile
-    shutil.copy2(DOCKERFILES_DIR / compose_file, tmp / compose_file)
+    # Resolve the sandbox image name from environment / defaults.
+    env_var, default_image = _SANDBOX_IMAGE_DEFAULTS.get(
+        framework_key, ("", "")
+    )
+    image_name = os.environ.get(env_var, default_image) if env_var else default_image
 
-    if framework_key == "shiny_r":
-        shutil.copy2(DOCKERFILES_DIR / "Dockerfile.r", tmp / "Dockerfile.r")
+    if image_name and _docker_image_exists_locally(image_name):
+        # Image is already pulled — write a minimal compose without the
+        # build: section so Inspect AI does not trigger a rebuild.
+        logger.info(
+            "Pre-built sandbox image found locally (%s); skipping Dockerfile build",
+            image_name,
+        )
+        src_compose = (DOCKERFILES_DIR / compose_file).read_text(encoding="utf-8")
+        # Strip the build: block (build: + lines indented deeper than it)
+        stripped = re.sub(
+            r"^(\s*)build:\s*\n(?:\1\s+\S.*\n)*",
+            "",
+            src_compose,
+            flags=re.MULTILINE,
+        )
+        # Also switch pull_policy to 'never' since the image is already local.
+        stripped = stripped.replace("pull_policy: missing", "pull_policy: never")
+        (tmp / compose_file).write_text(stripped, encoding="utf-8")
     else:
-        shutil.copy2(DOCKERFILES_DIR / "Dockerfile.python", tmp / "Dockerfile.python")
+        # Fallback: copy compose + Dockerfile so Docker can build from source.
+        shutil.copy2(DOCKERFILES_DIR / compose_file, tmp / compose_file)
+        if framework_key == "shiny_r":
+            shutil.copy2(DOCKERFILES_DIR / "Dockerfile.r", tmp / "Dockerfile.r")
+        else:
+            shutil.copy2(DOCKERFILES_DIR / "Dockerfile.python", tmp / "Dockerfile.python")
 
     # Create results dir for volume mount
     results = tmp / "results"

@@ -84,11 +84,16 @@ RULES YOU MUST FOLLOW:
 
 WORKFLOW:
 1. cd /home/user/project
-2. The following R packages are already installed: shiny, bslib, bsicons, \
-ggplot2, dplyr, readr, plotly, DT, leaflet. Install any others with:
+2. The following R packages are ALREADY INSTALLED — do NOT reinstall them:
+   shiny, bslib, bsicons, ggplot2, dplyr, readr, tidyr, stringr,
+   lubridate, plotly, DT, leaflet, scales, thematic, htmltools, htmlwidgets.
+   Only install packages that are NOT in the list above:
    {install_command}
 3. Write your R code to /home/user/project/app.R
 4. Verify: Rscript -e "parse('app.R'); cat('OK\\n')"
+
+Do NOT spend time running install.packages() for packages that are already \
+installed. Jump straight to creating app.R.
 
 Use modern bslib layout (page_sidebar, card, value_box, layout_columns). \
 Produce clean, production-quality R code.
