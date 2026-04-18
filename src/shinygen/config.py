@@ -57,7 +57,7 @@ FRAMEWORKS: dict[str, dict[str, str]] = {
             'launch.browser = FALSE)"'
         ),
         "install_command": (
-            'Rscript -e \'install.packages(c("NEW_PKG_HERE"), '
+            'Rscript -e \'install.packages(c("package_name"), '
             'repos = "https://cloud.r-project.org")\''
         ),
         "skill_dir": "shiny-bslib",
