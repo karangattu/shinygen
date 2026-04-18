@@ -590,6 +590,7 @@ def _run_generation(
 
     docker_dir = stage_docker_context(framework_key)
     log_path: Path | None = None
+    generation_usage_rows: list[dict[str, object]] = []
     try:
         task = build_generation_task(
             user_prompt=prompt,
@@ -654,7 +655,7 @@ def _run_generation(
 
     except Exception as exc:
         logger.error("Generation failed in iteration %d: %s", iteration, exc)
-        return None, [], False
+        return None, generation_usage_rows, False
     finally:
         if output_path is not None:
             copied_agent_screenshot = _copy_agent_screenshot_artifact(

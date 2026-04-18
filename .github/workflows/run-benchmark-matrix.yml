@@ -383,6 +383,13 @@ jobs:
               "prompt": os.environ["BENCHMARK_PROMPT"],
               "rows": rows,
               "missing_artifacts": missing,
+              "totals": {
+                  "total_cost": sum(r.get("total_cost") or 0 for r in rows),
+                  "generation_cost": sum(r.get("generation_cost") or 0 for r in rows),
+                  "judge_cost": sum(r.get("judge_cost") or 0 for r in rows),
+                  "total_input_tokens": sum(r.get("total_input_tokens") or 0 for r in rows),
+                  "total_output_tokens": sum(r.get("total_output_tokens") or 0 for r in rows),
+              },
           }
           (root / "benchmark_summary.json").write_text(
               json.dumps(summary_json, indent=2),
@@ -428,6 +435,23 @@ jobs:
                       artifact_dir=row.get("artifact_dir"),
                   )
               )
+
+          # Compute totals across all rows
+          benchmark_total_cost = sum(r.get("total_cost") or 0 for r in rows)
+          benchmark_gen_cost = sum(r.get("generation_cost") or 0 for r in rows)
+          benchmark_judge_cost = sum(r.get("judge_cost") or 0 for r in rows)
+          benchmark_input_tokens = sum(r.get("total_input_tokens") or 0 for r in rows)
+          benchmark_output_tokens = sum(r.get("total_output_tokens") or 0 for r in rows)
+
+          lines.append(
+              "| **Total** | | | | | | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
+                  total_cost=fmt_cost(benchmark_total_cost),
+                  generation_cost=fmt_cost(benchmark_gen_cost),
+                  judge_cost=fmt_cost(benchmark_judge_cost),
+                  input_tokens=benchmark_input_tokens,
+                  output_tokens=benchmark_output_tokens,
+              )
+          )
 
           if missing:
               lines.extend(
