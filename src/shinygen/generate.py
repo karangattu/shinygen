@@ -162,9 +162,101 @@ async def _read_artifact_text(sb: "SandboxEnvironment", path: str) -> str | None
 # ---------------------------------------------------------------------------
 
 
+SANDBOX_AUTO_SCREENSHOT_TIMEOUT = 90
+
+
+async def _ensure_sandbox_screenshot(
+    sb: "SandboxEnvironment",
+    framework: str,
+) -> bool:
+    """Capture screenshot.png in the sandbox project dir if missing.
+
+    The agent is asked to take its own screenshot, but in production runs
+    it sometimes skips this step. This fallback runs the bundled helper
+    against the agent's app inside the sandbox so the judge always has a
+    visual signal — independent of agent compliance.
+
+    Returns True when a screenshot file exists at the end of the call.
+    """
+    project = SANDBOX_WORK_DIR
+    screenshot_path = f"{project}/screenshot.png"
+    helper_path = f"{project}/.tools/screenshot_helper.py"
+
+    try:
+        existing = await sb.exec(["test", "-f", screenshot_path])
+        if existing.returncode == 0:
+            return True
+    except Exception as exc:
+        logger.debug("test -f %s failed: %s", screenshot_path, exc)
+
+    try:
+        helper_check = await sb.exec(["test", "-f", helper_path])
+        if helper_check.returncode != 0:
+            logger.debug("Screenshot helper not present at %s; skipping", helper_path)
+            return False
+    except Exception as exc:
+        logger.debug("Helper presence check failed: %s", exc)
+        return False
+
+    if framework == "shiny_r":
+        start_cmd = (
+            "cd {p} && nohup Rscript -e \"shiny::runApp('app.R', port=8000, "
+            "launch.browser=FALSE)\" > /tmp/auto_app.log 2>&1 &"
+        ).format(p=project)
+        stop_cmd = "pkill -f 'Rscript' || true"
+    else:
+        start_cmd = (
+            "cd {p} && nohup python3 -m shiny run app.py --port 8000 "
+            "> /tmp/auto_app.log 2>&1 &"
+        ).format(p=project)
+        stop_cmd = "pkill -f 'shiny run' || true"
+
+    try:
+        await sb.exec(["sh", "-lc", start_cmd])
+    except Exception as exc:
+        logger.warning("Auto-screenshot: failed to launch app: %s", exc)
+        return False
+
+    try:
+        result = await sb.exec(
+            [
+                "sh",
+                "-lc",
+                (
+                    f"python3 {helper_path} --port 8000 --output {screenshot_path} "
+                    "--wait 7 || true"
+                ),
+            ],
+            timeout=SANDBOX_AUTO_SCREENSHOT_TIMEOUT,
+        )
+        stdout = getattr(result, "stdout", "") or getattr(result, "output", "")
+        if stdout:
+            logger.debug("Auto-screenshot helper output: %s", stdout.strip())
+    except Exception as exc:
+        logger.warning("Auto-screenshot helper failed: %s", exc)
+    finally:
+        try:
+            await sb.exec(["sh", "-lc", stop_cmd])
+        except Exception:
+            pass
+
+    try:
+        check = await sb.exec(["test", "-f", screenshot_path])
+        return check.returncode == 0
+    except Exception:
+        return False
+
+
 @scorer(metrics=[])
-def app_created_scorer():
-    """1.0 if the expected artifact exists and is valid, 0.0 otherwise."""
+def app_created_scorer(screenshot: bool = False):
+    """1.0 if the expected artifact exists and is valid, 0.0 otherwise.
+
+    When ``screenshot`` is True, the scorer also ensures a screenshot of
+    the running app is captured inside the sandbox (using the bundled
+    helper) before the project is copied to the output volume. This makes
+    visual evaluation independent of whether the agent voluntarily ran
+    the screenshot tool.
+    """
 
     async def do_score(state: TaskState, target: Target) -> Score:
         from inspect_ai.util import sandbox
@@ -187,6 +279,20 @@ def app_created_scorer():
                 found_path = canonical
             except Exception as exc:
                 logger.warning("Failed to copy artifact to canonical path: %s", exc)
+
+        # Ensure a sandbox screenshot exists before copying the project so
+        # the host-side judge always has a visual signal (even when the
+        # agent forgot to take one itself).
+        if screenshot and found_path:
+            try:
+                captured = await _ensure_sandbox_screenshot(sb, framework)
+                if not captured:
+                    logger.warning(
+                        "Auto-screenshot did not produce screenshot.png; "
+                        "judge will fall back to agent attachment if any"
+                    )
+            except Exception as exc:
+                logger.warning("Auto-screenshot wrapper failed: %s", exc)
 
         # Copy project files to output volume
         sample_id = state.sample_id or "unknown"
@@ -339,7 +445,7 @@ def build_generation_task(
     return Task(
         dataset=dataset,
         solver=solver,
-        scorer=app_created_scorer(),
+        scorer=app_created_scorer(screenshot=screenshot),
         sandbox=("docker", str(docker_context_dir / compose_file)),
         time_limit=time_limit,
         working_limit=time_limit,

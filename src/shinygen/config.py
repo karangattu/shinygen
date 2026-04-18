@@ -109,9 +109,11 @@ SANDBOX_WORK_DIR = "/home/user/project"
 SANDBOX_TIME_LIMIT = 10 * 60  # 10 minutes
 # Shiny for R generations are generally slower due heavier startup and
 # package/runtime validation, so give them a larger execution budget.
+# 25 min for R lets Claude Opus complete with --screenshot enabled in 3
+# iterations within a 120 min GHA job budget.
 SANDBOX_TIME_LIMIT_BY_FRAMEWORK: dict[str, int] = {
     "shiny_python": SANDBOX_TIME_LIMIT,
-    "shiny_r": 20 * 60,
+    "shiny_r": 25 * 60,
 }
 BASE_PORT = 18801
 STARTUP_TIMEOUT = 25

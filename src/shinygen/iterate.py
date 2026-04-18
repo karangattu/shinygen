@@ -378,7 +378,14 @@ def generate_and_refine(
                     cache_read_tokens=int(row.get("cache_read_tokens", 0) or 0),
                 )
             if code is not None:
-                break
+                if hit_output_token_limit and screenshot and not (output_path / AGENT_LAST_SCREENSHOT_NAME).exists():
+                    logger.warning(
+                        "Iteration %d: Output token limit hit and screenshot missing, treating extraction as failed",
+                        iteration,
+                    )
+                    code = None
+                else:
+                    break
             if hit_output_token_limit and attempt < max_retries:
                 logger.warning(
                     "Iteration %d: Output token limit hit before artifact creation; retrying with direct-write prompt",
@@ -422,17 +429,29 @@ def generate_and_refine(
         # --- Step 3: Screenshots (host-side, for external judge) ---
         screenshot_paths: list[Path] = []
         if screenshot:
-            screenshot_paths = _resolve_judge_screenshot_paths(
-                output_path,
-                eval_dir,
-                framework_key,
-                effective_port,
-            )
-            logger.info(
-                "Iteration %d: Captured %d screenshots",
-                iteration,
-                len(screenshot_paths),
-            )
+            try:
+                screenshot_paths = _resolve_judge_screenshot_paths(
+                    output_path,
+                    eval_dir,
+                    framework_key,
+                    effective_port,
+                )
+                logger.info(
+                    "Iteration %d: Captured %d screenshots",
+                    iteration,
+                    len(screenshot_paths),
+                )
+            except RuntimeError as exc:
+                logger.error("Iteration %d: %s", iteration, exc)
+                if iteration == max_iterations:
+                    result.error = str(exc)
+                    break
+                current_prompt = (
+                    f"Your previous attempt failed: {exc}. "
+                    "Ensure your app runs locally without errors, and that you "
+                    "successfully run the screenshot tool before finishing."
+                )
+                continue
 
         # --- Step 4: Judge ---
         if judge_model:
