@@ -82,6 +82,7 @@ ui.layout_column_wrap(
         theme="success",
     ),
     width="240px",
+    gap="1rem",
     fill=False,
 )
 ```

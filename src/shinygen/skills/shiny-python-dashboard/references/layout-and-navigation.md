@@ -102,6 +102,7 @@ ui.layout_column_wrap(
     ui.value_box("Growth", ui.output_text("growth"), showcase=icon_svg("chart-line")),
     ui.value_box("Margin", ui.output_text("margin"), showcase=icon_svg("percent")),
     width="240px",
+    gap="1rem",
     fill=False,
 )
 ```
@@ -109,13 +110,14 @@ ui.layout_column_wrap(
 Use a CSS width like `"240px"` or `"280px"` when you want the column count to adapt to screen size automatically.
 
 ```python
-ui.layout_column_wrap(card_a, card_b, card_c, card_d, width="240px", fill=False)
+ui.layout_column_wrap(card_a, card_b, card_c, card_d, width="240px", gap="1rem", fill=False)
 ```
 
 Guidelines:
 
 - Prefer `width=1 / 3`, `width="240px"`, or `width="280px"` instead of hand-calculated percent strings.
 - Use `fill=False` for KPI rows so value boxes keep natural height.
+- Always pass `gap="1rem"` (or `"1.5rem"` for roomier spacing). Without an explicit gap, Python Shiny may render cards edge-to-edge with zero spacing.
 - Use `ui.layout_column_wrap()` when you want a clean, even dashboard rhythm.
 
 ### `ui.layout_columns()`
@@ -127,6 +129,7 @@ ui.layout_columns(
     ui.card(ui.card_header("Sidebar summary"), ui.output_text_verbatim("summary")),
     ui.card(ui.card_header("Main chart"), ui.output_plot("plot"), full_screen=True),
     col_widths=[4, 8],
+    gap="1rem",
 )
 ```
 
@@ -137,16 +140,19 @@ ui.layout_columns(
     chart_card,
     table_card,
     col_widths={"sm": 12, "md": [6, 6], "lg": [7, 5]},
+    gap="1rem",
 )
 ```
 
 Negative values create gaps when needed:
 
 ```python
-ui.layout_columns(card_a, card_b, col_widths=[5, -2, 5])
+ui.layout_columns(card_a, card_b, col_widths=[5, -2, 5], gap="1rem")
 ```
 
 Use `ui.layout_columns()` when the proportions matter more than uniformity.
+
+**Important:** Always pass `gap="1rem"` to both `ui.layout_columns()` and `ui.layout_column_wrap()`. Unlike R bslib which inherits a Bootstrap gap by default, Python Shiny layout containers may render with zero spacing if the `gap` parameter is omitted. This is the most common visual bug in generated dashboards.
 
 ## Navigation Containers
 
@@ -244,13 +250,18 @@ A common anti-squish pattern is a non-filling KPI row followed by readable cards
 ```python
 ui.page_sidebar(
     ui.sidebar(...),
-    ui.layout_column_wrap(kpi_a, kpi_b, kpi_c, kpi_d, width="240px", fill=False),
+    ui.layout_column_wrap(kpi_a, kpi_b, kpi_c, kpi_d, width="240px", gap="1rem", fill=False),
     ui.layout_columns(
         ui.card(ui.card_header("Chart A"), ui.output_plot("chart_a"), full_screen=True, min_height="320px"),
         ui.card(ui.card_header("Chart B"), ui.output_plot("chart_b"), full_screen=True, min_height="320px"),
         col_widths={"sm": 12, "xl": [6, 6]},
+        gap="1rem",
     ),
-    ui.card(ui.card_header("Table"), ui.output_data_frame("table"), full_screen=True, min_height="420px"),
+    ui.layout_columns(
+        ui.card(ui.card_header("Table"), ui.output_data_frame("table"), full_screen=True, min_height="420px"),
+        col_widths=[12],
+        gap="1rem",
+    ),
     fillable=False,
 )
 ```
@@ -265,3 +276,5 @@ ui.page_sidebar(
 6. Give visualization cards `min_height="320px"` or larger.
 7. Put page-specific controls in page-specific sidebars rather than forcing one global sidebar everywhere.
 8. Use `ui.navset_card_underline()` to organize plots, tables, and notes within a single card-sized region.
+9. Always pass `gap="1rem"` on every `ui.layout_column_wrap()` and `ui.layout_columns()` call — this is the most common spacing defect in Python Shiny dashboards.
+10. Never place cards directly as sequential page body children without a layout wrapper. Even a single full-width card should be inside `ui.layout_columns(card, col_widths=[12], gap="1rem")` for consistent vertical spacing.

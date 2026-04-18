@@ -107,6 +107,32 @@ Use CSS for:
 - subtle borders, backgrounds, and typography rules
 - responsive tweaks that do not belong inside Python layout logic
 
+### Mandatory card-spacing safety net
+
+Always include this rule in `styles.css` so that even cards placed outside a layout container get vertical spacing:
+
+```css
+/* Prevent cards from sticking together when placed as direct page children */
+.bslib-page-fill > .card + .card,
+.bslib-page-fill > .bslib-gap-spacing > .card + .card {
+  margin-top: 1rem;
+}
+
+/* Ensure layout containers themselves have vertical spacing between rows */
+.bslib-page-fill > .bslib-layout-wrap + .bslib-layout-wrap,
+.bslib-page-fill > .bslib-layout-columns + .bslib-layout-columns,
+.bslib-page-fill > .bslib-layout-wrap + .bslib-layout-columns,
+.bslib-page-fill > .bslib-layout-columns + .bslib-layout-wrap,
+.bslib-page-fill > .bslib-layout-wrap + .card,
+.bslib-page-fill > .card + .bslib-layout-wrap,
+.bslib-page-fill > .bslib-layout-columns + .card,
+.bslib-page-fill > .card + .bslib-layout-columns {
+  margin-top: 1rem;
+}
+```
+
+This is a safety net, not a replacement for passing `gap="1rem"` on layout containers. The CSS catches edge cases where a card or layout row ends up as a direct page child.
+
 Avoid using CSS to rebuild the layout system from scratch when Shiny layout primitives already solve the problem.
 
 ### Theme direction
