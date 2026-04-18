@@ -37,6 +37,13 @@ language syntax. Use Shiny Express or Core API with modern layout functions \
 (page_sidebar, card, value_box, etc.). Import from `shiny` or \
 `shiny.express`, and construct a real Shiny app in `app.py`. Remember: Use \
 Python, not R, and Shiny, not Streamlit or Dash. The file must be app.py.
+
+Dashboard layout rules for Python Shiny:
+- Put KPI and value-box rows in ui.layout_column_wrap(..., width="240px", gap="1rem", fill=False).
+- Always pass gap="1rem" (or roomier) to ui.layout_columns() and ui.layout_column_wrap() so cards do not touch.
+- For dense dashboards with a KPI row plus multiple chart, map, or table rows, set fillable=False on the page.
+- Never place multiple cards or value boxes as bare sequential page children; wrap them in ui.layout_columns() or ui.layout_column_wrap().
+- Give chart and table cards min_height="320px" or larger so they do not collapse into shallow strips.
 """
 
 SYSTEM_PROMPT_VISUAL_QA = """\

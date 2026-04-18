@@ -15,6 +15,12 @@ class TestBuildSystemPrompt:
         assert "app.py" in prompt
         assert "R" in prompt  # "DO NOT use R" should be in there
 
+    def test_python_prompt_includes_dashboard_spacing_rules(self):
+        prompt = build_system_prompt("shiny_python")
+        assert 'gap="1rem"' in prompt
+        assert "fillable=False" in prompt
+        assert "wrap them in ui.layout_columns() or ui.layout_column_wrap()" in prompt
+
     def test_python_prompt_prioritizes_writing_over_recon(self):
         prompt = build_system_prompt("shiny_python")
         assert "package version checks" in prompt
