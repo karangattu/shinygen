@@ -7,19 +7,19 @@ Generate, evaluate, and refine Shiny apps using LLM agents (Claude Code, Codex C
 ```mermaid
 flowchart TD
     A["👤 User Prompt + flags"] --> B["shinygen CLI / API"]
-    B --> C["Pre-flight checks\nDocker + API key"]
-    C --> D["Load framework defaults,\ndata files, and skills"]
+    B --> C["Pre-flight checks<br/>Docker + API key"]
+    C --> D["Load framework defaults,<br/>data files, and skills"]
     D --> E["Iteration loop"]
 
     subgraph F["Fresh Docker sandbox per iteration"]
-        G["Stage Docker context\n+ Inspect AI task"]
-        H["LLM Agent\n(Claude Code / Codex CLI)"]
+        G["Stage Docker context<br/>+ Inspect AI task"]
+        H["LLM Agent<br/>(Claude Code / Codex CLI)"]
         I["Generate app.py / app.R"]
         J{"--screenshot?"}
-        K["Run app on :8000\ninside sandbox"]
-        L["screenshot_helper.py\nwaits 7s and captures screenshot.png"]
-        M["Agent reviews screenshot\nand refines in sandbox"]
-        N["Scorer copies project files\nto results volume"]
+        K["Run app on :8000<br/>inside sandbox"]
+        L["screenshot_helper.py<br/>waits 7s and captures screenshot.png"]
+        M["Agent reviews screenshot<br/>and refines in sandbox"]
+        N["Scorer copies project files<br/>to results volume"]
         O["Eval log + usage rows"]
 
         E --> G --> H --> I --> J
@@ -28,20 +28,20 @@ flowchart TD
         N --> O
     end
 
-    O --> P["Extract code from results volume\nor eval log"]
-    O --> Q["Copy agent_last_screenshot.png\nfrom results or eval attachment"]
+    O --> P["Extract code from results volume<br/>or eval log"]
+    O --> Q["Copy agent_last_screenshot.png<br/>from results or eval attachment"]
     P --> R{"--judge-model?"}
     R -- Yes --> S["Run extracted app on host temp dir"]
     S --> T["Host Playwright screenshot"]
-    T --> U["External LLM judge\n(scores 4 criteria)"]
+    T --> U["External LLM judge<br/>(scores 4 criteria)"]
     U --> V{"Score ≥ threshold?"}
-    V -- No --> W["Refinement prompt includes\njudge feedback + previous code"]
+    V -- No --> W["Refinement prompt includes<br/>judge feedback + previous code"]
     W --> E
     V -- Yes --> X["✅ Output directory"]
     R -- No --> X
 
     Q --> X
-    X --> Y["Artifacts:\n• app.py / app.R\n• data files\n• screenshot.png\n• agent_last_screenshot.png\n• eval_logs/*.eval\n• run_summary.json"]
+    X --> Y["Artifacts:<br/>• app.py / app.R<br/>• data files<br/>• screenshot.png<br/>• agent_last_screenshot.png<br/>• eval_logs/*.eval<br/>• run_summary.json"]
 ```
 
 ### How It Works
