@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import ast
 import base64
+import io
 import json
 import re
+import struct
 import zipfile
 from pathlib import Path
 
@@ -18,6 +20,48 @@ CODE_PATTERN_PYTHON = re.compile(r"```python\s*\n(.*?)```", re.DOTALL)
 CODE_PATTERN_R = re.compile(r"```r\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 APP_ARTIFACTS = ("app.py", "app.R")
 ATTACHMENT_PREFIX = "attachment://"
+
+
+def _read_zip_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
+    """Read a ZIP member, including archives that use method 93 (zstd)."""
+    try:
+        return zf.read(info)
+    except NotImplementedError:
+        if info.compress_type != 93:
+            raise
+
+    try:
+        import zstandard as zstd
+    except ImportError as exc:  # pragma: no cover - exercised only when missing
+        raise NotImplementedError(
+            "ZIP method 93 (zstd) requires the zstandard package"
+        ) from exc
+
+    with open(zf.filename, "rb") as archive:
+        archive.seek(info.header_offset)
+        local_header = archive.read(30)
+        (
+            signature,
+            _version,
+            _flags,
+            _compression,
+            _mod_time,
+            _mod_date,
+            _crc,
+            _compressed_size,
+            _uncompressed_size,
+            name_len,
+            extra_len,
+        ) = struct.unpack("<IHHHHHIIIHH", local_header)
+
+        if signature != 0x04034B50:
+            raise zipfile.BadZipFile("Invalid local file header")
+
+        archive.seek(name_len + extra_len, 1)
+        compressed = archive.read(info.compress_size)
+
+    with zstd.ZstdDecompressor().stream_reader(io.BytesIO(compressed)) as reader:
+        return reader.read()
 
 
 def strip_line_numbers(text: str) -> str:
@@ -43,6 +87,55 @@ def _clean_text(text: str) -> str:
         r"<environment_details>.*?</environment_details>", "", text, flags=re.DOTALL
     )
     return text.strip()
+
+
+def _extract_heredoc_candidates(text: str, artifact_name: str) -> list[str]:
+    """Extract shell heredoc bodies that write the target artifact."""
+    candidates: list[str] = []
+    lines = text.splitlines()
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        if artifact_name not in line or "<<" not in line:
+            index += 1
+            continue
+
+        if not any(token in line for token in ("cat >", "cat >>", "tee ")):
+            index += 1
+            continue
+
+        match = re.search(r"<<-?\s*['\"]?([A-Za-z0-9_]+)['\"]?", line)
+        if not match:
+            index += 1
+            continue
+
+        delimiter = match.group(1)
+        body: list[str] = []
+        index += 1
+        while index < len(lines) and lines[index].strip() != delimiter:
+            body.append(lines[index])
+            index += 1
+
+        if body and index < len(lines):
+            candidates.append("\n".join(body).strip())
+
+        index += 1
+
+    return candidates
+
+
+def _normalize_tool_call_arguments(raw: object) -> dict[str, object]:
+    """Return tool-call arguments as a dict when possible."""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {"cmd": raw}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 
 
 def _candidate_score(code: str, artifact_name: str) -> tuple[int, int]:
@@ -74,6 +167,22 @@ def _candidate_score(code: str, artifact_name: str) -> tuple[int, int]:
 def _extract_python_from_text(text: str) -> str | None:
     """Extract Python app code from text content."""
     text = _clean_text(text)
+    heredoc_candidates = _extract_heredoc_candidates(text, "app.py")
+    if heredoc_candidates:
+        best_candidate: str | None = None
+        best_score: tuple[int, int] | None = None
+        for candidate in heredoc_candidates:
+            try:
+                ast.parse(candidate)
+            except SyntaxError:
+                continue
+            score = _candidate_score(candidate, "app.py")
+            if best_score is None or score > best_score:
+                best_candidate = candidate
+                best_score = score
+        if best_candidate is not None:
+            return best_candidate
+
     matches = [m.strip() for m in CODE_PATTERN_PYTHON.findall(text) if m.strip()]
 
     if matches:
@@ -118,6 +227,10 @@ def _extract_python_from_text(text: str) -> str | None:
 def _extract_r_from_text(text: str) -> str | None:
     """Extract R app code from text content."""
     text = _clean_text(text)
+    heredoc_candidates = _extract_heredoc_candidates(text, "app.R")
+    if heredoc_candidates:
+        return max(heredoc_candidates, key=lambda x: _candidate_score(x, "app.R"))
+
     matches = [m.strip() for m in CODE_PATTERN_R.findall(text) if m.strip()]
 
     if matches:
@@ -185,6 +298,17 @@ def find_app_code_in_messages(
                         if code:
                             candidates.append(code)
 
+        for tool_call in msg.get("tool_calls", []) or []:
+            if not isinstance(tool_call, dict):
+                continue
+            arguments = _normalize_tool_call_arguments(tool_call.get("arguments", {}))
+            for value in arguments.values():
+                if not isinstance(value, str):
+                    continue
+                code = find_app_code_in_text(value, artifact_name)
+                if code:
+                    candidates.append(code)
+
     # Strategy 2: assistant text content
     for msg in reversed(messages):
         if msg.get("role") != "assistant":
@@ -238,7 +362,7 @@ def extract_last_image_attachment(log_path: Path, output_path: Path) -> Path | N
         )
 
         for sample_file in sample_files:
-            sample = json.loads(z.read(sample_file))
+            sample = json.loads(_read_zip_member(z, z.getinfo(sample_file)))
             attachments = sample.get("attachments") or {}
             messages = sample.get("messages") or []
 
@@ -284,7 +408,7 @@ def extract_from_log(log_path: Path) -> dict[str, str]:
         ]
 
         for sf in sorted(sample_files):
-            sample = json.loads(z.read(sf))
+            sample = json.loads(_read_zip_member(z, z.getinfo(sf)))
             sid = sample.get("id", sf)
             messages = sample.get("messages", [])
 

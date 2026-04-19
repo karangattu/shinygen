@@ -13,6 +13,7 @@ from shinygen.iterate import (
     _copy_output_screenshots,
     _extract_generation_usage_rows,
     _generation_extra_config,
+    _recover_code_from_eval_logs,
     _resolve_judge_screenshot_paths,
     _write_run_summary,
 )
@@ -223,6 +224,69 @@ class TestCopyAgentScreenshotArtifact:
 
         assert copied == output_path / "agent_last_screenshot.png"
         assert copied.read_bytes() == last_image
+
+
+class TestRecoverCodeFromEvalLogs:
+    def test_recovers_code_from_latest_eval_log(self, tmp_path):
+        logs_dir = tmp_path / "logs"
+        logs_dir.mkdir()
+
+        sample = {
+            "id": "shinygen/generate",
+            "metadata": {
+                "framework": "shiny_r",
+                "primary_artifact": "app.R",
+            },
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": [],
+                    "tool_calls": [
+                        {
+                            "id": "call_123",
+                            "function": "exec_command",
+                            "arguments": {
+                                "cmd": (
+                                    "cat > /home/user/project/app.R <<'EOF'\n"
+                                    "library(shiny)\n"
+                                    "library(bslib)\n\n"
+                                    "ui <- page_sidebar(sidebar = sidebar(), textOutput('result'))\n\n"
+                                    "server <- function(input, output, session) {\n"
+                                    "  output$result <- renderText('ok')\n"
+                                    "}\n\n"
+                                    "shinyApp(ui, server)\n"
+                                    "EOF\n"
+                                    "Rscript -e \"parse('app.R')\""
+                                )
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+        eval_path = logs_dir / "sample.eval"
+        with zipfile.ZipFile(eval_path, "w") as archive:
+            archive.writestr(
+                "samples/shinygen/generate_epoch_1.json",
+                json.dumps(sample),
+            )
+
+        code, recovered_log_path = _recover_code_from_eval_logs(logs_dir, "app.R")
+
+        assert recovered_log_path == eval_path
+        assert code is not None
+        assert code.startswith("library(shiny)")
+        assert "shinyApp(ui, server)" in code
+
+    def test_returns_none_when_no_eval_log_exists(self, tmp_path):
+        code, recovered_log_path = _recover_code_from_eval_logs(
+            tmp_path / "missing-logs",
+            "app.R",
+        )
+
+        assert code is None
+        assert recovered_log_path is None
 
 
 class TestResolveJudgeScreenshotPaths:

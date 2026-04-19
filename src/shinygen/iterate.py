@@ -23,6 +23,7 @@ from .config import (
     resolve_model,
 )
 from .pricing import Timer, UsageStats
+from .extract import _read_zip_member, extract_from_log
 
 if TYPE_CHECKING:
     from inspect_ai.log import EvalLog
@@ -141,7 +142,7 @@ def _log_hit_output_token_limit(log_path: Path | None) -> bool:
             )
 
             for sample_file in sample_files:
-                sample = json.loads(archive.read(sample_file))
+                sample = json.loads(_read_zip_member(archive, archive.getinfo(sample_file)))
                 for message in sample.get("messages", []):
                     content = message.get("content")
                     if isinstance(content, str):
@@ -162,6 +163,35 @@ def _log_hit_output_token_limit(log_path: Path | None) -> bool:
         logger.debug("Failed to inspect eval log %s for token limits: %s", log_path, exc)
 
     return False
+
+
+def _recover_code_from_eval_logs(
+    logs_dir: Path,
+    artifact_name: str,
+) -> tuple[str | None, Path | None]:
+    """Recover app code from the newest copied eval log when sandbox output is missing."""
+    if not logs_dir.exists():
+        return None, None
+
+    log_candidates = sorted(logs_dir.rglob("*.eval"))
+    log_path = _latest_path(log_candidates)
+    if log_path is None:
+        return None, None
+
+    try:
+        code_map = extract_from_log(log_path)
+    except Exception as exc:
+        logger.debug("Failed to recover code from eval log %s: %s", log_path, exc)
+        return None, log_path
+
+    if not code_map:
+        return None, log_path
+
+    if len(code_map) == 1:
+        return next(iter(code_map.values())), log_path
+    if "shinygen/generate" in code_map:
+        return code_map["shinygen/generate"], log_path
+    return next(iter(code_map.values())), log_path
 
 
 def _latest_path(paths: list[Path]) -> Path | None:
@@ -589,6 +619,7 @@ def _run_generation(
     artifact_name = fw["primary_artifact"]
 
     docker_dir = stage_docker_context(framework_key)
+    logs_dir = docker_dir / "logs"
     log_path: Path | None = None
     generation_usage_rows: list[dict[str, object]] = []
     try:
@@ -611,7 +642,7 @@ def _run_generation(
         logs = inspect_eval(
             task,
             model=model_id,
-            log_dir=str(docker_dir / "logs"),
+            log_dir=str(logs_dir),
             **extra_config,
         )
 
@@ -655,7 +686,20 @@ def _run_generation(
 
     except Exception as exc:
         logger.error("Generation failed in iteration %d: %s", iteration, exc)
-        return None, generation_usage_rows, False
+        recovered_code, recovered_log_path = _recover_code_from_eval_logs(
+            logs_dir,
+            artifact_name,
+        )
+        if recovered_log_path is not None:
+            log_path = recovered_log_path
+        if recovered_code is not None:
+            logger.warning(
+                "Recovered %s from eval log after generation failure in iteration %d",
+                artifact_name,
+                iteration,
+            )
+            return recovered_code, generation_usage_rows, _log_hit_output_token_limit(log_path)
+        return None, generation_usage_rows, _log_hit_output_token_limit(log_path)
     finally:
         if output_path is not None:
             copied_agent_screenshot = _copy_agent_screenshot_artifact(
@@ -667,7 +711,6 @@ def _run_generation(
                 logger.info("Agent screenshot copied to %s", copied_agent_screenshot)
 
             # Copy eval logs to output directory before cleanup
-            logs_dir = docker_dir / "logs"
             if logs_dir.exists():
                 eval_logs_dest = output_path / "eval_logs"
                 eval_logs_dest.mkdir(parents=True, exist_ok=True)

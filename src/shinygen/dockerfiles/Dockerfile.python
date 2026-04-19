@@ -27,6 +27,7 @@ ARG CODEX_VERSION=rust-v0.121.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    ripgrep \
     tar \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \

@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     cmake \
     pkg-config \
+    ripgrep \
     git \
     curl \
     tar \
