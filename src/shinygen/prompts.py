@@ -44,6 +44,34 @@ Dashboard layout rules for Python Shiny:
 - For dense dashboards with a KPI row plus multiple chart, map, or table rows, set fillable=False on the page.
 - Never place multiple cards or value boxes as bare sequential page children; wrap them in ui.layout_columns() or ui.layout_column_wrap().
 - Give chart and table cards min_height="320px" or larger so they do not collapse into shallow strips.
+
+MANDATORY card-spacing safety net (Python Shiny only):
+You MUST also create /home/user/project/styles.css with the following content
+and load it from app.py via `ui.include_css(app_dir / "styles.css")` as the
+first child of the page container. Without this file, value boxes and cards
+will visibly touch in the rendered dashboard:
+
+```css
+.bslib-grid {{
+  gap: 1rem !important;
+  row-gap: 1rem !important;
+  column-gap: 1rem !important;
+}}
+.bslib-page-fill > .card + .card,
+.bslib-page-fill > .bslib-grid + .bslib-grid,
+.bslib-page-fill > .card + .bslib-grid,
+.bslib-page-fill > .bslib-grid + .card,
+.bslib-page-sidebar__main > .card + .card,
+.bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
+.bslib-page-sidebar__main > .card + .bslib-grid,
+.bslib-page-sidebar__main > .bslib-grid + .card {{
+  margin-top: 1rem;
+}}
+```
+
+This file is REQUIRED. Do not skip it. The bslib grid in Python Shiny defaults
+to gap: 0 unlike R bslib, so the !important rule above is the only reliable
+way to guarantee dashboards do not render with cards stuck together.
 """
 
 SYSTEM_PROMPT_VISUAL_QA = """\

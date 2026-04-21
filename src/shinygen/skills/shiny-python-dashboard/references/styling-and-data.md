@@ -109,29 +109,45 @@ Use CSS for:
 
 ### Mandatory card-spacing safety net
 
-Always include this rule in `styles.css` so that even cards placed outside a layout container get vertical spacing:
+Always include this rule in `styles.css` so cards never appear glued together,
+even when a `gap` argument is forgotten on a layout container. Unlike R bslib,
+Python Shiny's `ui.layout_columns()` and `ui.layout_column_wrap()` render
+`<div class="bslib-grid">` with `gap: 0` by default unless `gap=` is passed
+explicitly, so this CSS is the most reliable defense:
 
 ```css
-/* Prevent cards from sticking together when placed as direct page children */
+/* Force a sensible default gap on every bslib grid container.
+   Inline style="gap: ..." from layout_columns(gap=...) still wins. */
+.bslib-grid {
+  gap: 1rem !important;
+  row-gap: 1rem !important;
+  column-gap: 1rem !important;
+}
+
+/* Vertical spacing between bare cards or between a card and the next
+   layout row when they are placed as direct page children. */
 .bslib-page-fill > .card + .card,
-.bslib-page-fill > .bslib-gap-spacing > .card + .card {
+.bslib-page-fill > .bslib-grid + .bslib-grid,
+.bslib-page-fill > .card + .bslib-grid,
+.bslib-page-fill > .bslib-grid + .card,
+.bslib-page-sidebar__main > .card + .card,
+.bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
+.bslib-page-sidebar__main > .card + .bslib-grid,
+.bslib-page-sidebar__main > .bslib-grid + .card {
   margin-top: 1rem;
 }
 
-/* Ensure layout containers themselves have vertical spacing between rows */
-.bslib-page-fill > .bslib-layout-wrap + .bslib-layout-wrap,
-.bslib-page-fill > .bslib-layout-columns + .bslib-layout-columns,
-.bslib-page-fill > .bslib-layout-wrap + .bslib-layout-columns,
-.bslib-page-fill > .bslib-layout-columns + .bslib-layout-wrap,
-.bslib-page-fill > .bslib-layout-wrap + .card,
-.bslib-page-fill > .card + .bslib-layout-wrap,
-.bslib-page-fill > .bslib-layout-columns + .card,
-.bslib-page-fill > .card + .bslib-layout-columns {
-  margin-top: 1rem;
+/* Value boxes inside a bslib grid never touch */
+.bslib-grid > .bslib-value-box + .bslib-value-box {
+  margin-left: 0;  /* gap on parent already handles spacing */
 }
 ```
 
-This is a safety net, not a replacement for passing `gap="1rem"` on layout containers. The CSS catches edge cases where a card or layout row ends up as a direct page child.
+This safety net is **mandatory** for every Python Shiny dashboard. It catches
+the most common visual defect: cards rendered edge-to-edge with no spacing
+because `gap=` was omitted on a layout container or because cards were placed
+as bare page children. It does not replace passing `gap="1rem"` explicitly —
+it ensures the dashboard looks correct even if you forget.
 
 Avoid using CSS to rebuild the layout system from scratch when Shiny layout primitives already solve the problem.
 
