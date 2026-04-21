@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **Judge requires sandbox screenshots**: Iteration judging now reuses `agent_last_screenshot.png` captured inside the sandbox and fails loudly if that artifact is missing instead of falling back to host-side or code-only judging. This keeps benchmark visual scoring tied to sandbox-captured evidence and avoids silent quality regressions.
 
 ### Fixed
+- **Benchmark resilience when agent SIGTERMs**: When the in-sandbox `agent_last_screenshot.png` is missing (e.g. the codex/claude CLI is killed mid-run before reaching its screenshot step), `_resolve_judge_screenshot_paths` now attempts a host-side capture against the recovered code instead of immediately raising. If host-side capture also fails on the final iteration, the loop proceeds with code-only judging rather than failing the entire run. Set `SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1` to restore the previous strict behavior.
 - **Token truncation recovery**: Detect when Claude hits output token limits before writing artifacts; automatically retry with a focused direct-write prompt instead of repeating the full generation
 - **R screenshot pipeline**: Uncomment R app launch command in visual-QA skill, add `python3` screenshot helper reference for R containers, and add `Rscript` process cleanup
 - **R package baseline**: Add `scales` and `thematic` to default R install command to prevent app startup failures during visual QA

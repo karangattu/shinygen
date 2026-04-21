@@ -252,16 +252,70 @@ def _resolve_judge_screenshot_paths(
     framework_key: str,
     port: int,
 ) -> list[Path]:
-    """Return sandbox screenshots for judging or raise if they are missing."""
+    """Return screenshots for judging.
+
+    Preference order:
+    1. Sandbox-captured ``agent_last_screenshot.png`` (most faithful to the
+       agent's run).
+    2. Host-side capture of the extracted code (best-effort fallback when
+       the sandbox screenshot is missing — e.g. agent SIGTERMed mid-task).
+    3. Raise ``RuntimeError`` so the caller can decide whether to retry or
+       proceed with code-only judging.
+
+    Set ``SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1`` to disable the host-side
+    fallback and preserve the original strict behavior.
+    """
+    import os
+
     agent_screenshot = output_path / AGENT_LAST_SCREENSHOT_NAME
     if agent_screenshot.exists():
         logger.info("Using agent screenshot for judge: %s", agent_screenshot.name)
         return [agent_screenshot]
 
+    strict = os.environ.get("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if not strict:
+        try:
+            from . import screenshot as host_screenshot
+
+            logger.warning(
+                "Sandbox screenshot missing; attempting host-side capture "
+                "fallback (framework=%s, port=%d)",
+                framework_key,
+                port,
+            )
+            captured = host_screenshot.take_screenshots(eval_dir, framework_key, port)
+        except Exception as exc:  # pragma: no cover - host env dependent
+            logger.warning("Host-side screenshot fallback raised: %s", exc)
+            captured = None
+
+        if captured is not None and Path(captured).exists():
+            destination = output_path / AGENT_LAST_SCREENSHOT_NAME
+            try:
+                shutil.copy2(captured, destination)
+            except Exception as exc:  # pragma: no cover - filesystem dependent
+                logger.warning(
+                    "Failed to copy host screenshot to %s: %s", destination, exc
+                )
+                return [Path(captured)]
+            logger.info(
+                "Using host-side fallback screenshot for judge: %s",
+                destination.name,
+            )
+            return [destination]
+
+        logger.warning(
+            "Host-side screenshot fallback did not produce an image; "
+            "judge will need to operate without a screenshot."
+        )
+
     raise RuntimeError(
         "Missing sandbox screenshot: expected "
         f"{AGENT_LAST_SCREENSHOT_NAME} in {output_path}. "
-        "Refusing to fall back to host-side or code-only judging."
+        "Host-side fallback also failed."
     )
 
 
@@ -474,14 +528,22 @@ def generate_and_refine(
             except RuntimeError as exc:
                 logger.error("Iteration %d: %s", iteration, exc)
                 if iteration == max_iterations:
-                    result.error = str(exc)
-                    break
-                current_prompt = (
-                    f"Your previous attempt failed: {exc}. "
-                    "Ensure your app runs locally without errors, and that you "
-                    "successfully run the screenshot tool before finishing."
-                )
-                continue
+                    # Final iteration: don't hard-fail the whole run just
+                    # because the screenshot pipeline broke. Proceed with
+                    # code-only judging so we still get a usable result.
+                    logger.warning(
+                        "Iteration %d: Proceeding with code-only judging "
+                        "(no screenshot available).",
+                        iteration,
+                    )
+                    screenshot_paths = []
+                else:
+                    current_prompt = (
+                        f"Your previous attempt failed: {exc}. "
+                        "Ensure your app runs locally without errors, and that you "
+                        "successfully run the screenshot tool before finishing."
+                    )
+                    continue
 
         # --- Step 4: Judge ---
         if judge_model:

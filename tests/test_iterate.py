@@ -305,7 +305,7 @@ class TestResolveJudgeScreenshotPaths:
 
         assert screenshot_paths == [agent_screenshot]
 
-    def test_raises_when_agent_screenshot_is_missing_even_if_host_succeeds(
+    def test_falls_back_to_host_side_capture_when_sandbox_missing(
         self,
         tmp_path,
         monkeypatch,
@@ -317,15 +317,78 @@ class TestResolveJudgeScreenshotPaths:
         host_screenshot = eval_dir / "screenshot.png"
         host_screenshot.write_bytes(b"host")
 
+        monkeypatch.delenv("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", raising=False)
+
         def fake_take_screenshots(app_dir, framework_key, port):
             assert app_dir == eval_dir
             assert framework_key == "shiny_r"
             assert port == 18888
             return host_screenshot
 
-        monkeypatch.setattr("shinygen.screenshot.take_screenshots", fake_take_screenshots)
+        monkeypatch.setattr(
+            "shinygen.screenshot.take_screenshots", fake_take_screenshots
+        )
+
+        screenshot_paths = _resolve_judge_screenshot_paths(
+            output_path,
+            eval_dir,
+            "shiny_r",
+            18888,
+        )
+
+        copied = output_path / "agent_last_screenshot.png"
+        assert screenshot_paths == [copied]
+        assert copied.read_bytes() == b"host"
+
+    def test_raises_in_strict_mode_when_sandbox_missing(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        eval_dir = tmp_path / "eval"
+        eval_dir.mkdir()
+        host_screenshot = eval_dir / "screenshot.png"
+        host_screenshot.write_bytes(b"host")
+
+        monkeypatch.setenv("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", "1")
+
+        def fake_take_screenshots(app_dir, framework_key, port):
+            return host_screenshot
+
+        monkeypatch.setattr(
+            "shinygen.screenshot.take_screenshots", fake_take_screenshots
+        )
 
         with pytest.raises(RuntimeError, match="Missing sandbox screenshot"):
+            _resolve_judge_screenshot_paths(
+                output_path,
+                eval_dir,
+                "shiny_r",
+                18888,
+            )
+
+    def test_raises_when_sandbox_missing_and_host_fallback_fails(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        eval_dir = tmp_path / "eval"
+        eval_dir.mkdir()
+
+        monkeypatch.delenv("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", raising=False)
+
+        def fake_take_screenshots(app_dir, framework_key, port):
+            return None
+
+        monkeypatch.setattr(
+            "shinygen.screenshot.take_screenshots", fake_take_screenshots
+        )
+
+        with pytest.raises(RuntimeError, match="Host-side fallback also failed"):
             _resolve_judge_screenshot_paths(
                 output_path,
                 eval_dir,
