@@ -526,18 +526,26 @@ def generate_and_refine(
                     len(screenshot_paths),
                 )
             except RuntimeError as exc:
-                logger.error("Iteration %d: %s", iteration, exc)
                 if iteration == max_iterations:
                     # Final iteration: don't hard-fail the whole run just
                     # because the screenshot pipeline broke. Proceed with
                     # code-only judging so we still get a usable result.
                     logger.warning(
-                        "Iteration %d: Proceeding with code-only judging "
-                        "(no screenshot available).",
+                        "Iteration %d: %s Proceeding with code-only "
+                        "judging (no screenshot available).",
                         iteration,
+                        exc,
                     )
                     screenshot_paths = []
                 else:
+                    # Recoverable: next iteration will retry with a prompt
+                    # asking the agent to take its own screenshot.
+                    logger.warning(
+                        "Iteration %d: %s Retrying with screenshot-focused "
+                        "prompt for the next iteration.",
+                        iteration,
+                        exc,
+                    )
                     current_prompt = (
                         f"Your previous attempt failed: {exc}. "
                         "Ensure your app runs locally without errors, and that you "

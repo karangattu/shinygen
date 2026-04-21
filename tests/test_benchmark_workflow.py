@@ -72,13 +72,18 @@ def test_benchmark_workflow_pins_gpt54_mini_judge_model():
     assert 'BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17' in workflow
 
 
-def test_benchmark_workflow_uses_runner_minimal_install_after_sandbox_prebuild():
+def test_benchmark_workflow_installs_screenshot_extras_for_host_fallback():
+    """The runner must have Playwright + Shiny runtime so the host-side
+    screenshot fallback in iterate.py can capture an image when the agent
+    fails to produce one in the sandbox.
+    """
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert 'Install shinygen CLI on runner' in workflow
-    assert 'python -m pip install -e .' in workflow
-    assert 'python -m pip install -e ".[screenshot]"' not in workflow
-    assert 'python -m playwright install --with-deps chromium' not in workflow
+    assert 'python -m pip install -e ".[screenshot]"' in workflow
+    assert 'python -m playwright install --with-deps chromium' in workflow
+    # R packages are NOT reinstalled on the runner — host fallback for R
+    # is best-effort and degrades to code-only judging on its own.
     assert 'install.packages(c(' not in workflow
 
 

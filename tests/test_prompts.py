@@ -17,9 +17,10 @@ class TestBuildSystemPrompt:
 
     def test_python_prompt_includes_dashboard_spacing_rules(self):
         prompt = build_system_prompt("shiny_python")
-        assert 'gap="1rem"' in prompt
         assert "fillable=False" in prompt
-        assert "wrap them in ui.layout_columns() or ui.layout_column_wrap()" in prompt
+        assert 'min_height="320px"' in prompt
+        assert "ui.layout_columns() or ui.layout_column_wrap()" in prompt
+        assert "ui.page_navbar()" in prompt
 
     def test_python_prompt_prioritizes_writing_over_recon(self):
         prompt = build_system_prompt("shiny_python")

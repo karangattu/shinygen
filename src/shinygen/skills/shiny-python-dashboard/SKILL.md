@@ -21,32 +21,9 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 10. Format all displayed numbers for readability with commas, currency symbols, percentages, or compact abbreviations.
 11. Keep the default dashboard hierarchy: value boxes at the top, charts in the middle, and the detailed table below.
 12. Use breakpoint-aware `col_widths` so the layout still works on mobile.
-13. Always add `gap="1rem"` (or `"1.5rem"` for a roomier look) to `ui.layout_column_wrap()` and `ui.layout_columns()` so cards never stick together. The default CSS gap in Python Shiny can be zero depending on the page context, unlike R bslib which defaults to a Bootstrap gap. Always pass it explicitly.
-14. Never stack cards directly as page body children without wrapping them in a layout container (`ui.layout_columns()` or `ui.layout_column_wrap()`). Bare cards placed as sequential page children have no gap between them and will appear glued together.
-15. Always create a `styles.css` next to `app.py` with the **mandatory card-spacing safety net** below and load it via `ui.include_css(app_dir / "styles.css")`. This is the single most reliable defense against value boxes and cards rendering glued together — it works even when you forget to pass `gap=` on a layout container.
-
-```css
-/* MANDATORY: force a default gap on every bslib grid container.
-   Inline style="gap: ..." set by layout_columns(gap=...) still wins. */
-.bslib-grid {
-  gap: 1rem !important;
-  row-gap: 1rem !important;
-  column-gap: 1rem !important;
-}
-
-/* Vertical spacing between bare cards or rows placed as direct children
-   of the page or sidebar main area. */
-.bslib-page-fill > .card + .card,
-.bslib-page-fill > .bslib-grid + .bslib-grid,
-.bslib-page-fill > .card + .bslib-grid,
-.bslib-page-fill > .bslib-grid + .card,
-.bslib-page-sidebar__main > .card + .card,
-.bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
-.bslib-page-sidebar__main > .card + .bslib-grid,
-.bslib-page-sidebar__main > .bslib-grid + .card {
-  margin-top: 1rem;
-}
-```
+13. For multi-section dashboards (e.g. *Performance · Patient Flow · Outcomes*), default to `ui.page_navbar()` with one `ui.nav_panel()` per section. Single-page sidebar layouts work for narrow analytical apps; multi-tab layouts consistently feel more "production-grade" for broad operational dashboards.
+14. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta (`↓ 4.1% vs prior period`) using a secondary line and a coloured trend icon — this is the single biggest visual upgrade over a default dashboard.
+15. Only call `ui.include_css(app_dir / "styles.css")` if you actually create the `styles.css` file in the same step. A missing referenced stylesheet raises `FileNotFoundError` at startup and the app will not run.
 
 ## Quick Start
 
@@ -67,7 +44,6 @@ app_ui = ui.page_sidebar(
         ui.input_select("metric", "Metric", choices=list(df.columns)),
         open="desktop",
     ),
-    ui.include_css(app_dir / "styles.css"),
     ui.layout_column_wrap(
         ui.value_box(
             "Rows",
@@ -82,7 +58,6 @@ app_ui = ui.page_sidebar(
             theme="info",
         ),
         width="240px",
-        gap="1rem",
         fill=False,
     ),
     ui.layout_columns(
@@ -99,7 +74,6 @@ app_ui = ui.page_sidebar(
             min_height="320px",
         ),
         col_widths={"sm": 12, "xl": [6, 6]},
-        gap="1rem",
     ),
     ui.layout_columns(
         ui.card(
@@ -109,7 +83,6 @@ app_ui = ui.page_sidebar(
             min_height="420px",
         ),
         col_widths=[12],
-        gap="1rem",
     ),
     title="Dashboard",
     fillable=False,
@@ -274,7 +247,7 @@ If you are replacing an older Shiny for Python layout or translating an R bslib 
 
 1. Prefer Shiny's page and layout primitives over raw `ui.div()` composition when building dashboards.
 2. Keep one API style per app unless you have a compelling reason to mix Core and Express.
-3. Use `ui.layout_column_wrap(..., width="240px", gap="1rem", fill=False)` for KPI rows so they wrap cleanly before cards become cramped.
+3. Use `ui.layout_column_wrap(..., width="240px", fill=False)` for KPI rows so they wrap cleanly before cards become cramped. Pass an explicit `gap="1rem"` only if you observe cards rendering edge-to-edge in your specific theme; the bslib defaults are usually fine.
 4. Wrap dashboard outputs in cards and default to `full_screen=True` on charts, maps, and tables.
 5. Use `fillable=False` for dense dashboards with more than one row of visualization cards.
 6. Give plot, map, and table cards a floor like `min_height="320px"`; larger tables often need `min_height="420px"`.
@@ -285,9 +258,9 @@ If you are replacing an older Shiny for Python layout or translating an R bslib 
 11. Never display raw numbers when a formatted value is more readable.
 12. Guard empty selections and filtered datasets with `req()` before rendering.
 13. Never pass duplicate keys when unpacking Plotly dicts; merge overrides with `{**base, "key": value}` instead.
-14. Always pass `gap="1rem"` on every `ui.layout_column_wrap()` and `ui.layout_columns()` call. This is the single most common visual defect in Python Shiny dashboards: without it, cards render edge-to-edge with zero spacing.
-15. Every card must live inside a layout container (`ui.layout_columns()` or `ui.layout_column_wrap()`), even if the row has only one card. Pass `col_widths=[12]` for full-width single-card rows. This ensures consistent gap behavior.
-16. The dashboard MUST ship a `styles.css` containing the bslib grid safety net (see rule 15) and load it via `ui.include_css(app_dir / "styles.css")`. Without it, agents that forget `gap=` produce dashboards where every value box and card visibly touches the next.
+14. Reach for `ui.page_navbar()` whenever the prompt names more than two analytical themes (flow, staffing, outcomes, etc.). Multi-tab layouts are perceived as more polished than a single long-scroll page.
+15. In every value box, surface a *delta* alongside the headline number — e.g. `↓ 4.1% vs prior period` or `+12 vs yesterday` — using a small text line and a coloured `arrow-up` / `arrow-down` icon. This is the cheapest visual win available.
+16. If you reference an external CSS file with `ui.include_css(...)`, you must also create that file in the same write step. Otherwise drop the include — `ui.include_css` raises if the file is missing.
 
 ## Avoid Common Errors
 
@@ -300,8 +273,8 @@ If you are replacing an older Shiny for Python layout or translating an R bslib 
 7. Do not pass the same key through both `**base_dict` and a keyword override in Plotly layout dictionaries.
 8. Do not assume a sidebar on `ui.page_navbar()` should drive every page; use page-specific controls when sections need different filters.
 9. Do not leave cards untitled or charts unlabeled.
-10. Do not stack cards directly as page body children without a layout wrapper. Cards placed as sequential arguments to `ui.page_sidebar()` without being inside `ui.layout_columns()` or `ui.layout_column_wrap()` will have zero gap and appear glued together.
-11. Do not omit `gap="1rem"` on `ui.layout_column_wrap()` and `ui.layout_columns()`. Unlike R bslib, Python Shiny layout containers may render with zero gap if the parameter is not passed explicitly.
+10. Do not call `ui.include_css(app_dir / "styles.css")` without creating `styles.css` in the same step — the app will fail to start with `FileNotFoundError`.
+11. Do not over-correct spacing with `!important` CSS overrides in `styles.css`. Modern bslib + Python Shiny renders cards with sensible default gaps; reach for CSS only when you observe a real defect.
 
 ## Number formatting
 

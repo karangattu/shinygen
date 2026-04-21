@@ -39,39 +39,12 @@ language syntax. Use Shiny Express or Core API with modern layout functions \
 Python, not R, and Shiny, not Streamlit or Dash. The file must be app.py.
 
 Dashboard layout rules for Python Shiny:
-- Put KPI and value-box rows in ui.layout_column_wrap(..., width="240px", gap="1rem", fill=False).
-- Always pass gap="1rem" (or roomier) to ui.layout_columns() and ui.layout_column_wrap() so cards do not touch.
+- Put KPI and value-box rows in ui.layout_column_wrap(..., width="240px", fill=False).
 - For dense dashboards with a KPI row plus multiple chart, map, or table rows, set fillable=False on the page.
-- Never place multiple cards or value boxes as bare sequential page children; wrap them in ui.layout_columns() or ui.layout_column_wrap().
+- Wrap cards in ui.layout_columns() or ui.layout_column_wrap() rather than dropping them as bare sequential page children.
 - Give chart and table cards min_height="320px" or larger so they do not collapse into shallow strips.
-
-MANDATORY card-spacing safety net (Python Shiny only):
-You MUST also create /home/user/project/styles.css with the following content
-and load it from app.py via `ui.include_css(app_dir / "styles.css")` as the
-first child of the page container. Without this file, value boxes and cards
-will visibly touch in the rendered dashboard:
-
-```css
-.bslib-grid {{
-  gap: 1rem !important;
-  row-gap: 1rem !important;
-  column-gap: 1rem !important;
-}}
-.bslib-page-fill > .card + .card,
-.bslib-page-fill > .bslib-grid + .bslib-grid,
-.bslib-page-fill > .card + .bslib-grid,
-.bslib-page-fill > .bslib-grid + .card,
-.bslib-page-sidebar__main > .card + .card,
-.bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
-.bslib-page-sidebar__main > .card + .bslib-grid,
-.bslib-page-sidebar__main > .bslib-grid + .card {{
-  margin-top: 1rem;
-}}
-```
-
-This file is REQUIRED. Do not skip it. The bslib grid in Python Shiny defaults
-to gap: 0 unlike R bslib, so the !important rule above is the only reliable
-way to guarantee dashboards do not render with cards stuck together.
+- For multi-section dashboards (Performance / Patient Flow / Outcomes etc.), prefer ui.page_navbar() with a ui.nav_panel() per section over cramming everything onto one scrolling page.
+- If you reference a stylesheet (e.g. ui.include_css(app_dir / "styles.css")), you MUST also create that file. Otherwise omit the include — a missing file raises at startup and the app will not run.
 """
 
 SYSTEM_PROMPT_VISUAL_QA = """\

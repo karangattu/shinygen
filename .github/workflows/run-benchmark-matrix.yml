@@ -207,7 +207,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -e .
+          # Install with [screenshot] extras so the host-side screenshot
+          # fallback in iterate.py can capture an image when the in-sandbox
+          # screenshot is missing (e.g. agent SIGTERMed mid-run).
+          python -m pip install -e ".[screenshot]"
+          python -m playwright install --with-deps chromium
+          # Runtime deps so the fallback can actually start the generated
+          # app on the runner. Shiny-R apps have R + system Shiny baked
+          # into the sandbox image only, so host-side fallback for R
+          # is best-effort and will gracefully degrade to code-only judging.
+          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
+            python -m pip install \
+              shiny plotly faicons pandas matplotlib seaborn shinywidgets
+          fi
 
       - name: Run shinygen benchmark generation
         shell: bash
