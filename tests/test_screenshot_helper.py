@@ -37,6 +37,8 @@ class TestWaitForShinyRender:
         page = MagicMock()
         page.wait_for_function.side_effect = TimeoutError("timed out")
 
-        # Should not raise
+        # Should not raise. _wait_for_shiny_render now performs three
+        # wait_for_function calls: Shiny-connect, busy-flag, and a
+        # widget-settle pass for leaflet/plotly.
         _wait_for_shiny_render(page, wait=0.01)
-        assert page.wait_for_function.call_count == 2
+        assert page.wait_for_function.call_count == 3

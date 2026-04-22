@@ -29,16 +29,29 @@ SHINY_BUSY_TIMEOUT = 10000  # ms
 def _wait_for_shiny_render(page: "Page", wait: float = DEFAULT_WAIT) -> None:
     """Wait for Shiny to connect and render outputs.
 
+    Strategy (each step is best-effort, never raises):
+      1. Wait for the network to go idle (tiles, fonts, JS bundles).
+      2. Wait for Shiny + at least one bound output to exist.
+      3. Sleep ``wait`` seconds for deferred async renders.
+      4. Wait until ``html.shiny-busy`` is gone.
+      5. Wait for leaflet tiles and plotly SVGs to finish drawing.
+
     This shared logic is used by both the in-sandbox helper and
     the host-side screenshot module.
     """
-    # Wait for Shiny connection + bound outputs
+    # 1. Network idle (tiles, fonts, JS bundles)
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception:
+        pass
+
+    # 2. Shiny connection + bound outputs
     try:
         page.wait_for_function(
             """() => {
                 if (typeof Shiny === 'undefined') return false;
                 var outputs = document.querySelectorAll(
-                    '.shiny-bound-output, .html-widget, .plotly'
+                    '.shiny-bound-output, .html-widget, .plotly, .leaflet-container, .gt_table'
                 );
                 return outputs.length > 0;
             }""",
@@ -49,11 +62,30 @@ def _wait_for_shiny_render(page: "Page", wait: float = DEFAULT_WAIT) -> None:
 
     time.sleep(wait)
 
-    # Wait until Shiny is not busy
+    # 3. Wait until Shiny is not busy
     try:
         page.wait_for_function(
             "() => !document.querySelector('html.shiny-busy')",
             timeout=SHINY_BUSY_TIMEOUT,
+        )
+    except Exception:
+        pass
+
+    # 4. Widget-specific settle
+    try:
+        page.wait_for_function(
+            """() => {
+                var leaflets = document.querySelectorAll('.leaflet-container');
+                for (var i = 0; i < leaflets.length; i++) {
+                    if (!leaflets[i].querySelector('.leaflet-tile-loaded')) return false;
+                }
+                var plotlys = document.querySelectorAll('.plotly, .js-plotly-plot');
+                for (var j = 0; j < plotlys.length; j++) {
+                    if (!plotlys[j].querySelector('svg.main-svg')) return false;
+                }
+                return true;
+            }""",
+            timeout=10000,
         )
     except Exception:
         pass

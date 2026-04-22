@@ -30,6 +30,8 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 19. Never put more than one chart inside a single `@render.plot` (no `plt.subplots(nrows=N>1)`). Stacked Matplotlib subplots inside one card consistently produce title-into-frame collisions in screenshots. Split into one card per chart instead and let `ui.layout_columns` arrange them.
 20. Format numbers in `render.DataGrid` outputs the same way you format numbers in value boxes. Never display a raw 6-decimal float in a table — apply `df.assign(col=df["col"].map(lambda v: f"{v:,.1f}"))` or `df.style.format(...)` before passing to `DataGrid`.
 21. Wire up `ui.input_dark_mode()` in the navbar (or sidebar) of every dashboard. Dark-mode capability is now a baseline expectation for "modern BI tool" polish.
+22. For *summary* tables (top-N, league tables, KPI breakdowns) prefer `great_tables.GT(...)` over `render.DataGrid` — render via `@render.ui` returning `ui.HTML(GT(df).as_raw_html())`. `great_tables` produces a typeset, publication-quality table with column groups, spanners, formatted units (`fmt_currency`, `fmt_percent`, `fmt_number`), and bar/colour data cells. Reserve `render.DataGrid` for the long, scrollable, *filterable* drill-down table.
+23. For maps, never settle for a default `folium.Map()` with default OpenStreetMap tiles — that screams "tutorial app". Use one of: (a) Plotly `px.scatter_mapbox` / `density_mapbox` with `mapbox_style="carto-positron"` or `"carto-darkmatter"`, (b) `pydeck` with `HexagonLayer` / `ScatterplotLayer` for 3D aggregation, or (c) `folium` with `tiles="CartoDB positron"` + `MarkerCluster` and a `branca.colormap` legend. Match the basemap to the dashboard theme (light tiles for light theme, dark tiles for dark).
 
 ## Quick Start
 
@@ -217,6 +219,193 @@ See [references/styling-and-data.md](references/styling-and-data.md) for project
 Use `faicons.icon_svg()` for dashboard icons and treat map widgets as full-screen cards with clear loading and empty-state behavior.
 
 See [references/icons-and-maps.md](references/icons-and-maps.md) for icon, accessibility, and map patterns.
+
+## Beautiful tables — great_tables
+
+For any *summary* table on a dashboard (top 10 listings, KPI breakdown by
+category, league table), use [great_tables](https://posit-dev.github.io/great-tables/)
+instead of `render.DataGrid`. `great_tables` ships a publication-quality typeset
+table with formatted units, column spanners, in-cell data bars, and
+theme-friendly styling. Render via `@render.ui` returning `ui.HTML(...)`.
+
+```python
+from great_tables import GT, loc, style
+from shiny import App, render, ui
+
+app_ui = ui.page_fillable(
+    ui.card(
+        ui.card_header("Top neighbourhoods by revenue"),
+        ui.output_ui("top_table"),
+        full_screen=True,
+        min_height="460px",
+    ),
+)
+
+def server(input, output, session):
+    @render.ui
+    def top_table():
+        top = (
+            df.groupby("neighbourhood", as_index=False)
+              .agg(listings=("id", "count"),
+                   revenue=("price", "sum"),
+                   avg_rating=("rating", "mean"))
+              .nlargest(10, "revenue")
+        )
+        gt = (
+            GT(top, rowname_col="neighbourhood")
+            .tab_header(title="Top 10 neighbourhoods",
+                        subtitle="Ranked by total revenue")
+            .fmt_number("listings", decimals=0, use_seps=True)
+            .fmt_currency("revenue", currency="USD", decimals=0)
+            .fmt_number("avg_rating", decimals=2)
+            .data_color(
+                columns=["revenue"],
+                palette=["#fee5d9", "#a50f15"],
+            )
+            .cols_label(listings="Listings",
+                        revenue="Revenue",
+                        avg_rating="Avg rating")
+            .tab_options(
+                table_font_size="13px",
+                heading_title_font_size="16px",
+                column_labels_font_weight="600",
+                table_background_color="transparent",
+            )
+        )
+        return ui.HTML(gt.as_raw_html())
+```
+
+Guidelines:
+
+- Always set `tab_header(title=, subtitle=)` so the card double-titles cleanly.
+- Use `fmt_currency` / `fmt_percent` / `fmt_number(decimals=, use_seps=True)` — never show raw floats.
+- Use `data_color(columns=[...], palette=[...])` for in-cell heatmaps; pick a palette that matches your brand colours.
+- Use `cols_label()` to humanise snake_case column names.
+- Set `table_background_color="transparent"` so the GT table inherits the card's surface (works in both light and dark mode).
+- Keep `great_tables` for **summary** tables (≤20 rows). For long, filterable drill-down tables stay with `render.DataGrid(filters=True)`.
+
+## Mind-blowing maps
+
+Default `folium.Map()` with OpenStreetMap tiles looks like a 2014 tutorial.
+Pick the map library that matches the question and *always* style the basemap.
+
+### Choosing a map library
+
+| Question | Library | Why |
+| --- | --- | --- |
+| "Where are the points?" (≤5k markers) | **`folium` + CartoDB tiles + `MarkerCluster`** | Lightweight, tooltips, clusters cleanly |
+| "Where is density highest?" (≥10k points) | **`plotly.express.density_mapbox`** | GPU-accelerated heatmap, theme-able |
+| "Compare regions / choropleth" | **`plotly.express.choropleth_mapbox`** | One-liner with GeoJSON, theme-able |
+| "3D aggregation / hex bins / arcs" | **`pydeck`** | Stunning 3D, interactive, deck.gl power |
+| "Filtered scatter on a map" | **`plotly.express.scatter_mapbox`** | Reactive-friendly, hover shows full row |
+
+### Plotly mapbox — the safest "wow" option
+
+No Mapbox token required when you use `mapbox_style="carto-positron"`,
+`"carto-darkmatter"`, or `"open-street-map"`.
+
+```python
+import plotly.express as px
+from shinywidgets import output_widget, render_plotly
+
+ui.card(
+    ui.card_header("Listing density"),
+    output_widget("density_map"),
+    full_screen=True,
+    min_height="540px",
+)
+
+@render_plotly
+def density_map():
+    fig = px.density_mapbox(
+        filtered(),
+        lat="latitude",
+        lon="longitude",
+        z="price",
+        radius=12,
+        center=dict(lat=35.6, lon=-82.55),
+        zoom=10,
+        mapbox_style="carto-positron",   # "carto-darkmatter" for dark mode
+        color_continuous_scale="Plasma",
+    )
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+        coloraxis_colorbar=dict(title="Price"),
+    )
+    return fig
+```
+
+### Folium with branded tiles + clusters
+
+```python
+import folium
+from folium.plugins import MarkerCluster
+from shiny import render, ui
+
+@render.ui
+def markets_map():
+    df = filtered()
+    m = folium.Map(
+        location=[df.latitude.mean(), df.longitude.mean()],
+        zoom_start=11,
+        tiles="CartoDB positron",   # or "CartoDB dark_matter"
+        control_scale=True,
+    )
+    cluster = MarkerCluster().add_to(m)
+    for _, row in df.iterrows():
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color="#2c7fb8",
+            fill=True,
+            fill_opacity=0.7,
+            popup=folium.Popup(
+                f"<b>{row['name']}</b><br>${row['price']:,.0f}", max_width=240
+            ),
+        ).add_to(cluster)
+    return ui.HTML(m.get_root().render())
+```
+
+### pydeck — 3D hex aggregation (highest visual impact)
+
+```python
+import pydeck as pdk
+from shinywidgets import output_widget, render_widget
+
+@render_widget
+def hex_map():
+    df = filtered()
+    layer = pdk.Layer(
+        "HexagonLayer",
+        data=df,
+        get_position=["longitude", "latitude"],
+        radius=200,
+        elevation_scale=8,
+        elevation_range=[0, 1500],
+        pickable=True,
+        extruded=True,
+    )
+    view_state = pdk.ViewState(
+        latitude=df.latitude.mean(),
+        longitude=df.longitude.mean(),
+        zoom=11, pitch=45, bearing=15,
+    )
+    return pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        map_style="mapbox://styles/mapbox/light-v9",
+        tooltip={"text": "{position}"},
+    )
+```
+
+Guidelines:
+
+- Always pick a *styled* basemap (`carto-positron`, `carto-darkmatter`, `CartoDB positron`, `CartoDB dark_matter`). Plain OSM tiles read as unfinished.
+- Set `margin=dict(l=0, r=0, t=0, b=0)` on Plotly maps so the basemap fills the card edge-to-edge.
+- Give the map card `min_height="480px"` minimum, `"600px"` if it is the hero.
+- Compute the map centre and zoom from the *filtered* data, not a hard-coded city centre, so the map re-frames as the user filters.
+- Match the basemap to the theme: light tiles when the dashboard is light, dark tiles when `input.dark_mode() == "dark"`.
+- Never load > 5k individual markers without clustering; switch to `density_mapbox` or `pydeck` HexagonLayer instead.
 
 ### Core and Express APIs
 

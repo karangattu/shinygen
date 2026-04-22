@@ -127,7 +127,16 @@ class TestBuildGenerationTask:
         assert captured["skills"] == skills
 
         sample_files = task.dataset.samples[0].files or {}
-        assert sample_files == {"sales.csv": "x,y\n1,2\n"}
+        assert sample_files["sales.csv"] == "x,y\n1,2\n"
+        if agent == "codex_cli":
+            # codex_cli additionally stages bundled skill files into the
+            # documented `.agents/skills/<name>/` discovery path because
+            # inspect_swe writes to `$CODEX_HOME/skills` only.
+            staged = [k for k in sample_files if k.startswith(".agents/skills/")]
+            assert staged, "expected bundled skill files staged for codex_cli"
+            assert any(k.endswith("/SKILL.md") for k in staged)
+        else:
+            assert sample_files == {"sales.csv": "x,y\n1,2\n"}
 
     @pytest.mark.parametrize(
         ("framework_key", "expected_limit"),

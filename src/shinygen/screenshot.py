@@ -95,15 +95,29 @@ def stop_app(proc: subprocess.Popen) -> None:
 def _wait_for_shiny_render(page: "Page", wait: float = PAGE_LOAD_WAIT) -> None:
     """Wait for Shiny to connect and render outputs.
 
+    Strategy (each step is best-effort, never raises):
+      1. Wait for the network to go idle (tiles, fonts, JS bundles).
+      2. Wait for Shiny + at least one bound output to exist.
+      3. Sleep ``wait`` seconds for deferred async renders (Plotly, leaflet,
+         great_tables HTML, etc.).
+      4. Wait until ``html.shiny-busy`` is gone.
+      5. Wait for any leaflet/plotly/observable widgets to finish layout.
+
     Mirrors the same logic in screenshot_helper.py (in-sandbox).
     """
-    # Wait for Shiny connection + bound outputs
+    # 1. Network idle (tiles, fonts, JS) — generous timeout, ignore failure
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception as exc:
+        logger.debug("networkidle wait timed out: %s", exc)
+
+    # 2. Shiny connection + bound outputs
     try:
         page.wait_for_function(
             """() => {
                 if (typeof Shiny === 'undefined') return false;
                 var outputs = document.querySelectorAll(
-                    '.shiny-bound-output, .html-widget, .plotly'
+                    '.shiny-bound-output, .html-widget, .plotly, .leaflet-container, .gt_table'
                 );
                 return outputs.length > 0;
             }""",
@@ -114,7 +128,7 @@ def _wait_for_shiny_render(page: "Page", wait: float = PAGE_LOAD_WAIT) -> None:
 
     time.sleep(wait)
 
-    # Wait until not busy
+    # 3. Wait until not busy
     try:
         page.wait_for_function(
             "() => !document.querySelector('html.shiny-busy')",
@@ -122,6 +136,26 @@ def _wait_for_shiny_render(page: "Page", wait: float = PAGE_LOAD_WAIT) -> None:
         )
     except Exception as exc:
         logger.debug("Shiny busy-wait timed out: %s", exc)
+
+    # 4. Widget-specific settle: every leaflet must have tiles loaded,
+    #    every plotly must have its main svg drawn.
+    try:
+        page.wait_for_function(
+            """() => {
+                var leaflets = document.querySelectorAll('.leaflet-container');
+                for (var i = 0; i < leaflets.length; i++) {
+                    if (!leaflets[i].querySelector('.leaflet-tile-loaded')) return false;
+                }
+                var plotlys = document.querySelectorAll('.plotly, .js-plotly-plot');
+                for (var j = 0; j < plotlys.length; j++) {
+                    if (!plotlys[j].querySelector('svg.main-svg')) return false;
+                }
+                return true;
+            }""",
+            timeout=10000,
+        )
+    except Exception as exc:
+        logger.debug("widget settle wait timed out: %s", exc)
 
 
 def wait_for_shiny(page: "Page", url: str, timeout: int = 45) -> bool:
@@ -189,8 +223,31 @@ def take_screenshots(
             # Wait for any deferred rendering
             time.sleep(POST_INTERACT_WAIT)
 
-            # Full-page screenshot
-            page.screenshot(path=str(screenshot_path), full_page=True)
+            # Full-page screenshot. If the page is so tall that Chromium
+            # refuses to capture it (rare but seen with massive maps/tables),
+            # fall back to a viewport-only screenshot so the benchmark still
+            # has *something* to judge.
+            try:
+                page.screenshot(
+                    path=str(screenshot_path),
+                    full_page=True,
+                    timeout=30000,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "full_page screenshot failed (%s); falling back to viewport.",
+                    exc,
+                )
+                try:
+                    page.screenshot(
+                        path=str(screenshot_path),
+                        full_page=False,
+                        timeout=15000,
+                    )
+                except Exception as exc2:
+                    logger.warning("viewport screenshot also failed: %s", exc2)
+                    browser.close()
+                    return None
 
             browser.close()
 
