@@ -31,7 +31,9 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 20. Format numbers in `render.DataGrid` outputs the same way you format numbers in value boxes. Never display a raw 6-decimal float in a table — apply `df.assign(col=df["col"].map(lambda v: f"{v:,.1f}"))` or `df.style.format(...)` before passing to `DataGrid`.
 21. Do **not** add `ui.input_dark_mode()` to dashboards. Dark mode requires hand-tuning every chart, value_box gradient, `great_tables` cell colour, and `DataGrid` filter input — in practice it produces low-contrast "unreadable on cell" results. Ship a polished light theme instead.
 22. For *summary* tables (top-N, league tables, KPI breakdowns) prefer `great_tables.GT(...)` over `render.DataGrid` — render via `@render.ui` returning `ui.HTML(GT(df).as_raw_html())`. `great_tables` produces a typeset, publication-quality table with column groups, spanners, formatted units (`fmt_currency`, `fmt_percent`, `fmt_number`), and bar/colour data cells. Reserve `render.DataGrid` for the long, scrollable, *filterable* drill-down table.
-23. For maps, never settle for a default `folium.Map()` with default OpenStreetMap tiles — that screams "tutorial app". Use one of: (a) Plotly `px.scatter_mapbox` / `density_mapbox` with `mapbox_style="carto-positron"` (light), (b) `pydeck` with `HexagonLayer` / `ScatterplotLayer` for 3D aggregation, or (c) `folium` with `tiles="CartoDB positron"` + `MarkerCluster` and a `branca.colormap` legend. Always pick the **light** basemap variant (`carto-positron`, `CartoDB positron`); dark basemaps clash with the rest of the dashboard and bury the data.
+23. For maps, **default to `lonboard`** (deck.gl/WebGL binding with first-class Shiny support, no Mapbox token, light Carto basemap). It produces visibly more attractive output than `plotly.express.density_mapbox` or `folium`, supports per-row colours/sizes natively, and renders millions of points smoothly. Use `lonboard.ScatterplotLayer` (categorical-colour markers), `lonboard.TextLayer` with emoji glyphs (unique per-marker icons without a sprite atlas), or `lonboard.H3HexagonLayer` for 3D aggregation. Reach for `pydeck.IconLayer` only when the design genuinely calls for bitmap PNG markers, Plotly `density_mapbox`/`scatter_mapbox` only as a no-widget fallback, and `folium` only for ≤500-point HTML popups. **Do not use `kepler.gl-jupyter`** — last release was 2 years ago and it has no real Shiny integration. Always pick the **light** basemap variant (`CartoBasemap.Positron`, `carto-positron`, `CartoDB positron`); dark basemaps clash with the rest of the dashboard and bury the data.
+24. **Use `ui.toolbar()` (Shiny ≥ 1.6) to put per-card controls inside `ui.card_header()` / `ui.card_footer()`** instead of cramming card-specific filters into the global sidebar. Components: `ui.toolbar(align="left"|"right")`, `ui.toolbar_input_button(id, label, icon=..., tooltip=...)`, `ui.toolbar_input_select(id, label, choices=...)`, `ui.toolbar_divider()`, `ui.toolbar_spacer()`. Also useful as an `info` button inside an input `label=ui.toolbar(...)`, and as the `toolbar=` argument of `ui.input_submit_textarea()` for AI-chat composers. Set `shiny>=1.6` in `requirements.txt` / `pyproject.toml`.
+25. **Never use Bootstrap's `text-success` / `text-danger` classes for delta lines inside `ui.value_box()` themed with `theme="primary"` or any `theme="bg-gradient-*"`.** Their default green (#198754) / red (#DC3545) fail WCAG AA contrast on those dark backgrounds and produce "barely readable" delta arrows. Use light pastel variants (e.g. `#86EFAC` green-300 / `#FCA5A5` red-300) with `class_="small fw-bold"` and `style="text-shadow:0 1px 2px rgba(0,0,0,0.35);"`. Same rule applies to any badge / pill / annotation rendered on a dark gradient.
 
 ## Quick Start
 
@@ -187,6 +189,43 @@ Cards are the primary dashboard container. Use `ui.card_header()` for titles, `u
 
 See [references/components.md](references/components.md) for card composition, tabbed card patterns, and inline controls.
 
+### Toolbars (Shiny ≥ 1.6)
+
+Use `ui.toolbar()` to embed compact controls inside `ui.card_header()`, `ui.card_footer()`, input labels, or `ui.input_submit_textarea(toolbar=...)`. This is the modern, low-noise way to scope controls to a single card instead of pushing more inputs into the global sidebar.
+
+```python
+from faicons import icon_svg
+from shiny import ui
+
+ui.card(
+    ui.card_header(
+        "Listing map",
+        ui.toolbar(
+            ui.toolbar_input_select(
+                id="map_basemap",
+                label="Basemap",
+                choices=["Positron", "Voyager"],
+                selected="Positron",
+            ),
+            ui.toolbar_divider(),
+            ui.toolbar_input_button(
+                id="map_legend_info",
+                label="Legend",
+                icon=icon_svg("circle-info"),
+                tooltip="H = entire home · P = private · S = shared · L = lodging",
+            ),
+            align="right",
+        ),
+    ),
+    output_widget("density_map"),
+    full_screen=True,
+)
+```
+
+Components: `ui.toolbar()` (container with `align="left"|"right"`), `ui.toolbar_input_button()` (small action button with optional `tooltip=`), `ui.toolbar_input_select()` (compact dropdown), `ui.toolbar_divider()` (separator), `ui.toolbar_spacer()` (push items to opposite sides). Each input has a matching `ui.update_toolbar_input_*()`. Read inputs in the server with `input.<id>()` like any other input.
+
+Use toolbars for: per-card filters (date range, basemap, palette toggle), info/help tooltips next to inputs (`label=ui.toolbar(ui.toolbar_input_button(..., icon=icon_svg("circle-info"), tooltip="..."), "Threshold", align="left")`), and message-composer actions inside `ui.input_submit_textarea(toolbar=...)`. Do **not** use them as a substitute for the global sidebar — keep cross-cutting filters there.
+
 ### Value boxes
 
 Use `ui.value_box()` for KPIs, summaries, and status indicators. Place them in a non-filling row so they stay compact and scannable.
@@ -287,125 +326,235 @@ Guidelines:
 
 ## Mind-blowing maps
 
-Default `folium.Map()` with OpenStreetMap tiles looks like a 2014 tutorial.
-Pick the map library that matches the question and *always* style the basemap.
+Default `folium.Map()` with OpenStreetMap tiles looks like a 2014 tutorial. Plotly's mapbox is fine for heatmaps but visibly flat for everything else. **Reach for `lonboard` first** — it's a deck.gl/WebGL binding maintained by Development Seed, has first-class Shiny integration, no Mapbox token, light Carto basemap built in, and renders per-row colours and sizes natively. It is the closest Python gets to Kepler/Mapbox-quality maps in a Shiny app.
 
-### Choosing a map library
+### Library picker
 
 | Question | Library | Why |
 | --- | --- | --- |
-| "Where are the points?" (≤5k markers) | **`folium` + CartoDB tiles + `MarkerCluster`** | Lightweight, tooltips, clusters cleanly |
-| "Where is density highest?" (≥10k points) | **`plotly.express.density_mapbox`** | GPU-accelerated heatmap, theme-able |
-| "Compare regions / choropleth" | **`plotly.express.choropleth_mapbox`** | One-liner with GeoJSON, theme-able |
-| "3D aggregation / hex bins / arcs" | **`pydeck`** | Stunning 3D, interactive, deck.gl power |
-| "Filtered scatter on a map" | **`plotly.express.scatter_mapbox`** | Reactive-friendly, hover shows full row |
+| "Show every record with per-row colour/size, possibly with categorical icons" (1 – 3 M points) | **`lonboard`** (Tier 1, default) | WebGL/deck.gl rendering, NumPy-driven per-point styling, light Carto basemap, official Shiny support |
+| "Aggregate to hex bins / arcs / 3D extrusion" | **`lonboard`** (`H3HexagonLayer`, `ArcLayer`, `ColumnLayer`) | Same engine, GPU-accelerated 3D |
+| "Each marker needs a real PNG icon (e.g. brand logos)" | **`pydeck`** (`IconLayer` with image atlas) | Only deck.gl binding with bitmap icons |
+| "Static heatmap of density" | **`plotly.express.density_mapbox`** with `mapbox_style="carto-positron"` | One-liner, no widget overhead |
+| "Tiny ≤500-point map with HTML popups, no widget" | **`folium`** with `tiles="CartoDB positron"` + `MarkerCluster` | Server-rendered HTML, zero JS deps |
 
-### Plotly mapbox — the safest "wow" option
+**Do not use `kepler.gl-jupyter`.** Its last release was 2 years ago, it has no Shiny integration (only `_repr_html_`/static export), and it requires a Mapbox token for the good styles. Lonboard covers every kepler use case from Python.
 
-No Mapbox token required when you use `mapbox_style="carto-positron"`
-or `"open-street-map"`. Always pick the **light** `carto-positron` basemap.
+### Tier 1 — `lonboard` ScatterplotLayer with per-row colour and size (recommended)
+
+This is the new default. Each marker gets its own colour and radius from the dataframe — no clustering tricks, no per-row Python loops, no Mapbox token.
+
+```python
+import numpy as np
+import geopandas as gpd
+from lonboard import Map, ScatterplotLayer
+from lonboard.basemap import CartoBasemap
+from shiny import reactive
+from shinywidgets import output_widget, render_widget
+
+# Categorical RGB palette (room_type → fill colour). Always include alpha 200+.
+ROOM_COLOURS = {
+    "Entire home/apt": [15, 118, 110, 220],   # teal-700
+    "Private room":    [245, 158, 11, 220],   # amber-500
+    "Shared room":     [220, 38, 38, 220],    # red-600
+    "Hotel room":      [99, 102, 241, 220],   # indigo-500
+}
+
+@render_widget
+def listings_map():
+    df = filtered()                            # reactive pandas DataFrame
+    gdf = gpd.GeoDataFrame(
+        df,
+        geometry=gpd.points_from_xy(df["longitude"], df["latitude"]),
+        crs="EPSG:4326",
+    )
+    fill = np.array(
+        [ROOM_COLOURS.get(rt, [100, 116, 139, 200]) for rt in gdf["room_type"]],
+        dtype=np.uint8,
+    )
+    radius = np.clip(np.sqrt(gdf["price"].fillna(0)) * 1.4, 30, 220).astype(np.float32)
+
+    layer = ScatterplotLayer.from_geopandas(
+        gdf,
+        get_fill_color=fill,
+        get_radius=radius,
+        radius_units="meters",
+        radius_min_pixels=4,
+        radius_max_pixels=22,
+        stroked=True,
+        get_line_color=[255, 255, 255, 220],
+        line_width_min_pixels=1,
+        pickable=True,
+    )
+    return Map(
+        layers=[layer],
+        basemap_style=CartoBasemap.Positron,    # always light
+        view_state={"longitude": float(gdf.geometry.x.mean()),
+                    "latitude":  float(gdf.geometry.y.mean()),
+                    "zoom": 11, "pitch": 0},
+        height=540,
+    )
+```
+
+**Efficient updates** — when only the *data* changes, mutate the layer in place instead of returning a new `Map` (per [the official Shiny + lonboard guidance](https://developmentseed.org/lonboard/latest/ecosystem/shiny/)):
+
+```python
+@reactive.effect
+def _refresh():
+    df = filtered()
+    listings_map.widget.layers[0].get_fill_color = np.array(
+        [ROOM_COLOURS.get(rt, [100, 116, 139, 200]) for rt in df["room_type"]],
+        dtype=np.uint8,
+    )
+```
+
+### Tier 1b — Unique per-marker icons via `lonboard.TextLayer` (emoji / glyph markers)
+
+For "every category gets its own icon" *without* shipping a PNG sprite atlas, render an emoji per row with `TextLayer`. This gets you intuitive, high-contrast markers (🏠 🏨 🛏️ 🚪) overlaid on the basemap.
+
+```python
+import numpy as np, geopandas as gpd
+from lonboard import Map
+from lonboard.experimental import TextLayer       # TextLayer lives in experimental
+from lonboard.basemap import CartoBasemap
+
+ROOM_GLYPH = {
+    "Entire home/apt": "🏠",
+    "Private room":    "🛏️",
+    "Shared room":     "🚪",
+    "Hotel room":      "🏨",
+}
+
+@render_widget
+def icon_map():
+    df = filtered()
+    gdf = gpd.GeoDataFrame(
+        df,
+        geometry=gpd.points_from_xy(df["longitude"], df["latitude"]),
+        crs="EPSG:4326",
+    )
+    glyphs = np.array([ROOM_GLYPH.get(rt, "📍") for rt in gdf["room_type"]])
+    sizes  = np.clip(df["price"].fillna(50) / 6, 14, 32).astype(np.float32)
+
+    layer = TextLayer.from_geopandas(
+        gdf,
+        get_text=glyphs,
+        get_size=sizes,
+        size_units="pixels",
+        get_color=[17, 24, 39, 240],          # dark slate text
+        get_background_color=[255, 255, 255, 220],
+        get_border_color=[15, 118, 110, 220],
+        get_border_width=1,
+        background_padding=[6, 4, 6, 4],
+        font_family="Inter, system-ui, sans-serif",
+        pickable=True,
+    )
+    return Map(layers=[layer], basemap_style=CartoBasemap.Positron, height=540)
+```
+
+### Tier 1c — `lonboard.H3HexagonLayer` for aggregated density
+
+Use this instead of `pydeck.HexagonLayer` for "where is density highest" with 3D extrusion. It takes a `pyarrow.Table` plus a column of H3 cell IDs:
+
+```python
+import h3, numpy as np, pyarrow as pa
+from lonboard import Map, H3HexagonLayer
+from lonboard.basemap import CartoBasemap
+from lonboard.colormap import apply_continuous_cmap
+from matplotlib import colormaps
+
+@render_widget
+def hex_map():
+    df = filtered().copy()
+    df["h3"] = [h3.latlng_to_cell(lat, lon, 9)
+                for lat, lon in zip(df["latitude"], df["longitude"])]
+    agg = df.groupby("h3", as_index=False).agg(
+        count=("id", "size"), median_price=("price", "median"))
+    norm = (agg["median_price"] - agg["median_price"].min()) / (
+            agg["median_price"].max() - agg["median_price"].min() + 1e-9)
+    table = pa.table({
+        "hex": agg["h3"].to_numpy(),
+        "median_price": agg["median_price"].to_numpy(),
+        "count": agg["count"].to_numpy(),
+    })
+    layer = H3HexagonLayer(
+        table=table,
+        get_hexagon="hex",
+        get_fill_color=apply_continuous_cmap(norm.to_numpy(), colormaps["plasma"], alpha=210),
+        get_elevation=agg["count"].to_numpy() * 40,
+        elevation_scale=1,
+        extruded=True,
+        pickable=True,
+    )
+    return Map(layers=[layer], basemap_style=CartoBasemap.Positron, height=540,
+               view_state={"latitude": float(df.latitude.mean()),
+                           "longitude": float(df.longitude.mean()),
+                           "zoom": 10, "pitch": 45, "bearing": 15})
+```
+
+### Tier 2 — `pydeck.IconLayer` when you genuinely need image markers
+
+Only reach for this if the design calls for *bitmap* icons (brand logos, custom SVG/PNG sprites). Lonboard has no `IconLayer`, but pydeck does and renders inside `shinywidgets`.
+
+```python
+import pydeck as pdk
+from shinywidgets import render_widget
+
+ICON = {
+    "url": "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-atlas.png",
+    "width": 128, "height": 128, "anchorY": 128,
+}
+
+@render_widget
+def icon_map():
+    df = filtered().assign(icon=[ICON] * len(filtered()))
+    layer = pdk.Layer(
+        "IconLayer", data=df,
+        get_icon="icon", get_position=["longitude", "latitude"],
+        get_size=4, size_scale=15, pickable=True,
+    )
+    return pdk.Deck(
+        layers=[layer],
+        map_style="light",       # never use "dark" / "satellite" defaults
+        initial_view_state=pdk.ViewState(
+            latitude=df.latitude.mean(), longitude=df.longitude.mean(),
+            zoom=11, pitch=0,
+        ),
+        tooltip={"text": "{name}\n${price}"},
+    )
+```
+
+### Tier 3 — Plotly density heatmap (fallback when you don't want a JS widget)
 
 ```python
 import plotly.express as px
-from shinywidgets import output_widget, render_plotly
-
-ui.card(
-    ui.card_header("Listing density"),
-    output_widget("density_map"),
-    full_screen=True,
-    min_height="540px",
-)
+from shinywidgets import render_plotly
 
 @render_plotly
 def density_map():
     fig = px.density_mapbox(
-        filtered(),
-        lat="latitude",
-        lon="longitude",
-        z="price",
-        radius=12,
-        center=dict(lat=35.6, lon=-82.55),
-        zoom=10,
-        mapbox_style="carto-positron",   # always pick the light basemap
+        filtered(), lat="latitude", lon="longitude", z="price",
+        radius=12, zoom=10,
+        mapbox_style="carto-positron",      # always the light basemap
         color_continuous_scale="Plasma",
     )
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
-        coloraxis_colorbar=dict(title="Price"),
+        paper_bgcolor="white", plot_bgcolor="white",
+        font=dict(color="#111827"),
     )
     return fig
 ```
 
-### Folium with branded tiles + clusters
+### Universal map guidelines
 
-```python
-import folium
-from folium.plugins import MarkerCluster
-from shiny import render, ui
-
-@render.ui
-def markets_map():
-    df = filtered()
-    m = folium.Map(
-        location=[df.latitude.mean(), df.longitude.mean()],
-        zoom_start=11,
-        tiles="CartoDB positron",   # always pick the light basemap
-        control_scale=True,
-    )
-    cluster = MarkerCluster().add_to(m)
-    for _, row in df.iterrows():
-        folium.CircleMarker(
-            [row.latitude, row.longitude],
-            radius=5,
-            color="#2c7fb8",
-            fill=True,
-            fill_opacity=0.7,
-            popup=folium.Popup(
-                f"<b>{row['name']}</b><br>${row['price']:,.0f}", max_width=240
-            ),
-        ).add_to(cluster)
-    return ui.HTML(m.get_root().render())
-```
-
-### pydeck — 3D hex aggregation (highest visual impact)
-
-```python
-import pydeck as pdk
-from shinywidgets import output_widget, render_widget
-
-@render_widget
-def hex_map():
-    df = filtered()
-    layer = pdk.Layer(
-        "HexagonLayer",
-        data=df,
-        get_position=["longitude", "latitude"],
-        radius=200,
-        elevation_scale=8,
-        elevation_range=[0, 1500],
-        pickable=True,
-        extruded=True,
-    )
-    view_state = pdk.ViewState(
-        latitude=df.latitude.mean(),
-        longitude=df.longitude.mean(),
-        zoom=11, pitch=45, bearing=15,
-    )
-    return pdk.Deck(
-        layers=[layer],
-        initial_view_state=view_state,
-        map_style="mapbox://styles/mapbox/light-v9",
-        tooltip={"text": "{position}"},
-    )
-```
-
-Guidelines:
-
-- Always pick a *styled* light basemap (`carto-positron`, `CartoDB positron`). Plain OSM tiles read as unfinished, and dark basemaps consistently look out of place next to a light dashboard.
-- Set `margin=dict(l=0, r=0, t=0, b=0)` on Plotly maps so the basemap fills the card edge-to-edge.
-- Give the map card `min_height="480px"` minimum, `"600px"` if it is the hero.
-- Compute the map centre and zoom from the *filtered* data, not a hard-coded city centre, so the map re-frames as the user filters.
-- Never load > 5k individual markers without clustering; switch to `density_mapbox` or `pydeck` HexagonLayer instead.
+- Default to `lonboard`. Drop to Plotly/folium only when explicitly asked for a static HTML map or for ≤500 markers with HTML popups.
+- Always use a **light** basemap (`CartoBasemap.Positron`, `mapbox_style="carto-positron"`, `tiles="CartoDB positron"`, `map_style="light"`). Never `dark_matter`, `carto-darkmatter`, `mapbox/dark-v9`, or `"satellite"`.
+- Compute the map centre and zoom from the *filtered* data so the map re-frames as the user filters.
+- Map cards: `min_height="480px"` minimum, `"600px"` if it's the hero. Set `height=540` (or similar) on the lonboard `Map` so it fills the card.
+- For per-row colour, build a `numpy.uint8` array of `[R, G, B, A]` rows — never use a Python loop inside `get_fill_color`. Same for `get_radius` (use `numpy.float32`).
+- Reuse `widget.layers[0]` from a `@reactive.effect` instead of returning a new `Map` on every filter change — see lonboard's [Shiny "efficient updates" pattern](https://developmentseed.org/lonboard/latest/ecosystem/shiny/).
+- Never load >5k individual markers without aggregation; switch to `H3HexagonLayer` or `HeatmapLayer`.
 
 ### Core and Express APIs
 
@@ -557,11 +706,19 @@ def value_box_with_delta(
     else:
         improving = (delta >= 0) == higher_is_better
         arrow = "arrow-up" if delta >= 0 else "arrow-down"
-        color = "text-success" if improving else "text-danger"
+        # IMPORTANT: do NOT use Bootstrap's `text-success` / `text-danger`
+        # classes here. Their default green (#198754) and red (#DC3545) are
+        # dark and FAIL WCAG AA contrast on dark `value_box` themes such as
+        # "primary", "bg-gradient-blue-purple", "bg-gradient-orange-red", etc.
+        # Use light pastel variants + bold + a subtle text-shadow so the
+        # delta line stays legible on every gradient.
+        good, bad = "#86EFAC", "#FCA5A5"  # green-300 / red-300
+        color = good if improving else bad
         delta_block = ui.tags.div(
             icon_svg(arrow),
             f" {abs(delta):.1f}{delta_unit} vs prior period",
-            class_=f"small {color} d-flex align-items-center gap-1 mt-1",
+            class_="small fw-bold d-flex align-items-center gap-1 mt-1",
+            style=f"color:{color}; text-shadow:0 1px 2px rgba(0,0,0,0.35);",
         )
 
     return ui.value_box(
