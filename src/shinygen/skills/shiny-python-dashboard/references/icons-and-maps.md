@@ -88,13 +88,167 @@ Use the map when users need to answer geographic questions such as:
 
 If the geography is incidental, use a ranked table or bar chart instead.
 
-### Widget choices
+### Picking a map library
 
-Shiny for Python dashboards in this repo use widget-style geographic outputs, so keep the guidance library-agnostic:
+Default to `lonboard` for point, hex, and text layers. Reach for the next tier only when `lonboard` cannot express the encoding you need.
 
-- if the map library returns an interactive widget or figure, place it in a card with explicit height
-- if the map shares filters with charts, drive all of them from the same `@reactive.calc` dataset
-- keep legends, color scales, and marker size encodings simple enough to read at dashboard scale
+| Library | Use when | Notes |
+| --- | --- | --- |
+| `lonboard` | Point, text, hex, or path layers up to ~1M rows | Tier 1 default. GPU-accelerated, returns an `anywidget`. |
+| `pydeck` | You need a deck.gl layer that lonboard does not expose (e.g. `IconLayer` with custom sprites) | Tier 2 fallback. Returns a `pydeck.Deck`; render via `output_widget`. |
+| `plotly.express` | Density heatmaps, choropleths, or quick prototypes | Tier 3 fallback. Use `density_mapbox` or `choropleth_mapbox` with a light style. |
+| `folium` | Static-feeling tile maps with markers and popups | Use only for simple click-through maps; not great for >1k points. |
+| `keplergl` | Heavily exploratory analyst tooling | Rarely the right pick for a polished dashboard. |
+
+### Tier 1 — `lonboard` ScatterplotLayer with popup
+
+```python
+import lonboard
+import numpy as np
+from lonboard import Map, ScatterplotLayer
+from shinywidgets import output_widget, render_widget
+
+ROOM_COLOURS = {
+    "Entire home/apt": [13, 110, 253],
+    "Private room":    [25, 135, 84],
+    "Shared room":     [255, 193, 7],
+    "Hotel room":      [220, 53, 69],
+}
+
+
+def _short_keys(frame):
+    # Lonboard popups read better with short field names.
+    return frame.rename(columns={
+        "name": "name", "price": "$", "room_type": "type",
+        "number_of_reviews": "rev", "review_scores_rating": "score",
+    })[["name", "$", "type", "rev", "score", "latitude", "longitude"]]
+
+
+@render_widget
+def listings_map():
+    frame = filtered_listings()
+    colors = np.array(
+        [ROOM_COLOURS.get(r, [120, 120, 120]) for r in frame["room_type"]],
+        dtype=np.uint8,
+    )
+    layer = ScatterplotLayer.from_geopandas(
+        _short_keys(frame).pipe(_to_geo),
+        get_fill_color=colors,
+        get_radius=40,
+        radius_min_pixels=2,
+        pickable=True,
+    )
+    return Map(layer, basemap_style=lonboard.basemap.CartoBasemap.Positron)
+```
+
+Guidelines:
+
+- Build the `numpy.uint8` color array once per render and pass it as `get_fill_color`.
+- Project to GeoDataFrame once; do not repeat the conversion across layers.
+- Keep popup column names short — lonboard renders the dict keys verbatim.
+- Use a Positron / light Carto basemap.
+
+### Tier 1b — `lonboard` TextLayer with emoji glyphs
+
+Good for category icons that should be readable at any zoom.
+
+```python
+from lonboard import TextLayer
+
+ROOM_GLYPH = {
+    "Entire home/apt": "\U0001F3E1",  # house
+    "Private room":    "\U0001F6CC",  # bed
+    "Shared room":     "\U0001F46B",  # people
+    "Hotel room":      "\U0001F3E8",  # hotel
+}
+
+labels = frame["room_type"].map(ROOM_GLYPH).fillna("\u2022").to_numpy()
+text_layer = TextLayer.from_geopandas(
+    frame.pipe(_to_geo),
+    get_text=labels,
+    get_size=18,
+    size_units="pixels",
+    get_color=[33, 37, 41],
+    pickable=True,
+)
+```
+
+### Tier 1c — `lonboard` H3HexagonLayer for density
+
+```python
+import h3
+from lonboard import H3HexagonLayer
+from lonboard.colormap import apply_continuous_cmap
+from matplotlib import colormaps
+
+frame["hex"] = [h3.latlng_to_cell(lat, lng, 8)
+                for lat, lng in zip(frame["latitude"], frame["longitude"])]
+agg = frame.groupby("hex", as_index=False).size()
+normed = (agg["size"] - agg["size"].min()) / max(agg["size"].ptp(), 1)
+colors = apply_continuous_cmap(normed.to_numpy(), colormaps["viridis"], alpha=0.85)
+
+hex_layer = H3HexagonLayer(
+    get_hexagon=agg["hex"].to_numpy(),
+    get_fill_color=colors,
+    extruded=False,
+    pickable=True,
+)
+```
+
+### Tier 2 — `pydeck` IconLayer
+
+Use when you need genuine sprite icons that are not glyphs.
+
+```python
+import pydeck as pdk
+
+icon_atlas = {
+    "home":  {"url": "https://.../home.png",  "width": 128, "height": 128, "anchorY": 128},
+    "hotel": {"url": "https://.../hotel.png", "width": 128, "height": 128, "anchorY": 128},
+}
+
+frame["icon"] = frame["room_type"].map({
+    "Entire home/apt": icon_atlas["home"],
+    "Hotel room":      icon_atlas["hotel"],
+})
+
+layer = pdk.Layer(
+    "IconLayer", data=frame, get_position=["longitude", "latitude"],
+    get_icon="icon", get_size=4, size_scale=10, pickable=True,
+)
+view = pdk.ViewState(latitude=frame["latitude"].mean(),
+                     longitude=frame["longitude"].mean(), zoom=11)
+deck = pdk.Deck(layers=[layer], initial_view_state=view,
+                map_style="light", tooltip={"text": "{name}\n${price}"})
+```
+
+Render with `@render_widget` from `shinywidgets`.
+
+### Tier 3 — Plotly density fallback
+
+Use only when neither lonboard nor pydeck fit (e.g. quick density heatmap with no extra deps).
+
+```python
+import plotly.express as px
+
+fig = px.density_mapbox(
+    frame, lat="latitude", lon="longitude", z="price",
+    radius=12, zoom=11, mapbox_style="carto-positron",
+    center={"lat": frame["latitude"].mean(), "lon": frame["longitude"].mean()},
+    color_continuous_scale="Viridis",
+)
+fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=540)
+```
+
+### Universal map guidelines
+
+- Always use a light basemap (Positron / Carto Light). Dark basemaps look gimmicky and reduce contrast on points.
+- Recompute the map center from the filtered dataset instead of hard-coding coordinates.
+- Give the map card `min_height="420px"` to `"560px"` and `full_screen=True`.
+- For `lonboard`, build color and size arrays as `numpy.uint8` / `numpy.float32` once per render — do not iterate per-row in the render function.
+- Push live filter changes via `@reactive.effect` updating `layer.data` / `layer.get_fill_color` instead of re-rendering the whole `Map` when possible.
+- Never plot more than ~5,000 markers without aggregating to hexes or clusters first.
+- If the map shares filters with charts, drive everything from the same `@reactive.calc`.
 
 ## Best Practices
 

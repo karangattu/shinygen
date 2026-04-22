@@ -84,6 +84,49 @@ def fmt_large(number: float) -> str:
 
 Avoid raw values like `12345.6789` or `0.873421` in user-facing UI.
 
+## Themes and brand palette
+
+The single biggest visual upgrade for a Python Shiny dashboard is shipping an explicit light theme and a small brand palette. Default bslib styling reads as stock Shiny.
+
+```python
+import shinyswatch
+from shiny import ui
+
+BRAND_COLORS = {
+    "primary":   "#0d6efd",
+    "secondary": "#6c757d",
+    "success":   "#198754",
+    "warning":   "#ffc107",
+    "danger":    "#dc3545",
+    "accent":    "#6610f2",
+}
+
+# Reuse this ordered list anywhere you need a categorical color sequence
+# (Plotly, Matplotlib, lonboard, great_tables data_color).
+BRAND_SEQUENCE = [
+    BRAND_COLORS["primary"],
+    BRAND_COLORS["success"],
+    BRAND_COLORS["warning"],
+    BRAND_COLORS["danger"],
+    BRAND_COLORS["accent"],
+]
+
+app_ui = ui.page_navbar(
+    ...,
+    title="Analytics Platform",
+    theme=shinyswatch.theme.zephyr,
+    fillable=False,
+)
+```
+
+Guidelines:
+
+- Always pass an explicit `theme=` to your `ui.page_*()` call. Prefer `shinyswatch.theme.zephyr`, `flatly`, `minty`, `cosmo`, `lumen`, or `yeti`.
+- Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
+- Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, value-box themes, and `great_tables.data_color()` ramps.
+- Use named Bootstrap themes (`"primary"`, `"success"`, `"info"`, `"warning"`, `"danger"`) on value boxes so they line up with the active swatch.
+- Avoid mixing rainbow palettes with the brand sequence — pick one and stick to it.
+
 ## CSS and Theming
 
 Use a small stylesheet for layout polish and component-specific tuning.

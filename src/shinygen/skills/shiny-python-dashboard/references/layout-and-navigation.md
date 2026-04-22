@@ -89,6 +89,53 @@ Best practices:
 - `ui.nav_spacer()` is useful when you want later nav items aligned to the right.
 - Do not force one shared sidebar onto every page if the pages need different filters.
 
+### Branded navbar with per-tab icons
+
+For multi-section dashboards, give each tab an icon and use a small branded title block. This is the fastest way to make a Python Shiny app stop looking auto-generated.
+
+```python
+import shinyswatch
+from faicons import icon_svg
+from shiny import ui
+
+brand_title = ui.tags.span(
+    icon_svg("hospital", margin_right="0.5em"),
+    "ED Operations",
+    style="font-weight:600;letter-spacing:0.2px;",
+)
+
+app_ui = ui.page_navbar(
+    ui.nav_panel(
+        ui.tags.span(icon_svg("gauge-high"), " Performance"),
+        performance_ui,
+    ),
+    ui.nav_panel(
+        ui.tags.span(icon_svg("people-group"), " Patient Flow"),
+        flow_ui,
+    ),
+    ui.nav_panel(
+        ui.tags.span(icon_svg("user-doctor"), " Staffing"),
+        staffing_ui,
+    ),
+    ui.nav_panel(
+        ui.tags.span(icon_svg("chart-line"), " Outcomes"),
+        outcomes_ui,
+    ),
+    title=brand_title,
+    theme=shinyswatch.theme.zephyr,
+    fillable=False,
+    bg="#0d6efd",
+    inverse=True,
+)
+```
+
+Guidelines:
+
+- Use one icon per tab from a single semantic family (avoid mixing line and solid styles).
+- Keep tab labels to 1–2 words.
+- Pair `bg=` with `inverse=True` for a colored navbar; use a brand color, not a random accent.
+- Reuse the same icon vocabulary inside the page bodies (KPI showcases, card headers).
+
 ## Grid Layouts
 
 ### `ui.layout_column_wrap()`

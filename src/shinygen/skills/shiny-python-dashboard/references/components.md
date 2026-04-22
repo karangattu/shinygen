@@ -120,6 +120,89 @@ def change_icon():
 
 In Express, `with ui.hold():` is useful when an output is referenced before it is defined.
 
+### KPI value box with period-over-period delta
+
+Headline metrics read better with a small "vs prior period" delta. Render the delta as a high-contrast pill so it stays legible on colored or gradient value-box backgrounds. Never rely on raw Bootstrap `text-success` / `text-danger` inside themed value boxes — they wash out.
+
+```python
+from faicons import icon_svg
+from shiny import ui
+
+
+def value_box_with_delta(title, value, delta_pct, *, showcase, theme="primary"):
+    """Value box with a pill-style period-over-period delta."""
+    up = delta_pct >= 0
+    arrow = icon_svg("arrow-up" if up else "arrow-down")
+    pill_bg = "rgba(25, 135, 84, 0.18)" if up else "rgba(220, 53, 69, 0.18)"
+    pill_fg = "#0f5132" if up else "#842029"
+    pill = ui.span(
+        arrow,
+        f" {abs(delta_pct):.1f}% vs prior period",
+        style=(
+            f"background:{pill_bg};color:{pill_fg};"
+            "padding:2px 8px;border-radius:999px;"
+            "font-size:0.8rem;font-weight:600;display:inline-flex;"
+            "align-items:center;gap:4px;margin-top:6px;"
+        ),
+    )
+    return ui.value_box(title, value, pill, showcase=showcase, theme=theme)
+```
+
+Guidelines:
+
+- Always pair the headline number with context (delta, target, or share).
+- Format the value before passing it in — never show raw floats.
+- Keep the pill copy short; one metric, one comparison.
+- Use the same delta convention (vs prior period, vs target, etc.) across the whole dashboard.
+
+## Summary tables with `great_tables`
+
+Use `great_tables.GT(...)` for short, presentation-quality summary tables — leaderboards, KPI breakdowns, executive rollups. Reach for `render.DataGrid` only when users need to sort or filter long tables.
+
+```python
+from great_tables import GT, md, style, loc
+from shiny import render
+
+
+@render.ui
+def revenue_summary():
+    summary = (
+        filtered_data()
+        .groupby("region", as_index=False)
+        .agg(revenue=("revenue", "sum"), orders=("order_id", "nunique"))
+        .sort_values("revenue", ascending=False)
+    )
+    return (
+        GT(summary)
+        .tab_header(title="Revenue by region", subtitle=md("Last 30 days"))
+        .fmt_currency(columns="revenue", currency="USD", decimals=0)
+        .fmt_integer(columns="orders")
+        .data_color(
+            columns="revenue",
+            palette=["#e7f1ff", "#0d6efd"],
+        )
+        .cols_label(region="Region", revenue="Revenue", orders="Orders")
+        .tab_options(
+            table_font_size="0.9rem",
+            heading_title_font_size="1.05rem",
+            column_labels_font_weight="600",
+            table_border_top_style="hidden",
+        )
+        .as_raw_html()
+    )
+```
+
+Wire it into the UI with `ui.output_ui("revenue_summary")` inside a card.
+
+Guidelines:
+
+- Keep `GT` tables short — typically under 25 rows. For longer tables, switch to `render.DataGrid`.
+- Always set a `tab_header()` so the table reads as a finished artifact.
+- Format every numeric column (`fmt_currency`, `fmt_percent`, `fmt_integer`, `fmt_number`).
+- Use a single soft `data_color` ramp on the most important column instead of coloring every column.
+- Rename columns with `cols_label()` so headers are human-readable.
+- Return `.as_raw_html()` and render through `@render.ui`.
+
 ## Accordions
 
 Accordions are most useful in sidebars with many controls.

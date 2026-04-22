@@ -113,6 +113,51 @@ fig.update_layout(yaxis={**axis_style, "tickfont": {"size": 11}})
 
 Do not write `dict(**axis_style, tickfont=...)` if `axis_style` already contains `tickfont`.
 
+#### Plotly defaults that don't scream auto-generated
+
+Default Plotly rainbow palettes and the `plotly` template are the fastest tells of a generated dashboard. Define a small template + helper once and reuse it.
+
+```python
+import plotly.graph_objects as go
+import plotly.io as pio
+from shared import BRAND_SEQUENCE  # see references/styling-and-data.md
+
+PLOTLY_FONT = dict(family="Inter, system-ui, sans-serif", size=13, color="#1f2937")
+
+PLOTLY_TEMPLATE = go.layout.Template(
+    layout=dict(
+        font=PLOTLY_FONT,
+        colorway=BRAND_SEQUENCE,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=40, r=20, t=40, b=40),
+        xaxis=dict(showgrid=False, showline=True, linecolor="#e5e7eb", ticks="outside"),
+        yaxis=dict(gridcolor="#eef0f3", zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        hoverlabel=dict(bgcolor="white", font=PLOTLY_FONT, bordercolor="#e5e7eb"),
+    )
+)
+pio.templates["brand"] = PLOTLY_TEMPLATE
+pio.templates.default = "plotly_white+brand"
+
+
+def styled_bar(frame, *, x, y, color=None, title=None):
+    import plotly.express as px
+    fig = px.bar(frame, x=x, y=y, color=color, title=title,
+                 color_discrete_sequence=BRAND_SEQUENCE)
+    fig.update_traces(marker_line_width=0)
+    fig.update_layout(title=dict(x=0, font=dict(size=15, color="#111827")))
+    return fig
+```
+
+Guidelines:
+
+- Always start from `template="plotly_white"` (or the registered `"brand"` template).
+- Pass an explicit 3–4 color palette via `color_discrete_sequence`. Never accept default rainbow.
+- Strip chart junk: hide the top/right spines, drop the y-axis line, soften gridlines.
+- Place the legend horizontally above the plot.
+- Set `margin` explicitly so titles do not collide with the card header.
+
 ### Tables with `@render.data_frame`
 
 Use `render.DataGrid(...)` for sortable, filterable tables.
@@ -124,6 +169,34 @@ def summary_table():
 ```
 
 Treat the data table as the detailed layer beneath charts and KPIs.
+
+#### Format numbers in `DataGrid` columns
+
+Never surface raw 6-decimal floats in a `DataGrid`. Format the dataframe before handing it to `render.DataGrid`.
+
+```python
+@render.data_frame
+def listings_table():
+    frame = filtered_listings().copy()
+    frame["price"]   = frame["price"].map(lambda v: f"${v:,.0f}")
+    frame["rating"]  = frame["rating"].map(lambda v: f"{v:.2f}")
+    frame["share"]   = frame["share"].map(lambda v: f"{v:.1%}")
+    frame["reviews"] = frame["reviews"].map(lambda v: f"{int(v):,}")
+    frame = frame.rename(columns={
+        "price":   "Price",
+        "rating":  "Rating",
+        "share":   "Share",
+        "reviews": "Reviews",
+    })
+    return render.DataGrid(frame, filters=True, summary=False, height="420px")
+```
+
+Guidelines:
+
+- Format currency, percent, and integer columns up front with f-strings or `fmt_*` helpers from `shared.py`.
+- Rename columns to human-readable labels just before rendering.
+- Pass `height="420px"` (or larger) so the grid does not collapse inside a card.
+- Use `filters=True` for drill-down tables; turn it off for short summary tables (and consider `great_tables` instead — see [components.md](components.md)).
 
 ### Dynamic UI with `@render.ui`
 
