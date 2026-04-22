@@ -42,7 +42,12 @@ permissions:
   packages: read
 
 env:
-  BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17
+  # Panel of judges. Each entry produces one --judge-model flag, and the
+  # generator averages per-criterion scores across the panel. Keep this in
+  # sync with the README docs in any update.
+  BENCHMARK_JUDGE_MODELS: |
+    anthropic/claude-sonnet-4-6
+    openai/gpt-5.4-mini-2026-03-17
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
 
@@ -236,6 +241,14 @@ jobs:
           set -euo pipefail
           mkdir -p "${OUTPUT_DIR}"
 
+          # Build one --judge-model flag per non-empty line in BENCHMARK_JUDGE_MODELS.
+          judge_args=()
+          while IFS= read -r line; do
+            line="${line//[$'\t\r ']/}"
+            [[ -z "${line}" ]] && continue
+            judge_args+=(--judge-model "${line}")
+          done <<< "${BENCHMARK_JUDGE_MODELS}"
+
           shinygen generate \
             --prompt "${BENCHMARK_PROMPT}" \
             --model "${{ matrix.model.name }}" \
@@ -243,7 +256,7 @@ jobs:
             --output "${OUTPUT_DIR}" \
             --csv-file "${BENCHMARK_DATASET}" \
             --screenshot \
-            --judge-model "${BENCHMARK_JUDGE_MODEL}" \
+            "${judge_args[@]}" \
             --max-iterations "${BENCHMARK_MAX_ITERATIONS}" \
             --quality-threshold "${BENCHMARK_QUALITY_THRESHOLD}" \
             --web-fetch \
@@ -297,11 +310,15 @@ jobs:
           if summary_path.exists():
               summary = json.loads(summary_path.read_text(encoding="utf-8"))
               usage = summary.get("usage") or {}
+              judge_models = summary.get("judge_models") or (
+                  [summary.get("judge_model")] if summary.get("judge_model") else []
+              )
               lines.extend(
                   [
                       f"passed: {summary.get('passed')}",
                       f"score: {summary.get('score')}",
                       f"iterations: {summary.get('iterations')}",
+                      f"judge_models: {','.join(judge_models) if judge_models else 'none'}",
                       f"generation_cost_usd: {usage.get('generation_cost')}",
                       f"judge_cost_usd: {usage.get('judge_cost')}",
                       f"total_cost_usd: {usage.get('total_cost')}",
@@ -384,6 +401,9 @@ jobs:
               summary = json.loads(summary_paths[0].read_text(encoding="utf-8"))
               usage = summary.get("usage") or {}
               model = summary.get("model") or {}
+              judge_models = summary.get("judge_models") or (
+                  [summary.get("judge_model")] if summary.get("judge_model") else []
+              )
               rows.append(
                   {
                       "artifact_dir": artifact_dir.name,
@@ -394,6 +414,7 @@ jobs:
                       "arm": summary.get("arm"),
                       "use_skills": summary.get("use_skills"),
                       "web_fetch": summary.get("web_fetch"),
+                      "judge_models": judge_models,
                       "passed": summary.get("passed"),
                       "score": summary.get("score"),
                       "iterations": summary.get("iterations"),
@@ -481,6 +502,140 @@ jobs:
                   output_tokens=benchmark_output_tokens,
               )
           )
+
+          # ----------------------------------------------------------------
+          # Skills (treatment) vs vanilla (control) delta per (framework, model)
+          # ----------------------------------------------------------------
+          def fmt_delta(value):
+              if value is None:
+                  return "n/a"
+              sign = "+" if value > 0 else ("" if value == 0 else "-")
+              return f"{sign}{abs(value):.2f}"
+
+          def fmt_pct(value):
+              if value is None:
+                  return "n/a"
+              sign = "+" if value > 0 else ("" if value == 0 else "-")
+              return f"{sign}{abs(value):.1f}%"
+
+          pairs: dict[tuple[str, str], dict[str, dict]] = {}
+          for row in rows:
+              framework = row.get("framework") or "n/a"
+              model = row.get("model") or "n/a"
+              arm = row.get("arm") or "n/a"
+              if arm not in {"skills", "vanilla"}:
+                  continue
+              pairs.setdefault((framework, model), {})[arm] = row
+
+          arm_comparison = []
+          for (framework, model), arms in sorted(pairs.items()):
+              skills = arms.get("skills") or {}
+              vanilla = arms.get("vanilla") or {}
+              skills_score = skills.get("score")
+              vanilla_score = vanilla.get("score")
+              delta = (
+                  skills_score - vanilla_score
+                  if skills_score is not None and vanilla_score is not None
+                  else None
+              )
+              pct = (
+                  (delta / vanilla_score * 100.0)
+                  if delta is not None and vanilla_score not in (None, 0)
+                  else None
+              )
+              if delta is None:
+                  winner = "incomplete pair"
+              elif delta > 0.05:
+                  winner = "skills"
+              elif delta < -0.05:
+                  winner = "vanilla"
+              else:
+                  winner = "tie"
+              skills_cost = skills.get("total_cost")
+              vanilla_cost = vanilla.get("total_cost")
+              cost_delta = (
+                  skills_cost - vanilla_cost
+                  if skills_cost is not None and vanilla_cost is not None
+                  else None
+              )
+              arm_comparison.append(
+                  {
+                      "framework": framework,
+                      "model": model,
+                      "skills_score": skills_score,
+                      "vanilla_score": vanilla_score,
+                      "score_delta": delta,
+                      "score_delta_pct": pct,
+                      "skills_passed": skills.get("passed"),
+                      "vanilla_passed": vanilla.get("passed"),
+                      "skills_iterations": skills.get("iterations"),
+                      "vanilla_iterations": vanilla.get("iterations"),
+                      "skills_total_cost": skills_cost,
+                      "vanilla_total_cost": vanilla_cost,
+                      "cost_delta": cost_delta,
+                      "winner": winner,
+                  }
+              )
+
+          summary_json["arm_comparison"] = arm_comparison
+          (root / "benchmark_summary.json").write_text(
+              json.dumps(summary_json, indent=2),
+              encoding="utf-8",
+          )
+
+          if arm_comparison:
+              lines.extend(
+                  [
+                      "",
+                      "## Skills vs vanilla delta (per model)",
+                      "",
+                      "Positive `Δ score` means the bundled skill helped that model on this benchmark.",
+                      "",
+                      "| Framework | Model | Skills score | Vanilla score | Δ score | Δ % | Winner | Δ cost | Skills passed | Vanilla passed |",
+                      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+                  ]
+              )
+              skills_wins = 0
+              vanilla_wins = 0
+              ties = 0
+              deltas: list[float] = []
+              for item in arm_comparison:
+                  if item["winner"] == "skills":
+                      skills_wins += 1
+                  elif item["winner"] == "vanilla":
+                      vanilla_wins += 1
+                  elif item["winner"] == "tie":
+                      ties += 1
+                  if item["score_delta"] is not None:
+                      deltas.append(item["score_delta"])
+                  lines.append(
+                      "| {framework} | {model} | {skills_score} | {vanilla_score} | {delta} | {pct} | {winner} | {cost_delta} | {skills_passed} | {vanilla_passed} |".format(
+                          framework=item["framework"],
+                          model=item["model"],
+                          skills_score=fmt_score(item["skills_score"]),
+                          vanilla_score=fmt_score(item["vanilla_score"]),
+                          delta=fmt_delta(item["score_delta"]),
+                          pct=fmt_pct(item["score_delta_pct"]),
+                          winner=item["winner"],
+                          cost_delta=(
+                              fmt_cost(item["cost_delta"])
+                              if item["cost_delta"] is not None
+                              else "n/a"
+                          ),
+                          skills_passed="yes" if item["skills_passed"] else ("no" if item["skills_passed"] is not None else "n/a"),
+                          vanilla_passed="yes" if item["vanilla_passed"] else ("no" if item["vanilla_passed"] is not None else "n/a"),
+                      )
+                  )
+
+              mean_delta = sum(deltas) / len(deltas) if deltas else None
+              lines.extend(
+                  [
+                      "",
+                      "**Arm scoreboard:** "
+                      f"skills wins = {skills_wins}, vanilla wins = {vanilla_wins}, ties = {ties}, "
+                      f"mean Δ score = {fmt_delta(mean_delta)} (n={len(deltas)})",
+                  ]
+              )
 
           if missing:
               lines.extend(

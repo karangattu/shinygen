@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
 from .iterate import GenerationResult, generate_and_refine
 
@@ -20,7 +21,7 @@ def generate(
     data_csv: str | Path | None = None,
     data_files: dict[str, str] | None = None,
     screenshot: bool = False,
-    judge_model: str | None = None,
+    judge_model: str | Sequence[str] | None = None,
     max_iterations: int = 3,
     quality_threshold: float = 7.0,
     web_fetch: bool = True,
@@ -51,9 +52,12 @@ def generate(
             that should be available in the sandbox.
         screenshot: If True, take Playwright screenshots of the running app
             for visual quality evaluation.
-        judge_model: Model to use for quality evaluation. If None, the app
-            is accepted on first successful generation without judging.
-            Examples: "anthropic/claude-sonnet-4-6", "openai/gpt-4.1".
+        judge_model: Model(s) to use for quality evaluation. If ``None``,
+            the app is accepted on first successful generation without
+            judging. Pass a single model ID/alias for the classic
+            single-judge flow, or a sequence (e.g.
+            ``["anthropic/claude-sonnet-4-6", "openai/gpt-5.4-mini-2026-03-17"]``)
+            to run a panel of judges and average their scores.
         max_iterations: Maximum number of generate-judge-refine cycles.
         quality_threshold: Minimum composite quality score (1-10) to accept.
         web_fetch: If True (default), allow the agent to use web search tools.
@@ -138,7 +142,7 @@ class BatchJob:
     data_csv: str | Path | None = None
     data_files: dict[str, str] | None = None
     screenshot: bool = False
-    judge_model: str | None = None
+    judge_model: str | Sequence[str] | None = None
     max_iterations: int = 3
     quality_threshold: float = 7.0
     web_fetch: bool = True

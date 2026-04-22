@@ -21,7 +21,14 @@ from pathlib import Path
 
 @dataclass
 class JudgeResult:
-    """Result from an LLM quality evaluation."""
+    """Result from an LLM quality evaluation.
+
+    When the result is produced by averaging across multiple judges,
+    ``per_judge`` holds one entry per contributing judge and
+    ``judge_models`` lists the model IDs in the order they were called.
+    For single-judge runs both fields stay empty so the surface stays
+    backwards compatible.
+    """
 
     scores: dict[str, float] = field(default_factory=dict)
     rationales: dict[str, str] = field(default_factory=dict)
@@ -29,6 +36,8 @@ class JudgeResult:
     raw_response: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
+    judge_models: list[str] = field(default_factory=list)
+    per_judge: list[dict] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -368,6 +377,85 @@ def judge_app_with_api(
         return _judge_with_anthropic(
             code, judge_model, screenshot_paths if has_images else None, user_prompt
         )
+
+
+def judge_app_with_models(
+    code: str,
+    judge_models: list[str],
+    screenshot_paths: list[Path] | None = None,
+    user_prompt: str = "",
+) -> JudgeResult:
+    """Judge app quality using one or more judge models and merge results.
+
+    Each judge in ``judge_models`` is called independently. Their per-criterion
+    scores are averaged into the merged ``scores`` and ``composite``. Rationales
+    are concatenated with a model-name prefix so refinement prompts surface
+    every judge's reasoning. Token counts are summed across judges.
+
+    Failures from individual judges are recorded under ``per_judge`` with an
+    ``error`` field but do not abort the run as long as at least one judge
+    returns a parseable response. If every judge fails, the returned
+    ``JudgeResult`` has empty scores and ``composite == 0`` (matching the
+    single-judge failure surface so callers can keep their existing handling).
+
+    Args:
+        code: The generated app source code.
+        judge_models: One or more resolved model IDs
+            (e.g. ``["anthropic/claude-sonnet-4-6", "openai/gpt-5.4-mini-..."]``).
+        screenshot_paths: Optional screenshots for multimodal evaluation.
+        user_prompt: The original user prompt for context.
+
+    Returns:
+        A merged ``JudgeResult`` with averaged scores and per-judge details.
+    """
+    if not judge_models:
+        raise ValueError("judge_models must contain at least one model ID")
+
+    merged = JudgeResult(judge_models=list(judge_models))
+    per_criterion_scores: dict[str, list[float]] = {c: [] for c in CRITERIA}
+    per_criterion_rationales: dict[str, list[str]] = {c: [] for c in CRITERIA}
+
+    for model_id in judge_models:
+        try:
+            single = judge_app_with_api(
+                code, model_id, screenshot_paths, user_prompt
+            )
+            merged.input_tokens += single.input_tokens
+            merged.output_tokens += single.output_tokens
+            merged.per_judge.append(
+                {
+                    "model": model_id,
+                    "composite": single.composite,
+                    "scores": dict(single.scores),
+                    "rationales": dict(single.rationales),
+                    "input_tokens": single.input_tokens,
+                    "output_tokens": single.output_tokens,
+                }
+            )
+            for criterion in CRITERIA:
+                if criterion in single.scores:
+                    per_criterion_scores[criterion].append(
+                        float(single.scores[criterion])
+                    )
+                rationale = single.rationales.get(criterion, "").strip()
+                if rationale:
+                    per_criterion_rationales[criterion].append(
+                        f"[{model_id}] {rationale}"
+                    )
+        except Exception as exc:  # pragma: no cover - defensive
+            merged.per_judge.append({"model": model_id, "error": str(exc)})
+
+    for criterion, values in per_criterion_scores.items():
+        if values:
+            merged.scores[criterion] = sum(values) / len(values)
+    for criterion, rationales in per_criterion_rationales.items():
+        if rationales:
+            merged.rationales[criterion] = "\n\n".join(rationales)
+
+    if merged.scores:
+        merged.composite = sum(merged.scores.values()) / len(merged.scores)
+
+    return merged
 
 
 def _judge_with_anthropic(

@@ -76,8 +76,13 @@ def main() -> None:
 @click.option(
     "--judge-model",
     "-j",
-    default=None,
-    help='Model for quality evaluation (e.g., "anthropic/claude-sonnet-4-6").',
+    "judge_model",
+    multiple=True,
+    default=(),
+    help=(
+        'Model for quality evaluation (e.g. "anthropic/claude-sonnet-4-6"). '
+        "Repeat the flag to run a panel of judges and average their scores."
+    ),
 )
 @click.option(
     "--max-iterations",
@@ -134,7 +139,7 @@ def generate(
     csv_file: str | None,
     data_file: tuple[str, ...],
     screenshot: bool,
-    judge_model: str | None,
+    judge_model: tuple[str, ...],
     max_iterations: int,
     quality_threshold: float,
     web_fetch: bool,
@@ -169,7 +174,7 @@ def generate(
             skills_dir=skills_dir,
             data_files=data_files,
             screenshot=screenshot,
-            judge_model=judge_model,
+            judge_model=list(judge_model) if judge_model else None,
             max_iterations=max_iterations,
             quality_threshold=quality_threshold,
             web_fetch=web_fetch,

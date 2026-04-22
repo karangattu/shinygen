@@ -66,10 +66,21 @@ def test_benchmark_workflow_uses_generic_benchmark_metadata():
     assert '# Benchmark:' in workflow
 
 
-def test_benchmark_workflow_pins_gpt54_mini_judge_model():
+def test_benchmark_workflow_uses_dual_judge_panel():
+    """Benchmarks default to a panel of two judges (anthropic + openai) so
+    every score is the average of an independent Claude and GPT review.
+    Keeping both vendors in the panel cancels per-vendor bias.
+    """
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert 'BENCHMARK_JUDGE_MODEL: openai/gpt-5.4-mini-2026-03-17' in workflow
+    assert "BENCHMARK_JUDGE_MODELS:" in workflow
+    assert "anthropic/claude-sonnet-4-6" in workflow
+    assert "openai/gpt-5.4-mini-2026-03-17" in workflow
+    # The generation step must expand the panel into repeated --judge-model
+    # flags rather than the old single-flag form.
+    assert "BENCHMARK_JUDGE_MODEL " not in workflow
+    assert '--judge-model "${BENCHMARK_JUDGE_MODEL}"' not in workflow
+    assert 'judge_args+=(--judge-model' in workflow
 
 
 def test_benchmark_workflow_installs_screenshot_extras_for_host_fallback():

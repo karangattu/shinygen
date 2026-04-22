@@ -131,7 +131,7 @@ class TestWriteRunSummary:
             agent="codex_cli",
             framework_key="shiny_python",
             artifact_name="app.py",
-            judge_model="anthropic/claude-sonnet-4-6",
+            judge_models=["anthropic/claude-sonnet-4-6"],
             data_file_names=["airbnb-asheville-short.csv"],
         )
 
@@ -145,6 +145,7 @@ class TestWriteRunSummary:
         assert summary["framework"] == "shiny_python"
         assert summary["artifact_name"] == "app.py"
         assert summary["judge_model"] == "anthropic/claude-sonnet-4-6"
+        assert summary["judge_models"] == ["anthropic/claude-sonnet-4-6"]
         assert summary["passed"] is True
         assert summary["score"] == 8.7
         assert summary["iterations"] == 2

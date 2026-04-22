@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from .config import (
     DEFAULT_MAX_ITERATIONS,
@@ -58,7 +58,7 @@ def _write_run_summary(
     agent: str,
     framework_key: str,
     artifact_name: str,
-    judge_model: str | None,
+    judge_models: list[str],
     data_file_names: list[str],
     use_skills: bool = True,
     web_fetch: bool = True,
@@ -73,7 +73,8 @@ def _write_run_summary(
         },
         "framework": framework_key,
         "artifact_name": artifact_name,
-        "judge_model": judge_model,
+        "judge_model": judge_models[0] if len(judge_models) == 1 else None,
+        "judge_models": list(judge_models),
         "arm": "skills" if use_skills else "vanilla",
         "use_skills": use_skills,
         "web_fetch": web_fetch,
@@ -467,7 +468,7 @@ def generate_and_refine(
     skills_dir: str | Path | None = None,
     data_files: dict[str, str] | None = None,
     screenshot: bool = False,
-    judge_model: str | None = None,
+    judge_model: str | Sequence[str] | None = None,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
     quality_threshold: float = DEFAULT_QUALITY_THRESHOLD,
     web_fetch: bool = True,
@@ -492,7 +493,11 @@ def generate_and_refine(
         skills_dir: Path to custom skill files to inject.
         data_files: Dict of {filename: content} for data files.
         screenshot: Whether to take screenshots for visual evaluation.
-        judge_model: Model to use for quality judging.
+        judge_model: Model(s) to use for quality judging. Pass a single
+            model ID/alias for the classic single-judge flow, or pass a
+            sequence (e.g. ``["claude-sonnet", "openai/gpt-5.4-mini-..."]``)
+            to run a panel of judges and average their scores per
+            criterion. ``None`` skips judging entirely.
         max_iterations: Maximum refinement iterations.
         quality_threshold: Minimum composite score to accept (1-10 scale).
         web_fetch: Allow web search tools in the sandbox (default: True).
@@ -519,7 +524,13 @@ def generate_and_refine(
     preflight_checks(agent)
 
     if judge_model:
-        _, judge_model = resolve_model(judge_model)
+        if isinstance(judge_model, str):
+            judge_inputs: list[str] = [judge_model]
+        else:
+            judge_inputs = [m for m in judge_model if m]
+        judge_models = [resolve_model(m)[1] for m in judge_inputs]
+    else:
+        judge_models = []
     fw = FRAMEWORKS[framework_key]
     artifact_name = fw["primary_artifact"]
     effective_port = port or find_free_port()
@@ -695,32 +706,65 @@ def generate_and_refine(
                     continue
 
         # --- Step 4: Judge ---
-        if judge_model:
+        if judge_models:
             try:
-                from .judge import judge_app_with_api
+                from .judge import judge_app_with_models
 
                 with Timer() as judge_timer:
-                    judge_result = judge_app_with_api(
+                    judge_result = judge_app_with_models(
                         code,
-                        judge_model,
+                        judge_models,
                         screenshot_paths or None,
                         prompt,
                     )
-                result.usage.add(
-                    stage="judge",
-                    model=judge_model,
-                    input_tokens=judge_result.input_tokens,
-                    output_tokens=judge_result.output_tokens,
-                    elapsed=judge_timer.elapsed,
-                    iteration=iteration,
-                )
+                # Attribute token usage per judge so the cost breakdown stays
+                # accurate when more than one judge runs. Fall back to the
+                # merged totals if per-judge attribution is unavailable.
+                if judge_result.per_judge:
+                    elapsed_share = judge_timer.elapsed / max(
+                        len(judge_result.per_judge), 1
+                    )
+                    for entry in judge_result.per_judge:
+                        if "error" in entry:
+                            continue
+                        result.usage.add(
+                            stage="judge",
+                            model=str(entry.get("model", judge_models[0])),
+                            input_tokens=int(entry.get("input_tokens", 0) or 0),
+                            output_tokens=int(entry.get("output_tokens", 0) or 0),
+                            elapsed=elapsed_share,
+                            iteration=iteration,
+                        )
+                else:
+                    result.usage.add(
+                        stage="judge",
+                        model=judge_models[0],
+                        input_tokens=judge_result.input_tokens,
+                        output_tokens=judge_result.output_tokens,
+                        elapsed=judge_timer.elapsed,
+                        iteration=iteration,
+                    )
                 score = judge_result.composite
-                logger.info(
-                    "Iteration %d: Quality score = %.2f (threshold = %.2f)",
-                    iteration,
-                    score,
-                    quality_threshold,
-                )
+                if len(judge_models) > 1:
+                    panel_breakdown = ", ".join(
+                        f"{entry.get('model')}={entry.get('composite', 0):.2f}"
+                        for entry in judge_result.per_judge
+                        if "error" not in entry
+                    )
+                    logger.info(
+                        "Iteration %d: Panel score = %.2f (threshold = %.2f) [%s]",
+                        iteration,
+                        score,
+                        quality_threshold,
+                        panel_breakdown or "no judges responded",
+                    )
+                else:
+                    logger.info(
+                        "Iteration %d: Quality score = %.2f (threshold = %.2f)",
+                        iteration,
+                        score,
+                        quality_threshold,
+                    )
 
                 if score > best_score:
                     best_score = score
@@ -801,7 +845,7 @@ def generate_and_refine(
         agent=agent,
         framework_key=framework_key,
         artifact_name=artifact_name,
-        judge_model=judge_model,
+        judge_models=judge_models,
         data_file_names=list(data_files or {}),
         use_skills=use_skills,
         web_fetch=web_fetch,
