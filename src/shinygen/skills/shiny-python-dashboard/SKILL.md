@@ -24,14 +24,14 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 13. For multi-section dashboards (e.g. *Performance · Patient Flow · Outcomes*), default to `ui.page_navbar()` with one `ui.nav_panel()` per section. Single-page sidebar layouts work for narrow analytical apps; multi-tab layouts consistently feel more "production-grade" for broad operational dashboards.
 14. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta (`↓ 4.1% vs prior period`) using a secondary line and a coloured trend icon — this is the single biggest visual upgrade over a default dashboard.
 15. Only call `ui.include_css(app_dir / "styles.css")` if you actually create the `styles.css` file in the same step. A missing referenced stylesheet raises `FileNotFoundError` at startup and the app will not run.
-16. Always pass an explicit `theme=` to your `ui.page_*()` call. Default bslib styling reads as "stock Shiny" and caps the dashboard at a 6/10 visual score. Use `shinyswatch.theme.*` (e.g. `shinyswatch.theme.flatly`, `minty`, `zephyr`) or build a small `ui.Theme(version=5).add_defaults(...)` with your brand color and a neutral surface palette. Never ship a dashboard on the bslib default theme.
+16. Always pass an explicit `theme=` to your `ui.page_*()` call. Default bslib styling reads as "stock Shiny" and caps the dashboard at a 6/10 visual score. Use a **light** `shinyswatch` theme such as `shinyswatch.theme.flatly`, `minty`, `zephyr`, `cosmo`, `lumen`, or `yeti`, or build a small `ui.Theme(version=5).add_defaults(...)` with your brand color and a neutral surface palette. Stick to light themes — dark themes are hard to get right (low contrast on `value_box`, `great_tables`, and `DataGrid` filter inputs) and consistently look worse than a polished light theme.
 17. For multi-tab navbars, give every `ui.nav_panel()` an `icon=icon_svg("...")` and set the page `title=` to a `ui.tags.span(icon_svg("hospital-user"), " App Name", class_="d-flex align-items-center gap-2")` brand block. A branded navbar with per-tab icons is the cheapest way to escape the default-Shiny look.
 18. For Plotly charts, always pass `template="plotly_white"` (or `plotly_dark`) and an explicit `color_discrete_sequence=` from a 3–4 hue brand palette. Default Plotly rainbow colors are an instant "auto-generated dashboard" tell. Add a chart subtitle via `fig.update_layout(title=dict(text="Chart name", subtitle=dict(text="What the encoding means")))` whenever the encoding is non-obvious.
 19. Never put more than one chart inside a single `@render.plot` (no `plt.subplots(nrows=N>1)`). Stacked Matplotlib subplots inside one card consistently produce title-into-frame collisions in screenshots. Split into one card per chart instead and let `ui.layout_columns` arrange them.
 20. Format numbers in `render.DataGrid` outputs the same way you format numbers in value boxes. Never display a raw 6-decimal float in a table — apply `df.assign(col=df["col"].map(lambda v: f"{v:,.1f}"))` or `df.style.format(...)` before passing to `DataGrid`.
-21. Wire up `ui.input_dark_mode()` in the navbar (or sidebar) of every dashboard. Dark-mode capability is now a baseline expectation for "modern BI tool" polish.
+21. Do **not** add `ui.input_dark_mode()` to dashboards. Dark mode requires hand-tuning every chart, value_box gradient, `great_tables` cell colour, and `DataGrid` filter input — in practice it produces low-contrast "unreadable on cell" results. Ship a polished light theme instead.
 22. For *summary* tables (top-N, league tables, KPI breakdowns) prefer `great_tables.GT(...)` over `render.DataGrid` — render via `@render.ui` returning `ui.HTML(GT(df).as_raw_html())`. `great_tables` produces a typeset, publication-quality table with column groups, spanners, formatted units (`fmt_currency`, `fmt_percent`, `fmt_number`), and bar/colour data cells. Reserve `render.DataGrid` for the long, scrollable, *filterable* drill-down table.
-23. For maps, never settle for a default `folium.Map()` with default OpenStreetMap tiles — that screams "tutorial app". Use one of: (a) Plotly `px.scatter_mapbox` / `density_mapbox` with `mapbox_style="carto-positron"` or `"carto-darkmatter"`, (b) `pydeck` with `HexagonLayer` / `ScatterplotLayer` for 3D aggregation, or (c) `folium` with `tiles="CartoDB positron"` + `MarkerCluster` and a `branca.colormap` legend. Match the basemap to the dashboard theme (light tiles for light theme, dark tiles for dark).
+23. For maps, never settle for a default `folium.Map()` with default OpenStreetMap tiles — that screams "tutorial app". Use one of: (a) Plotly `px.scatter_mapbox` / `density_mapbox` with `mapbox_style="carto-positron"` (light), (b) `pydeck` with `HexagonLayer` / `ScatterplotLayer` for 3D aggregation, or (c) `folium` with `tiles="CartoDB positron"` + `MarkerCluster` and a `branca.colormap` legend. Always pick the **light** basemap variant (`carto-positron`, `CartoDB positron`); dark basemaps clash with the rest of the dashboard and bury the data.
 
 ## Quick Start
 
@@ -281,7 +281,8 @@ Guidelines:
 - Use `fmt_currency` / `fmt_percent` / `fmt_number(decimals=, use_seps=True)` — never show raw floats.
 - Use `data_color(columns=[...], palette=[...])` for in-cell heatmaps; pick a palette that matches your brand colours.
 - Use `cols_label()` to humanise snake_case column names.
-- Set `table_background_color="transparent"` so the GT table inherits the card's surface (works in both light and dark mode).
+- Set `table_background_color="#ffffff"` (or a very light surface like `"#F8FAFC"`) explicitly. Do **not** use `"transparent"` — if the theme background turns dark or a card uses a deep colour, white text will be unreadable on the light `data_color` cells.
+- Always pair `data_color` with explicit text colour: `.tab_style(style=style.text(color="#111827"), locations=loc.body())` so cell text stays dark on light heat-map cells regardless of theme.
 - Keep `great_tables` for **summary** tables (≤20 rows). For long, filterable drill-down tables stay with `render.DataGrid(filters=True)`.
 
 ## Mind-blowing maps
@@ -301,8 +302,8 @@ Pick the map library that matches the question and *always* style the basemap.
 
 ### Plotly mapbox — the safest "wow" option
 
-No Mapbox token required when you use `mapbox_style="carto-positron"`,
-`"carto-darkmatter"`, or `"open-street-map"`.
+No Mapbox token required when you use `mapbox_style="carto-positron"`
+or `"open-street-map"`. Always pick the **light** `carto-positron` basemap.
 
 ```python
 import plotly.express as px
@@ -325,7 +326,7 @@ def density_map():
         radius=12,
         center=dict(lat=35.6, lon=-82.55),
         zoom=10,
-        mapbox_style="carto-positron",   # "carto-darkmatter" for dark mode
+        mapbox_style="carto-positron",   # always pick the light basemap
         color_continuous_scale="Plasma",
     )
     fig.update_layout(
@@ -348,7 +349,7 @@ def markets_map():
     m = folium.Map(
         location=[df.latitude.mean(), df.longitude.mean()],
         zoom_start=11,
-        tiles="CartoDB positron",   # or "CartoDB dark_matter"
+        tiles="CartoDB positron",   # always pick the light basemap
         control_scale=True,
     )
     cluster = MarkerCluster().add_to(m)
@@ -400,11 +401,10 @@ def hex_map():
 
 Guidelines:
 
-- Always pick a *styled* basemap (`carto-positron`, `carto-darkmatter`, `CartoDB positron`, `CartoDB dark_matter`). Plain OSM tiles read as unfinished.
+- Always pick a *styled* light basemap (`carto-positron`, `CartoDB positron`). Plain OSM tiles read as unfinished, and dark basemaps consistently look out of place next to a light dashboard.
 - Set `margin=dict(l=0, r=0, t=0, b=0)` on Plotly maps so the basemap fills the card edge-to-edge.
 - Give the map card `min_height="480px"` minimum, `"600px"` if it is the hero.
 - Compute the map centre and zoom from the *filtered* data, not a hard-coded city centre, so the map re-frames as the user filters.
-- Match the basemap to the theme: light tiles when the dashboard is light, dark tiles when `input.dark_mode() == "dark"`.
 - Never load > 5k individual markers without clustering; switch to `density_mapbox` or `pydeck` HexagonLayer instead.
 
 ### Core and Express APIs
@@ -487,8 +487,9 @@ explicitly asks for stock styling.
 import shinyswatch
 from shiny import ui
 
-# Pick one of: cosmo, flatly, minty, zephyr, lumen, sandstone (avoid darkly
-# unless the user asks for dark mode by default).
+# Pick a polished *light* theme. Good defaults: cosmo, flatly, minty, zephyr,
+# lumen, sandstone, yeti. Avoid darkly/cyborg/superhero — dark themes
+# consistently produce low-contrast value_box and great_tables results.
 THEME = shinyswatch.theme.zephyr
 
 # Brand-aligned 4-color sequence reused by every chart.
@@ -506,7 +507,7 @@ app_ui = ui.page_navbar(
 )
 ```
 
-### 2. Branded navbar with icons + dark-mode toggle
+### 2. Branded navbar with per-tab icons
 
 ```python
 from faicons import icon_svg
@@ -530,11 +531,6 @@ app_ui = ui.page_navbar(
         class_="d-flex align-items-center gap-2 fw-semibold",
     ),
     theme=shinyswatch.theme.zephyr,
-    # Dark-mode toggle always visible in the navbar.
-    header=ui.tags.div(
-        ui.input_dark_mode(id="mode"),
-        class_="ms-auto",
-    ),
 )
 ```
 

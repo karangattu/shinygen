@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pre-install Python packages used by generated Shiny apps
 RUN pip install --no-cache-dir \
     shiny \
+    shinyswatch \
     plotly \
     faicons \
     pandas \
@@ -48,6 +49,7 @@ RUN pip install --no-cache-dir \
     htmltools \
     shinywidgets \
     folium \
+    pydeck \
     numpy \
     playwright
 
