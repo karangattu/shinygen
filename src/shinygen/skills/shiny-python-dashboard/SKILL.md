@@ -33,7 +33,7 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 22. For *summary* tables (top-N, league tables, KPI breakdowns) prefer `great_tables.GT(...)` over `render.DataGrid` — render via `@render.ui` returning `ui.HTML(GT(df).as_raw_html())`. `great_tables` produces a typeset, publication-quality table with column groups, spanners, formatted units (`fmt_currency`, `fmt_percent`, `fmt_number`), and bar/colour data cells. Reserve `render.DataGrid` for the long, scrollable, *filterable* drill-down table.
 23. For maps, **default to `lonboard`** (deck.gl/WebGL binding with first-class Shiny support, no Mapbox token, light Carto basemap). It produces visibly more attractive output than `plotly.express.density_mapbox` or `folium`, supports per-row colours/sizes natively, and renders millions of points smoothly. Use `lonboard.ScatterplotLayer` (categorical-colour markers), `lonboard.TextLayer` with emoji glyphs (unique per-marker icons without a sprite atlas), or `lonboard.H3HexagonLayer` for 3D aggregation. Reach for `pydeck.IconLayer` only when the design genuinely calls for bitmap PNG markers, Plotly `density_mapbox`/`scatter_mapbox` only as a no-widget fallback, and `folium` only for ≤500-point HTML popups. **Do not use `kepler.gl-jupyter`** — last release was 2 years ago and it has no real Shiny integration. Always pick the **light** basemap variant (`CartoBasemap.Positron`, `carto-positron`, `CartoDB positron`); dark basemaps clash with the rest of the dashboard and bury the data.
 24. **Use `ui.toolbar()` (Shiny ≥ 1.6) to put per-card controls inside `ui.card_header()` / `ui.card_footer()`** instead of cramming card-specific filters into the global sidebar. Components: `ui.toolbar(align="left"|"right")`, `ui.toolbar_input_button(id, label, icon=..., tooltip=...)`, `ui.toolbar_input_select(id, label, choices=...)`, `ui.toolbar_divider()`, `ui.toolbar_spacer()`. Also useful as an `info` button inside an input `label=ui.toolbar(...)`, and as the `toolbar=` argument of `ui.input_submit_textarea()` for AI-chat composers. Set `shiny>=1.6` in `requirements.txt` / `pyproject.toml`.
-25. **Never use Bootstrap's `text-success` / `text-danger` classes for delta lines inside `ui.value_box()` themed with `theme="primary"` or any `theme="bg-gradient-*"`.** Their default green (#198754) / red (#DC3545) fail WCAG AA contrast on those dark backgrounds and produce "barely readable" delta arrows. Use light pastel variants (e.g. `#86EFAC` green-300 / `#FCA5A5` red-300) with `class_="small fw-bold"` and `style="text-shadow:0 1px 2px rgba(0,0,0,0.35);"`. Same rule applies to any badge / pill / annotation rendered on a dark gradient.
+25. **Never use Bootstrap's `text-success` / `text-danger` classes for delta lines inside `ui.value_box()` themed with `theme="primary"` or any `theme="bg-gradient-*"`.** Their default green (#198754) / red (#DC3545) fail WCAG AA contrast on those dark backgrounds and produce "barely readable" delta arrows. **Render the delta as a pill badge** with a dark translucent background, white bold label, and only the up/down arrow tinted in the pastel good/bad accent — pastel-colored *text* alone (e.g. `#86EFAC` / `#FCA5A5`) still fails contrast on the bright amber (`bg-gradient-orange-red`) and green (`bg-gradient-teal-green`) themes even with `text-shadow`. Use this pill style on the wrapper span: `display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; background:rgba(15,23,42,0.55); color:#FFFFFF; font-weight:600; border:1px solid rgba(255,255,255,0.25);` and put the arrow in a nested span with `color:#86EFAC` (good) or `#FCA5A5` (bad). Same rule applies to any badge / pill / annotation rendered on a dark gradient.
 
 ## Quick Start
 
@@ -707,18 +707,26 @@ def value_box_with_delta(
         improving = (delta >= 0) == higher_is_better
         arrow = "arrow-up" if delta >= 0 else "arrow-down"
         # IMPORTANT: do NOT use Bootstrap's `text-success` / `text-danger`
-        # classes here. Their default green (#198754) and red (#DC3545) are
-        # dark and FAIL WCAG AA contrast on dark `value_box` themes such as
-        # "primary", "bg-gradient-blue-purple", "bg-gradient-orange-red", etc.
-        # Use light pastel variants + bold + a subtle text-shadow so the
-        # delta line stays legible on every gradient.
+        # classes here, and do NOT use pastel-colored *text* on its own —
+        # both fail WCAG AA contrast on the bright amber
+        # (`bg-gradient-orange-red`) and green (`bg-gradient-teal-green`)
+        # value_box themes. Render a dark translucent **pill badge** with
+        # white bold label and tint only the arrow in the pastel accent.
         good, bad = "#86EFAC", "#FCA5A5"  # green-300 / red-300
-        color = good if improving else bad
-        delta_block = ui.tags.div(
-            icon_svg(arrow),
-            f" {abs(delta):.1f}{delta_unit} vs prior period",
-            class_="small fw-bold d-flex align-items-center gap-1 mt-1",
-            style=f"color:{color}; text-shadow:0 1px 2px rgba(0,0,0,0.35);",
+        accent = good if improving else bad
+        pill_style = (
+            "display:inline-flex; align-items:center; gap:6px;"
+            "padding:3px 10px; border-radius:999px;"
+            "background:rgba(15,23,42,0.55);"
+            "color:#FFFFFF; font-weight:600;"
+            "border:1px solid rgba(255,255,255,0.25);"
+        )
+        delta_block = ui.tags.span(
+            ui.tags.span(icon_svg(arrow),
+                         style=f"color:{accent}; display:inline-flex;"),
+            ui.tags.span(f"{abs(delta):.1f}{delta_unit} vs prior period"),
+            class_="small mt-1",
+            style=pill_style,
         )
 
     return ui.value_box(
