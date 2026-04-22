@@ -33,9 +33,10 @@ flowchart TD
     P --> R{"--judge-model?"}
     R -- Yes --> S["Run extracted app on host temp dir"]
     S --> T["Host Playwright screenshot"]
-    T --> U["External LLM judge<br/>(scores 4 criteria)"]
-    U --> V{"Score ≥ threshold?"}
-    V -- No --> W["Refinement prompt includes<br/>judge feedback + previous code"]
+    T --> U["Judge panel<br/>(1+ external LLM judges)"]
+    U --> Y["Average per-criterion scores<br/>+ concatenate rationales"]
+    Y --> V{"Score ≥ threshold?"}
+    V -- No --> W["Refinement prompt includes<br/>panel feedback + previous code"]
     W --> E
     V -- Yes --> X["✅ Output directory"]
     R -- No --> X
@@ -50,7 +51,7 @@ flowchart TD
 2. **Pre-flight + setup** — shinygen checks Docker/API access, resolves the framework and model, and loads bundled skills, custom skills, and any data files.
 3. **Fresh sandbox generation** — each iteration stages a fresh Docker sandbox, installs agent skills in the agent's native home, and asks Claude Code or Codex CLI to generate `app.py` or `app.R`.
 4. **Agent self-evaluation** (when `--screenshot` is enabled) — inside the sandbox, the agent runs the app, uses `screenshot_helper.py`, waits 7 seconds before capture, reviews the screenshot, and refines visually before submission.
-5. **Extraction + optional external judge** — shinygen extracts the app from the results volume or eval log, preserves the final in-agent screenshot as `agent_last_screenshot.png`, and, if `--judge-model` is set, runs the extracted app on the host for a separate Playwright screenshot and external LLM score. Failed scores feed a refinement prompt that includes both judge feedback and the previous code.
+5. **Extraction + optional judge panel** — shinygen extracts the app from the results volume or eval log, preserves the final in-agent screenshot as `agent_last_screenshot.png`, and, if `--judge-model` is set, runs the extracted app on the host for a separate Playwright screenshot and one or more external LLM judges. Repeat the `--judge-model` flag (e.g. `--judge-model anthropic/claude-sonnet-4-6 --judge-model openai/gpt-5.4-mini-2026-03-17`) to run a panel: scores are averaged per criterion and each judge's rationale is concatenated into the refinement prompt. The benchmark workflow defaults to this dual-judge panel to cancel per-vendor bias.
 6. **Final output** — the final app, screenshots, eval logs, and structured run summary are written to your output directory.
 
 ### What You Get
