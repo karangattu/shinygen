@@ -215,6 +215,11 @@ Pass custom skill files into the agent sandbox to control coding style, componen
 :::
 
 ::: {.feature-card}
+#### {{< fa flask-vial >}} Control vs Treatment Arms
+Toggle the bundled framework skill on or off with `--skills` / `--no-skills` to A/B test how much the skill actually moves quality scores. Each run records its `arm` (`skills` or `vanilla`) in `run_summary.json`.
+:::
+
+::: {.feature-card}
 #### {{< fa globe >}} Web Fetch
 Enabled by default. Allows the agent to search the web during generation for up-to-date API docs and examples. Use `--no-web-fetch` to disable.
 :::
@@ -377,6 +382,85 @@ for r in results.results:
 - A failed job doesn't stop the rest.
 - Use different `output_dir` values per job.
 - Relative paths resolve from the config file's directory.
+:::
+
+---
+
+## {{< fa flask-vial >}} Control vs Treatment Benchmarks
+
+shinygen ships a built-in A/B harness for measuring how much the bundled framework skill (and any `--skills-dir` extras) actually improves generated apps. Every generation runs in one of two **arms**:
+
+| Arm | Flag | What loads into the sandbox |
+| --- | --- | --- |
+| `skills` (treatment) | `--skills` (default) | Bundled `shiny-python-dashboard` / `shiny-r-dashboard` skill plus any `--skills-dir` files |
+| `vanilla` (control) | `--no-skills` | No skill files at all — the agent sees only the prompt and tools |
+
+Both arms keep web search enabled, so the only intentional difference is the skill payload. Each run writes its arm into `run_summary.json`:
+
+```json
+{
+  "arm": "vanilla",
+  "use_skills": false,
+  "score": 6.75,
+  "iterations": 1,
+  "passed": false,
+  "...": "..."
+}
+```
+
+### Run a paired comparison locally
+
+```bash
+# Treatment: bundled skill loaded
+shinygen generate \
+    --prompt "$(cat prompt.txt)" \
+    --model claude-sonnet \
+    --output ./bench/skills \
+    --csv-file ./test_data_csv_files/trials_short_50.csv \
+    --screenshot --judge-model claude-sonnet
+
+# Control: same everything, no skill
+shinygen generate \
+    --prompt "$(cat prompt.txt)" \
+    --model claude-sonnet \
+    --output ./bench/vanilla \
+    --csv-file ./test_data_csv_files/trials_short_50.csv \
+    --screenshot --judge-model claude-sonnet \
+    --no-skills
+```
+
+Or from the Python API:
+
+```python
+import shinygen
+
+common = dict(
+    prompt=open("prompt.txt").read(),
+    model="claude-sonnet",
+    data_csv="./test_data_csv_files/trials_short_50.csv",
+    screenshot=True,
+    judge_model="claude-sonnet",
+)
+
+treatment = shinygen.generate(output_dir="./bench/skills",  use_skills=True,  **common)
+control   = shinygen.generate(output_dir="./bench/vanilla", use_skills=False, **common)
+
+print(f"skills:  {treatment.score:.2f}")
+print(f"vanilla: {control.score:.2f}")
+```
+
+### Benchmark matrix in CI
+
+The `run-benchmark-matrix.yml` GitHub Actions workflow expands the control/treatment axis automatically: every `(framework, model)` cell runs **twice** — once as `skills`, once as `vanilla` — producing paired output directories named `…/<idx>-<model>-skills/` and `…/<idx>-<model>-vanilla/`. Downstream review tooling (e.g. the `ed_operations_benchmark` report) reads `run_summary.json` to compute per-model treatment lift.
+
+::: {.callout-tip}
+## When to use `--no-skills`
+
+- Measuring whether a new skill version actually helps before merging it.
+- Producing fair baselines for blog posts or model comparisons.
+- Diagnosing whether a regression came from the model or from the skill.
+
+For day-to-day app generation, leave skills on — they're the default for a reason.
 :::
 
 ---
