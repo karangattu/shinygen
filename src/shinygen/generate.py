@@ -413,6 +413,7 @@ def build_generation_task(
     skills: list[Skill] | None = None,
     web_fetch: bool = True,
     screenshot: bool = False,
+    use_skills: bool = True,
 ) -> Task:
     """Build an Inspect AI Task for generating a Shiny app.
 
@@ -425,6 +426,10 @@ def build_generation_task(
         skills: Agent skills to install inside the sandbox.
         web_fetch: Whether to allow web search tools.
         screenshot: Whether to inject visual self-evaluation tools.
+        use_skills: When False, run the agent vanilla — discard any provided
+            `skills`, do not load the visual-qa skill, and do not stage
+            `.agents/skills/` files for codex_cli. Used for control/treatment
+            benchmarks comparing skill-equipped runs against vanilla baselines.
 
     Returns:
         An Inspect AI Task ready to be evaluated.
@@ -442,18 +447,21 @@ def build_generation_task(
         screenshot=screenshot,
     )
     full_user_prompt = build_user_prompt(user_prompt, framework_key)
-    resolved_skills = list(skills or [])
+    resolved_skills = list(skills or []) if use_skills else []
 
     # Merge sample files
     sample_files: dict[str, str] = {}
     if data_files:
         sample_files.update(data_files)
 
-    # Inject visual self-evaluation tools when screenshot mode is on
+    # Inject visual self-evaluation tools when screenshot mode is on.
+    # Vanilla (use_skills=False) runs still get the screenshot helper script
+    # so screenshots succeed, but skip the visual-qa SKILL.md guidance.
     if screenshot:
-        from .skills import load_visual_qa_skills
+        if use_skills:
+            from .skills import load_visual_qa_skills
 
-        resolved_skills.extend(load_visual_qa_skills())
+            resolved_skills.extend(load_visual_qa_skills())
 
         # Inject the screenshot helper script
         helper_script = (Path(__file__).parent / "screenshot_helper.py").read_text()
@@ -463,7 +471,7 @@ def build_generation_task(
     # so Codex's documented discovery picks it up. inspect_swe writes skills
     # under `$CODEX_HOME/skills` (i.e. `.codex/skills`), which is not a
     # Codex-scanned path per https://developers.openai.com/codex/skills.
-    if agent == "codex_cli":
+    if agent == "codex_cli" and use_skills:
         from .skills import collect_skill_sample_files
 
         for rel_path, content in collect_skill_sample_files(
@@ -490,7 +498,10 @@ def build_generation_task(
 
     dataset = MemoryDataset(samples=[sample])
 
-    # Select solver
+    # Select solver. `web_fetch=False` disables Codex's `web_search` tool;
+    # when True we leave the disallowed list empty so the agent can use
+    # `web_search` (Codex) or Claude Code's built-in WebFetch / WebSearch.
+    codex_disallowed_tools = list(CODEX_DISALLOWED_TOOLS) if not web_fetch else []
     if agent == "claude_code":
         solver = claude_code(
             cwd=SANDBOX_WORK_DIR,
@@ -504,7 +515,7 @@ def build_generation_task(
             skills=resolved_skills or None,
             version=CODEX_CLI_VERSION,
             config_overrides=CODEX_CONFIG_OVERRIDES,
-            disallowed_tools=CODEX_DISALLOWED_TOOLS,
+            disallowed_tools=codex_disallowed_tools,
         )
 
     time_limit = sandbox_time_limit_for_framework(framework_key)

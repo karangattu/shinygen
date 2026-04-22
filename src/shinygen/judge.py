@@ -234,9 +234,35 @@ def _build_judge_message(
     parts.append(f"## Source Code\n\n```python\n{code}\n```\n")
 
     if screenshot_paths:
-        parts.append(
-            f"\n{len(screenshot_paths)} screenshot(s) are attached as images.\n"
-        )
+        count = len(screenshot_paths)
+        if count == 1:
+            parts.append(
+                "\n1 screenshot is attached as an image (the rendered app).\n"
+            )
+        else:
+            # Name each screenshot so the judge can correlate the image with
+            # its tab/view label. Multi-tab dashboards used to be scored
+            # against the landing image only, biasing visual_ux_quality
+            # downward — give the judge the full set and tell it to evaluate
+            # the app holistically.
+            labelled = "\n".join(
+                f"  {idx}. `{path.name}`"
+                for idx, path in enumerate(screenshot_paths, start=1)
+            )
+            parts.append(
+                f"\n{count} screenshots are attached, in DOM order across the app's "
+                "tabs / nav-panels:\n\n"
+                f"{labelled}\n\n"
+                "**Judge the app as a whole, not one screenshot.** "
+                "The first image is the landing view; subsequent images are the "
+                "remaining tabs/views. Score `visual_ux_quality` against the "
+                "*combined* set: a polished landing page with broken or near-empty "
+                "tabs is worse than a uniformly polished multi-tab app, and a "
+                "dashboard whose secondary tabs are as carefully designed as the "
+                "landing page deserves credit for that breadth. Likewise, score "
+                "`requirement_fidelity` against features visible across all tabs, "
+                "not only the first one.\n"
+            )
     else:
         parts.append(
             "\nNo screenshots available — evaluate based on code alone with "

@@ -102,6 +102,17 @@ def main() -> None:
     help="Allow the agent to use web search tools.",
 )
 @click.option(
+    "--skills/--no-skills",
+    "use_skills",
+    default=True,
+    show_default=True,
+    help=(
+        "Inject the bundled framework skill (and any --skills-dir) into the "
+        "agent context. Use --no-skills to run a vanilla baseline for "
+        "control/treatment benchmarks."
+    ),
+)
+@click.option(
     "--port",
     default=None,
     type=int,
@@ -127,6 +138,7 @@ def generate(
     max_iterations: int,
     quality_threshold: float,
     web_fetch: bool,
+    use_skills: bool,
     port: int | None,
     verbose: bool,
 ) -> None:
@@ -161,6 +173,7 @@ def generate(
             max_iterations=max_iterations,
             quality_threshold=quality_threshold,
             web_fetch=web_fetch,
+            use_skills=use_skills,
             port=port,
             verbose=verbose,
         )

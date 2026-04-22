@@ -31,7 +31,7 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 20. Format numbers in `render.DataGrid` outputs the same way you format numbers in value boxes. Never display a raw 6-decimal float in a table — apply `df.assign(col=df["col"].map(lambda v: f"{v:,.1f}"))` or `df.style.format(...)` before passing to `DataGrid`.
 21. Do **not** add `ui.input_dark_mode()` to dashboards. Dark mode requires hand-tuning every chart, value_box gradient, `great_tables` cell colour, and `DataGrid` filter input — in practice it produces low-contrast "unreadable on cell" results. Ship a polished light theme instead.
 22. For *summary* tables (top-N, league tables, KPI breakdowns) prefer `great_tables.GT(...)` over `render.DataGrid` — render via `@render.ui` returning `ui.HTML(GT(df).as_raw_html())`. `great_tables` produces a typeset, publication-quality table with column groups, spanners, formatted units (`fmt_currency`, `fmt_percent`, `fmt_number`), and bar/colour data cells. Reserve `render.DataGrid` for the long, scrollable, *filterable* drill-down table.
-23. For maps, **default to `lonboard`** (deck.gl/WebGL binding with first-class Shiny support, no Mapbox token, light Carto basemap). It produces visibly more attractive output than `plotly.express.density_mapbox` or `folium`, supports per-row colours/sizes natively, and renders millions of points smoothly. Use `lonboard.ScatterplotLayer` (categorical-colour markers), `lonboard.TextLayer` with emoji glyphs (unique per-marker icons without a sprite atlas), or `lonboard.H3HexagonLayer` for 3D aggregation. Reach for `pydeck.IconLayer` only when the design genuinely calls for bitmap PNG markers, Plotly `density_mapbox`/`scatter_mapbox` only as a no-widget fallback, and `folium` only for ≤500-point HTML popups. **Do not use `kepler.gl-jupyter`** — last release was 2 years ago and it has no real Shiny integration. Always pick the **light** basemap variant (`CartoBasemap.Positron`, `carto-positron`, `CartoDB positron`); dark basemaps clash with the rest of the dashboard and bury the data.
+23. For maps, **default to `lonboard`** (deck.gl/WebGL binding with first-class Shiny support, no Mapbox token, light Carto basemap). It produces visibly more attractive output than `plotly.express.density_mapbox` or `folium`, supports per-row colours/sizes natively, and renders millions of points smoothly. Use `lonboard.ScatterplotLayer` (categorical-colour markers), `lonboard.TextLayer` with emoji glyphs (unique per-marker icons without a sprite atlas), or `lonboard.H3HexagonLayer` for 3D aggregation. Reach for `pydeck.IconLayer` only when the design genuinely calls for bitmap PNG markers, Plotly `density_mapbox`/`scatter_mapbox` only as a no-widget fallback, and `folium` only for ≤500-point HTML popups. **Do not use `kepler.gl-jupyter`** — last release was 2 years ago and it has no real Shiny integration. Always pick the **light** basemap variant (`CartoBasemap.Positron`, `carto-positron`, `CartoDB positron`); dark basemaps clash with the rest of the dashboard and bury the data. **When the layer is `pickable=True`, never pass the raw analysis dataframe straight to `gpd.GeoDataFrame`** — lonboard's click panel ("Feature properties") renders every column with its raw name, so long `snake_case` headers get truncated to `stati…` / `neig…` and float lat/lon spill across multiple lines, leaving an unreadable popup. The property-name cell is a very narrow fixed-width column (~50 px) that **also truncates labels longer than ~4 characters**, so always project to a slim `pandas.DataFrame` with VERY short keys (`"Op"`, `"Util"`, `"Rev"`, `"Sess"`, `"Rate"` — 2–4 letters max) and bake units into the value (`"$1,234"`, `"82.4%"`); drop `latitude` / `longitude` (already in the geometry) **before** wrapping in the GeoDataFrame.
 24. **Use `ui.toolbar()` (Shiny ≥ 1.6) to put per-card controls inside `ui.card_header()` / `ui.card_footer()`** instead of cramming card-specific filters into the global sidebar. Components: `ui.toolbar(align="left"|"right")`, `ui.toolbar_input_button(id, label, icon=..., tooltip=...)`, `ui.toolbar_input_select(id, label, choices=...)`, `ui.toolbar_divider()`, `ui.toolbar_spacer()`. Also useful as an `info` button inside an input `label=ui.toolbar(...)`, and as the `toolbar=` argument of `ui.input_submit_textarea()` for AI-chat composers. Set `shiny>=1.6` in `requirements.txt` / `pyproject.toml`.
 25. **Never use Bootstrap's `text-success` / `text-danger` classes for delta lines inside `ui.value_box()` themed with `theme="primary"` or any `theme="bg-gradient-*"`.** Their default green (#198754) / red (#DC3545) fail WCAG AA contrast on those dark backgrounds and produce "barely readable" delta arrows. **Render the delta as a pill badge** with a dark translucent background, white bold label, and only the up/down arrow tinted in the pastel good/bad accent — pastel-colored *text* alone (e.g. `#86EFAC` / `#FCA5A5`) still fails contrast on the bright amber (`bg-gradient-orange-red`) and green (`bg-gradient-teal-green`) themes even with `text-shadow`. Use this pill style on the wrapper span: `display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; background:rgba(15,23,42,0.55); color:#FFFFFF; font-weight:600; border:1px solid rgba(255,255,255,0.25);` and put the arrow in a nested span with `color:#86EFAC` (good) or `#FCA5A5` (bad). Same rule applies to any badge / pill / annotation rendered on a dark gradient.
 
@@ -363,16 +363,33 @@ ROOM_COLOURS = {
 @render_widget
 def listings_map():
     df = filtered()                            # reactive pandas DataFrame
+
+    # Build a slim, friendly-named frame for the click popup. lonboard
+    # renders every column of the GeoDataFrame in its "Feature properties"
+    # panel using the raw column names — long snake_case names get
+    # truncated to "stati…" / "neig…" and float coordinates spill across
+    # multiple lines, making the popup unreadable. The panel's name cell
+    # is a VERY narrow fixed-width column (~50 px) that ALSO truncates
+    # labels longer than ~4 characters, so keep keys to 2–4 letters
+    # ("Op", "Util", "Rev", "Rate") and bake units into the value
+    # ("$1,234", "82.4%"). Drop lat/lon — they're already in the geometry.
+    popup = pd.DataFrame({
+        "Name":  df["name"].values,
+        "Type":  df["room_type"].values,
+        "Price": df["price"].map(lambda v: f"${v:,.0f}").values,
+        "Rev":   df["number_of_reviews"].astype(int).values,
+        "Rate":  df["review_scores_rating"].round(2).values,
+    })
     gdf = gpd.GeoDataFrame(
-        df,
+        popup,
         geometry=gpd.points_from_xy(df["longitude"], df["latitude"]),
         crs="EPSG:4326",
     )
     fill = np.array(
-        [ROOM_COLOURS.get(rt, [100, 116, 139, 200]) for rt in gdf["room_type"]],
+        [ROOM_COLOURS.get(rt, [100, 116, 139, 200]) for rt in df["room_type"]],
         dtype=np.uint8,
     )
-    radius = np.clip(np.sqrt(gdf["price"].fillna(0)) * 1.4, 30, 220).astype(np.float32)
+    radius = np.clip(np.sqrt(df["price"].fillna(0)) * 1.4, 30, 220).astype(np.float32)
 
     layer = ScatterplotLayer.from_geopandas(
         gdf,

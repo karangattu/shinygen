@@ -140,13 +140,22 @@ jobs:
             name: gpt-5.4-mini
           - idx: "06"
             name: gpt-5.4-nano
+        # Control / treatment axis: each (framework, model) cell runs twice,
+        # once with the bundled shinygen skill (`skills`) and once vanilla
+        # (`vanilla`). Both arms keep web search enabled so the comparison
+        # isolates the skill's contribution.
+        arm:
+          - name: skills
+            use_skills: "true"
+          - name: vanilla
+            use_skills: "false"
     env:
       BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
       BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
       BENCHMARK_DATASET_BASENAME: ${{ needs.prepare.outputs.benchmark_dataset_basename }}
       BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
       BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
-      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}-${{ matrix.arm.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
@@ -238,6 +247,7 @@ jobs:
             --max-iterations "${BENCHMARK_MAX_ITERATIONS}" \
             --quality-threshold "${BENCHMARK_QUALITY_THRESHOLD}" \
             --web-fetch \
+            $([[ "${{ matrix.arm.use_skills }}" == "true" ]] && echo "--skills" || echo "--no-skills") \
             2>&1 | tee "${OUTPUT_DIR}/run.log"
 
       - name: Write benchmark metrics summary into output directory
@@ -250,6 +260,7 @@ jobs:
           OUTPUT_DIR="${OUTPUT_DIR}" \
           MODEL="${{ matrix.model.name }}" \
           FRAMEWORK="${{ matrix.framework }}" \
+          ARM="${{ matrix.arm.name }}" \
           GHA_RUN_ID="${{ github.run_id }}" \
           GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
           GHA_WORKFLOW="${{ github.workflow }}" \
@@ -263,6 +274,7 @@ jobs:
           output_dir = Path(os.environ["OUTPUT_DIR"])
           model = os.environ["MODEL"]
           framework = os.environ["FRAMEWORK"]
+          arm = os.environ["ARM"]
           summary_path = output_dir / "run_summary.json"
           metrics_path = output_dir / "run_metrics.txt"
 
@@ -276,6 +288,7 @@ jobs:
               f"benchmark_dataset: {os.environ['BENCHMARK_DATASET']}",
               f"model: {model}",
               f"framework: {framework}",
+              f"arm: {arm}",
               "timestamp_utc: "
               + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "",
@@ -316,7 +329,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.name }}
+          name: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.name }}-${{ matrix.arm.name }}
           path: ${{ env.OUTPUT_DIR }}
           if-no-files-found: warn
 
@@ -378,6 +391,9 @@ jobs:
                       "model": model.get("requested"),
                       "resolved_model_id": model.get("resolved_id"),
                       "agent": model.get("agent"),
+                      "arm": summary.get("arm"),
+                      "use_skills": summary.get("use_skills"),
+                      "web_fetch": summary.get("web_fetch"),
                       "passed": summary.get("passed"),
                       "score": summary.get("score"),
                       "iterations": summary.get("iterations"),
@@ -426,16 +442,17 @@ jobs:
               f"Run ID: {os.environ['GHA_RUN_ID']}",
               f"Run attempt: {os.environ['GHA_RUN_ATTEMPT']}",
               "",
-              "| Framework | Model | Agent | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Agent | Arm | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
 
           for row in rows:
               lines.append(
-                "| {framework} | {model} | {agent} | {passed} | {score} | {iterations} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
+                "| {framework} | {model} | {agent} | {arm} | {passed} | {score} | {iterations} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
                   framework=row.get("framework") or "n/a",
                       model=row.get("model") or "n/a",
                       agent=row.get("agent") or "n/a",
+                      arm=row.get("arm") or "n/a",
                       passed="yes" if row.get("passed") else "no",
                       score=fmt_score(row.get("score")),
                       iterations=row.get("iterations") if row.get("iterations") is not None else "n/a",
@@ -456,7 +473,7 @@ jobs:
           benchmark_output_tokens = sum(r.get("total_output_tokens") or 0 for r in rows)
 
           lines.append(
-              "| **Total** | | | | | | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
+              "| **Total** | | | | | | | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
                   total_cost=fmt_cost(benchmark_total_cost),
                   generation_cost=fmt_cost(benchmark_gen_cost),
                   judge_cost=fmt_cost(benchmark_judge_cost),

@@ -60,6 +60,8 @@ def _write_run_summary(
     artifact_name: str,
     judge_model: str | None,
     data_file_names: list[str],
+    use_skills: bool = True,
+    web_fetch: bool = True,
 ) -> Path:
     """Persist structured run metadata for workflow artifacts."""
     summary = {
@@ -72,6 +74,9 @@ def _write_run_summary(
         "framework": framework_key,
         "artifact_name": artifact_name,
         "judge_model": judge_model,
+        "arm": "skills" if use_skills else "vanilla",
+        "use_skills": use_skills,
+        "web_fetch": web_fetch,
         "passed": result.passed,
         "score": result.score,
         "iterations": result.iterations,
@@ -202,9 +207,25 @@ def _latest_path(paths: list[Path]) -> Path | None:
 
 
 def _find_agent_screenshot_in_results(results_dir: Path | None) -> Path | None:
-    """Find the raw agent screenshot copied from the sandbox results volume."""
+    """Find the raw agent landing-page screenshot from the results volume.
+
+    Used as a "did the agent screenshot anything at all?" signal. The full
+    multi-tab capture is gathered separately by
+    :func:`_collect_agent_screenshots_in_results`.
+    """
     if results_dir is None or not results_dir.exists():
         return None
+
+    # Prefer the new numbered landing screenshot, then any legacy single-file
+    # capture, then anything else that looks like a screenshot.
+    landing_matches = [
+        path
+        for path in results_dir.rglob("screenshot_01_*.png")
+        if path.is_file()
+    ]
+    preferred = _latest_path(landing_matches)
+    if preferred is not None:
+        return preferred
 
     full_page_matches = [path for path in results_dir.rglob("screenshot.png") if path.is_file()]
     preferred = _latest_path(full_page_matches)
@@ -219,18 +240,65 @@ def _find_agent_screenshot_in_results(results_dir: Path | None) -> Path | None:
     return _latest_path(fallback_matches)
 
 
+def _collect_agent_screenshots_in_results(results_dir: Path | None) -> list[Path]:
+    """Find every per-tab screenshot the agent captured in the sandbox.
+
+    Returns an ordered list (landing first, then tabs). Multi-tab dashboards
+    benefit because the judge sees every panel instead of only the first
+    rendered view. Falls back to the legacy single ``screenshot.png`` when
+    the agent only emitted one image.
+    """
+    if results_dir is None or not results_dir.exists():
+        return []
+
+    # New layout: ``screenshot_01_landing.png``, ``screenshot_02_<slug>.png``...
+    numbered = sorted(
+        (path for path in results_dir.rglob("screenshot_[0-9][0-9]_*.png") if path.is_file()),
+        key=lambda p: p.name,
+    )
+    if numbered:
+        return numbered
+
+    # Legacy layout: a single ``screenshot.png``.
+    legacy = [path for path in results_dir.rglob("screenshot.png") if path.is_file()]
+    latest_legacy = _latest_path(legacy)
+    if latest_legacy is not None:
+        return [latest_legacy]
+
+    return []
+
+
 def _copy_agent_screenshot_artifact(
     output_path: Path,
     *,
     results_dir: Path | None,
     log_path: Path | None,
 ) -> Path | None:
-    """Copy the latest coding-agent screenshot into the model artifact directory."""
+    """Copy every coding-agent screenshot into the model artifact directory.
+
+    Returns the canonical landing-page screenshot path
+    (``agent_last_screenshot.png``) for backwards compatibility with callers
+    that only need a "did the agent screenshot?" signal. All per-tab
+    captures are also copied with their original numbered names so the
+    judge can pick them up in :func:`_resolve_judge_screenshot_paths`.
+    """
     destination = output_path / AGENT_LAST_SCREENSHOT_NAME
 
-    source = _find_agent_screenshot_in_results(results_dir)
-    if source is not None:
-        shutil.copy2(source, destination)
+    captures = _collect_agent_screenshots_in_results(results_dir)
+    if captures:
+        # Preserve the numbered per-tab files alongside the canonical
+        # ``agent_last_screenshot.png`` (which mirrors the landing page
+        # for legacy tooling that expects exactly one filename).
+        for source in captures:
+            target = output_path / source.name
+            try:
+                shutil.copy2(source, target)
+            except Exception as exc:  # pragma: no cover - filesystem dependent
+                logger.warning("Failed to copy %s -> %s: %s", source, target, exc)
+        try:
+            shutil.copy2(captures[0], destination)
+        except Exception as exc:  # pragma: no cover - filesystem dependent
+            logger.warning("Failed to copy landing screenshot to %s: %s", destination, exc)
         return destination
 
     if log_path is not None and log_path.exists():
@@ -246,6 +314,32 @@ def _copy_agent_screenshot_artifact(
     return None
 
 
+def _gather_existing_screenshots(output_path: Path) -> list[Path]:
+    """Return every per-tab screenshot already present in ``output_path``.
+
+    Numbered ``screenshot_NN_<slug>.png`` files come first (landing then
+    tabs in DOM order). The canonical ``agent_last_screenshot.png`` is
+    only returned when no numbered captures exist, so the judge never sees
+    the same landing image twice.
+    """
+    numbered = sorted(
+        (path for path in output_path.glob("screenshot_[0-9][0-9]_*.png") if path.is_file()),
+        key=lambda p: p.name,
+    )
+    if numbered:
+        return numbered
+
+    legacy = output_path / AGENT_LAST_SCREENSHOT_NAME
+    if legacy.exists():
+        return [legacy]
+
+    fallback = output_path / "screenshot.png"
+    if fallback.exists():
+        return [fallback]
+
+    return []
+
+
 def _resolve_judge_screenshot_paths(
     output_path: Path,
     eval_dir: Path,
@@ -255,22 +349,33 @@ def _resolve_judge_screenshot_paths(
     """Return screenshots for judging.
 
     Preference order:
-    1. Sandbox-captured ``agent_last_screenshot.png`` (most faithful to the
-       agent's run).
+    1. Sandbox-captured per-tab series (``screenshot_01_landing.png``,
+       ``screenshot_02_<slug>.png``, ...). Falls back to the legacy single
+       ``agent_last_screenshot.png`` when the agent only captured one view.
     2. Host-side capture of the extracted code (best-effort fallback when
-       the sandbox screenshot is missing — e.g. agent SIGTERMed mid-task).
+       the sandbox screenshots are missing — e.g. agent SIGTERMed mid-task).
+       Captures every tab via the same multi-view helper.
     3. Raise ``RuntimeError`` so the caller can decide whether to retry or
        proceed with code-only judging.
 
     Set ``SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1`` to disable the host-side
     fallback and preserve the original strict behavior.
+
+    Multi-image judging matters because multi-tab dashboards used to be
+    judged on the landing page only, biasing visual_ux_quality scores
+    against ``page_navbar`` / ``navset_*`` apps that hide secondary
+    content behind tabs.
     """
     import os
 
-    agent_screenshot = output_path / AGENT_LAST_SCREENSHOT_NAME
-    if agent_screenshot.exists():
-        logger.info("Using agent screenshot for judge: %s", agent_screenshot.name)
-        return [agent_screenshot]
+    existing = _gather_existing_screenshots(output_path)
+    if existing:
+        logger.info(
+            "Using %d agent screenshot(s) for judge: %s",
+            len(existing),
+            ", ".join(p.name for p in existing),
+        )
+        return existing
 
     strict = os.environ.get("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", "").lower() in (
         "1",
@@ -290,22 +395,41 @@ def _resolve_judge_screenshot_paths(
             captured = host_screenshot.take_screenshots(eval_dir, framework_key, port)
         except Exception as exc:  # pragma: no cover - host env dependent
             logger.warning("Host-side screenshot fallback raised: %s", exc)
-            captured = None
+            captured = []
 
-        if captured is not None and Path(captured).exists():
-            destination = output_path / AGENT_LAST_SCREENSHOT_NAME
+        # ``take_screenshots`` now returns a list of paths (one per tab).
+        if isinstance(captured, Path):
+            captured = [captured]
+        captured = [Path(p) for p in (captured or []) if Path(p).exists()]
+
+        if captured:
+            destinations: list[Path] = []
+            for source in captured:
+                target = output_path / source.name
+                try:
+                    if source.resolve() != target.resolve():
+                        shutil.copy2(source, target)
+                    destinations.append(target)
+                except Exception as exc:  # pragma: no cover - filesystem dependent
+                    logger.warning(
+                        "Failed to copy host screenshot %s -> %s: %s",
+                        source,
+                        target,
+                        exc,
+                    )
+                    destinations.append(source)
+            # Keep the legacy single-file name pointing at the landing
+            # capture so older inspection tools still work.
             try:
-                shutil.copy2(captured, destination)
-            except Exception as exc:  # pragma: no cover - filesystem dependent
-                logger.warning(
-                    "Failed to copy host screenshot to %s: %s", destination, exc
-                )
-                return [Path(captured)]
+                shutil.copy2(destinations[0], output_path / AGENT_LAST_SCREENSHOT_NAME)
+            except Exception as exc:  # pragma: no cover
+                logger.debug("Could not copy landing alias: %s", exc)
             logger.info(
-                "Using host-side fallback screenshot for judge: %s",
-                destination.name,
+                "Using %d host-side fallback screenshot(s) for judge: %s",
+                len(destinations),
+                ", ".join(p.name for p in destinations),
             )
-            return [destination]
+            return destinations
 
         logger.warning(
             "Host-side screenshot fallback did not produce an image; "
@@ -347,6 +471,7 @@ def generate_and_refine(
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
     quality_threshold: float = DEFAULT_QUALITY_THRESHOLD,
     web_fetch: bool = True,
+    use_skills: bool = True,
     port: int | None = None,
     verbose: bool = False,
 ) -> GenerationResult:
@@ -371,6 +496,10 @@ def generate_and_refine(
         max_iterations: Maximum refinement iterations.
         quality_threshold: Minimum composite score to accept (1-10 scale).
         web_fetch: Allow web search tools in the sandbox (default: True).
+        use_skills: When True (default), inject the bundled framework skill
+            (and any ``skills_dir``) into the agent context. When False, run
+            a vanilla baseline with no skills loaded — used for
+            control/treatment benchmarks comparing skill gains.
         port: Port for running the app during screenshots.
         verbose: Enable verbose logging.
 
@@ -399,13 +528,20 @@ def generate_and_refine(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Load skills
+    # Load skills (skipped entirely when use_skills=False so we have a
+    # truly vanilla baseline arm for control/treatment benchmarks).
     from .skills import load_default_skills, load_skill_files
 
     skills: list[Skill] = []
-    skills.extend(load_default_skills(framework_key))
-    if skills_dir:
-        skills.extend(load_skill_files(Path(skills_dir)))
+    if use_skills:
+        skills.extend(load_default_skills(framework_key))
+        if skills_dir:
+            skills.extend(load_skill_files(Path(skills_dir)))
+    elif skills_dir:
+        logger.info(
+            "use_skills=False: ignoring --skills-dir %s for vanilla baseline",
+            skills_dir,
+        )
 
     logger.info(
         "Starting generation: model=%s, agent=%s, framework=%s",
@@ -433,7 +569,11 @@ def generate_and_refine(
         hit_output_token_limit = False
         for attempt in range(1, max_retries + 1):
             if screenshot:
+                # Clear stale screenshots from previous attempts so the
+                # judge never sees images from a discarded iteration.
                 (output_path / AGENT_LAST_SCREENSHOT_NAME).unlink(missing_ok=True)
+                for stale in output_path.glob("screenshot_[0-9][0-9]_*.png"):
+                    stale.unlink(missing_ok=True)
 
             with Timer() as gen_timer:
                 code, generation_usage_rows, hit_output_token_limit = _run_generation(
@@ -447,6 +587,7 @@ def generate_and_refine(
                     iteration,
                     screenshot,
                     output_path,
+                    use_skills=use_skills,
                 )
             result.usage.add_time("generate", gen_timer.elapsed)
             for row in generation_usage_rows:
@@ -662,6 +803,8 @@ def generate_and_refine(
         artifact_name=artifact_name,
         judge_model=judge_model,
         data_file_names=list(data_files or {}),
+        use_skills=use_skills,
+        web_fetch=web_fetch,
     )
 
     return result
@@ -678,6 +821,8 @@ def _run_generation(
     iteration: int,
     screenshot: bool = False,
     output_path: Path | None = None,
+    *,
+    use_skills: bool = True,
 ) -> tuple[str | None, list[dict[str, object]], bool]:
     """Run a single generation via Inspect AI and extract the code."""
     from inspect_ai import eval as inspect_eval
@@ -702,6 +847,7 @@ def _run_generation(
             skills=skills,
             web_fetch=web_fetch,
             screenshot=screenshot,
+            use_skills=use_skills,
         )
 
         # Use reasoning_effort for Anthropic Claude 4.6+ models so the

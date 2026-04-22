@@ -24,6 +24,7 @@ def generate(
     max_iterations: int = 3,
     quality_threshold: float = 7.0,
     web_fetch: bool = True,
+    use_skills: bool = True,
     port: int | None = None,
     verbose: bool = False,
 ) -> GenerationResult:
@@ -56,8 +57,11 @@ def generate(
         max_iterations: Maximum number of generate-judge-refine cycles.
         quality_threshold: Minimum composite quality score (1-10) to accept.
         web_fetch: If True (default), allow the agent to use web search tools.
-        port: Port for running the app during screenshots.
-        verbose: If True, enable debug logging.
+        use_skills: If True (default), inject the bundled framework skill
+            (and any ``skills_dir``) into the agent context. Set to False to
+            run a vanilla baseline with no skills loaded — used to compare
+            skill gains against the un-augmented model in benchmarks.
+        port: Port for running the app during screenshots.        verbose: If True, enable debug logging.
 
     Returns:
         A GenerationResult containing the app path, source code, quality
@@ -116,6 +120,7 @@ def generate(
         max_iterations=max_iterations,
         quality_threshold=quality_threshold,
         web_fetch=web_fetch,
+        use_skills=use_skills,
         port=port,
         verbose=verbose,
     )
@@ -137,6 +142,7 @@ class BatchJob:
     max_iterations: int = 3
     quality_threshold: float = 7.0
     web_fetch: bool = True
+    use_skills: bool = True
     port: int | None = None
     verbose: bool = False
 
@@ -255,6 +261,7 @@ def batch(jobs: list[BatchJob | dict]) -> BatchResult:
                 max_iterations=job.max_iterations,
                 quality_threshold=job.quality_threshold,
                 web_fetch=job.web_fetch,
+                use_skills=job.use_skills,
                 port=job.port,
                 verbose=job.verbose,
             )

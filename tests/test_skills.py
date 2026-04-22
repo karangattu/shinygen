@@ -92,7 +92,78 @@ class TestBuildGenerationTask:
         # pre-built sandbox image, falling back to a download when missing.
         assert captured["version"] == "auto"
         assert captured["config_overrides"] == {"web_search": "live"}
+        # web_fetch defaults to True, so web_search must NOT be disallowed.
+        assert captured["disallowed_tools"] == []
+
+    def test_codex_solver_disallows_web_search_when_web_fetch_false(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        captured = {}
+        sentinel_solver = object()
+
+        def fake_solver(**kwargs):
+            captured.update(kwargs)
+            return sentinel_solver
+
+        monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
+
+        build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="codex_cli",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+            web_fetch=False,
+        )
+
         assert captured["disallowed_tools"] == ["web_search"]
+
+    @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
+    def test_use_skills_false_runs_vanilla_baseline(
+        self,
+        tmp_path,
+        monkeypatch,
+        agent,
+    ):
+        """Control arm: no bundled skills, no .agents/skills/ staging."""
+        captured = {}
+        sentinel_solver = object()
+
+        def fake_solver(**kwargs):
+            captured.update(kwargs)
+            return sentinel_solver
+
+        if agent == "claude_code":
+            monkeypatch.setattr("shinygen.generate.claude_code", fake_solver)
+        else:
+            monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
+
+        skills = load_default_skills("shiny_python")
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent=agent,
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+            data_files={"sales.csv": "x,y\n1,2\n"},
+            skills=skills,
+            use_skills=False,
+            screenshot=True,
+        )
+
+        assert task.solver is sentinel_solver
+        # Even if the caller passed skills, the vanilla arm must drop them.
+        assert captured["skills"] is None
+
+        sample_files = task.dataset.samples[0].files or {}
+        # Data files still present.
+        assert sample_files["sales.csv"] == "x,y\n1,2\n"
+        # Screenshot helper script still present (vanilla arm still
+        # captures screenshots; only the SKILL.md guidance is removed).
+        assert ".tools/screenshot_helper.py" in sample_files
+        # No bundled skill files staged for codex_cli either.
+        staged = [k for k in sample_files if k.startswith(".agents/skills/")]
+        assert staged == []
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_passes_skills_to_solver_instead_of_sample_files(

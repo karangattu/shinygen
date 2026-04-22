@@ -336,9 +336,16 @@ class TestResolveJudgeScreenshotPaths:
             18888,
         )
 
-        copied = output_path / "agent_last_screenshot.png"
+        # New behavior: host-side fallback preserves the original filename
+        # (so multi-tab series like ``screenshot_02_<slug>.png`` survive)
+        # and additionally writes a legacy ``agent_last_screenshot.png``
+        # alias pointing at the landing image.
+        copied = output_path / "screenshot.png"
+        legacy_alias = output_path / "agent_last_screenshot.png"
         assert screenshot_paths == [copied]
         assert copied.read_bytes() == b"host"
+        assert legacy_alias.exists()
+        assert legacy_alias.read_bytes() == b"host"
 
     def test_raises_in_strict_mode_when_sandbox_missing(
         self,

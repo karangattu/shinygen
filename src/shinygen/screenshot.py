@@ -176,13 +176,177 @@ def wait_for_shiny(page: "Page", url: str, timeout: int = 45) -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# Multi-tab capture
+# ---------------------------------------------------------------------------
+
+# Maximum number of tab/nav screenshots to capture per app (in addition to the
+# landing page). Caps both runtime cost and judge token usage. 8 covers the
+# vast majority of real dashboards (most multi-tab apps use 3-5 tabs).
+MAX_TAB_SCREENSHOTS = 8
+
+# Selectors that match Shiny / bslib / Bootstrap tab and navbar links.
+# Covers ``ui.navset_tab``, ``ui.navset_pill``, ``ui.navset_card_tab``,
+# ``ui.page_navbar`` (bslib + bs5) and the older shinydashboard sidebar.
+_TAB_SELECTOR_JS = """
+() => {
+    const seen = new Set();
+    const items = [];
+    const candidates = document.querySelectorAll(
+        '[data-bs-toggle="tab"],'
+        + '[data-bs-toggle="pill"],'
+        + '[data-toggle="tab"],'
+        + '[data-toggle="pill"],'
+        + '[role="tab"],'
+        + '.bslib-page-navbar .navbar-nav .nav-link,'
+        + '.shiny-tab-input ~ .nav .nav-link'
+    );
+    candidates.forEach((el, idx) => {
+        // Skip already-active tab; landing screenshot already covers it.
+        if (el.classList.contains('active') || el.getAttribute('aria-selected') === 'true') {
+            return;
+        }
+        // Skip dropdown toggles — they don't reveal a panel directly.
+        if (el.classList.contains('dropdown-toggle')) {
+            return;
+        }
+        // De-dup by href/target so navbar + sidebar twins of the same tab
+        // do not produce two screenshots.
+        const key = (el.getAttribute('href') || '')
+            + '|' + (el.getAttribute('data-bs-target') || '')
+            + '|' + (el.getAttribute('data-value') || '')
+            + '|' + (el.textContent || '').trim();
+        if (!key || seen.has(key)) return;
+        // Skip invisible nav items (display:none collapsed menus).
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return;
+        seen.add(key);
+        items.push({
+            index: idx,
+            label: (el.textContent || '').trim().slice(0, 40) || ('tab-' + items.length),
+        });
+    });
+    return items;
+}
+"""
+
+
+def _slugify(label: str) -> str:
+    """Turn a tab label into a filesystem-safe slug."""
+    import re
+
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", label).strip("-").lower()
+    return slug[:32] or "tab"
+
+
+def _capture_app_views(
+    page: "Page",
+    output_dir: Path,
+    prefix: str = "screenshot",
+) -> list[Path]:
+    """Capture the landing page plus every detected tab / nav-panel.
+
+    Returns a sorted list of screenshot paths. The first entry is always the
+    landing page; subsequent entries are one per tab in the order they appear
+    in the DOM, capped at ``MAX_TAB_SCREENSHOTS``.
+
+    Multi-tab dashboards otherwise get judged on landing-page only, which
+    biases scores against `page_navbar` / `navset_*` apps. This function
+    gives the judge full coverage of the app surface.
+    """
+    paths: list[Path] = []
+
+    landing = output_dir / f"{prefix}_01_landing.png"
+    try:
+        page.screenshot(path=str(landing), full_page=True, timeout=30000)
+        paths.append(landing)
+    except Exception as exc:
+        logger.warning("landing full_page screenshot failed (%s); viewport fallback", exc)
+        try:
+            page.screenshot(path=str(landing), full_page=False, timeout=15000)
+            paths.append(landing)
+        except Exception as exc2:
+            logger.warning("landing viewport screenshot also failed: %s", exc2)
+            return paths
+
+    # Detect tabs/nav links to visit.
+    try:
+        tabs = page.evaluate(_TAB_SELECTOR_JS) or []
+    except Exception as exc:
+        logger.debug("tab detection failed: %s", exc)
+        tabs = []
+
+    if not tabs:
+        return paths
+
+    logger.info("Detected %d additional tab(s) for multi-view capture", len(tabs))
+    tabs = tabs[:MAX_TAB_SCREENSHOTS]
+
+    for ordinal, tab in enumerate(tabs, start=2):
+        label = str(tab.get("label", f"tab-{ordinal}")) or f"tab-{ordinal}"
+        idx = int(tab.get("index", -1))
+        if idx < 0:
+            continue
+        slug = _slugify(label)
+        target = output_dir / f"{prefix}_{ordinal:02d}_{slug}.png"
+
+        try:
+            # Click by re-querying with the same selector list and indexing
+            # — keeps the helper resilient to nodes detaching between calls.
+            clicked = page.evaluate(
+                """(targetIdx) => {
+                    const els = document.querySelectorAll(
+                        '[data-bs-toggle="tab"],'
+                        + '[data-bs-toggle="pill"],'
+                        + '[data-toggle="tab"],'
+                        + '[data-toggle="pill"],'
+                        + '[role="tab"],'
+                        + '.bslib-page-navbar .navbar-nav .nav-link,'
+                        + '.shiny-tab-input ~ .nav .nav-link'
+                    );
+                    if (targetIdx < 0 || targetIdx >= els.length) return false;
+                    els[targetIdx].click();
+                    return true;
+                }""",
+                idx,
+            )
+            if not clicked:
+                logger.debug("tab '%s' (idx=%d) was not clickable; skipping", label, idx)
+                continue
+        except Exception as exc:
+            logger.debug("tab '%s' click failed: %s", label, exc)
+            continue
+
+        # Give Shiny time to swap the panel + render any deferred outputs.
+        _wait_for_shiny_render(page, wait=3)
+        time.sleep(1)
+
+        try:
+            page.screenshot(path=str(target), full_page=True, timeout=30000)
+            paths.append(target)
+        except Exception as exc:
+            logger.warning("tab '%s' full_page screenshot failed (%s); viewport fallback", label, exc)
+            try:
+                page.screenshot(path=str(target), full_page=False, timeout=15000)
+                paths.append(target)
+            except Exception as exc2:
+                logger.warning("tab '%s' viewport screenshot also failed: %s", label, exc2)
+
+    return paths
+
+
 def take_screenshots(
     app_dir: Path,
     framework_key: str,
     port: int | None = None,
     output_dir: Path | None = None,
-) -> Path | None:
-    """Take a full-page screenshot of a Shiny app.
+) -> list[Path]:
+    """Take full-page screenshots of a Shiny app, one per tab/view.
+
+    Always captures the landing page; additionally clicks through any
+    detected tab / nav-panel links (``ui.navset_*``, ``ui.page_navbar``,
+    bslib/Bootstrap tabs) and captures each view, capped at
+    ``MAX_TAB_SCREENSHOTS``.
 
     Args:
         app_dir: Directory containing the app file.
@@ -191,7 +355,8 @@ def take_screenshots(
         output_dir: Where to save screenshots (default: app_dir).
 
     Returns:
-        Path to the screenshot, or None if it failed.
+        Sorted list of screenshot paths. Empty list if capture failed.
+        The first entry is always the landing page.
     """
     from playwright.sync_api import sync_playwright
 
@@ -205,7 +370,6 @@ def take_screenshots(
     language = fw["language"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    screenshot_path = output_dir / "screenshot.png"
 
     proc = start_app(app_dir, artifact, language, port)
     width, height = SCREENSHOT_VIEWPORT
@@ -218,43 +382,17 @@ def take_screenshots(
             url = f"http://localhost:{port}"
             if not wait_for_shiny(page, url):
                 browser.close()
-                return None
+                return []
 
-            # Wait for any deferred rendering
             time.sleep(POST_INTERACT_WAIT)
 
-            # Full-page screenshot. If the page is so tall that Chromium
-            # refuses to capture it (rare but seen with massive maps/tables),
-            # fall back to a viewport-only screenshot so the benchmark still
-            # has *something* to judge.
-            try:
-                page.screenshot(
-                    path=str(screenshot_path),
-                    full_page=True,
-                    timeout=30000,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "full_page screenshot failed (%s); falling back to viewport.",
-                    exc,
-                )
-                try:
-                    page.screenshot(
-                        path=str(screenshot_path),
-                        full_page=False,
-                        timeout=15000,
-                    )
-                except Exception as exc2:
-                    logger.warning("viewport screenshot also failed: %s", exc2)
-                    browser.close()
-                    return None
+            paths = _capture_app_views(page, output_dir, prefix="screenshot")
 
             browser.close()
-
-        return screenshot_path
+            return paths
 
     except Exception as exc:
         logger.warning("Screenshot capture failed: %s", exc)
-        return None
+        return []
     finally:
         stop_app(proc)
