@@ -24,6 +24,12 @@ Build professional dashboards with Shiny for Python's layout primitives, reactiv
 13. For multi-section dashboards (e.g. *Performance · Patient Flow · Outcomes*), default to `ui.page_navbar()` with one `ui.nav_panel()` per section. Single-page sidebar layouts work for narrow analytical apps; multi-tab layouts consistently feel more "production-grade" for broad operational dashboards.
 14. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta (`↓ 4.1% vs prior period`) using a secondary line and a coloured trend icon — this is the single biggest visual upgrade over a default dashboard.
 15. Only call `ui.include_css(app_dir / "styles.css")` if you actually create the `styles.css` file in the same step. A missing referenced stylesheet raises `FileNotFoundError` at startup and the app will not run.
+16. Always pass an explicit `theme=` to your `ui.page_*()` call. Default bslib styling reads as "stock Shiny" and caps the dashboard at a 6/10 visual score. Use `shinyswatch.theme.*` (e.g. `shinyswatch.theme.flatly`, `minty`, `zephyr`) or build a small `ui.Theme(version=5).add_defaults(...)` with your brand color and a neutral surface palette. Never ship a dashboard on the bslib default theme.
+17. For multi-tab navbars, give every `ui.nav_panel()` an `icon=icon_svg("...")` and set the page `title=` to a `ui.tags.span(icon_svg("hospital-user"), " App Name", class_="d-flex align-items-center gap-2")` brand block. A branded navbar with per-tab icons is the cheapest way to escape the default-Shiny look.
+18. For Plotly charts, always pass `template="plotly_white"` (or `plotly_dark`) and an explicit `color_discrete_sequence=` from a 3–4 hue brand palette. Default Plotly rainbow colors are an instant "auto-generated dashboard" tell. Add a chart subtitle via `fig.update_layout(title=dict(text="Chart name", subtitle=dict(text="What the encoding means")))` whenever the encoding is non-obvious.
+19. Never put more than one chart inside a single `@render.plot` (no `plt.subplots(nrows=N>1)`). Stacked Matplotlib subplots inside one card consistently produce title-into-frame collisions in screenshots. Split into one card per chart instead and let `ui.layout_columns` arrange them.
+20. Format numbers in `render.DataGrid` outputs the same way you format numbers in value boxes. Never display a raw 6-decimal float in a table — apply `df.assign(col=df["col"].map(lambda v: f"{v:,.1f}"))` or `df.style.format(...)` before passing to `DataGrid`.
+21. Wire up `ui.input_dark_mode()` in the navbar (or sidebar) of every dashboard. Dark-mode capability is now a baseline expectation for "modern BI tool" polish.
 
 ## Quick Start
 
@@ -275,6 +281,177 @@ If you are replacing an older Shiny for Python layout or translating an R bslib 
 9. Do not leave cards untitled or charts unlabeled.
 10. Do not call `ui.include_css(app_dir / "styles.css")` without creating `styles.css` in the same step — the app will fail to start with `FileNotFoundError`.
 11. Do not over-correct spacing with `!important` CSS overrides in `styles.css`. Modern bslib + Python Shiny renders cards with sensible default gaps; reach for CSS only when you observe a real defect.
+12. Do not ship the bslib default theme. Always pass `theme=shinyswatch.theme.<name>` or a custom `ui.Theme(...)` to your `ui.page_*()` call — the default grey-on-white look caps the dashboard at a 6.
+13. Do not stack Matplotlib subplots inside a single `@render.plot`. Use one card per chart and let `ui.layout_columns()` arrange them; stacked subplots collide titles into adjacent frames in screenshots.
+14. Do not leave Plotly charts with the default rainbow categorical palette. Always pass `template="plotly_white"` and an explicit `color_discrete_sequence=` of 3–4 brand colors.
+15. Do not display raw floating-point values in a `render.DataGrid`. Format every numeric column the same way you format value-box numbers.
+
+## Modern look — copy-pasteable patterns
+
+These four patterns lift a generated dashboard from the bslib-default 6/10 band
+into the 7–8 "designed" band. Apply all of them by default unless the prompt
+explicitly asks for stock styling.
+
+### 1. Custom theme + brand palette
+
+```python
+import shinyswatch
+from shiny import ui
+
+# Pick one of: cosmo, flatly, minty, zephyr, lumen, sandstone (avoid darkly
+# unless the user asks for dark mode by default).
+THEME = shinyswatch.theme.zephyr
+
+# Brand-aligned 4-color sequence reused by every chart.
+BRAND_COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626"]
+
+app_ui = ui.page_navbar(
+    # ... nav panels ...
+    title=ui.tags.span(
+        icon_svg("hospital-user"),
+        " ED Operations",
+        class_="d-flex align-items-center gap-2 fw-semibold",
+    ),
+    theme=THEME,
+    fillable=False,
+)
+```
+
+### 2. Branded navbar with icons + dark-mode toggle
+
+```python
+from faicons import icon_svg
+from shiny import ui
+
+app_ui = ui.page_navbar(
+    ui.nav_panel(
+        "Performance",
+        icon=icon_svg("gauge-high"),
+        # ... content ...
+    ),
+    ui.nav_panel("Patient flow", icon=icon_svg("people-arrows")),
+    ui.nav_panel("Outcomes", icon=icon_svg("clipboard-check")),
+    sidebar=ui.sidebar(
+        ui.input_select("hospital", "Hospital", choices=hospitals),
+        # ... more filters ...
+    ),
+    title=ui.tags.span(
+        icon_svg("hospital"),
+        " ED Ops Console",
+        class_="d-flex align-items-center gap-2 fw-semibold",
+    ),
+    theme=shinyswatch.theme.zephyr,
+    # Dark-mode toggle always visible in the navbar.
+    header=ui.tags.div(
+        ui.input_dark_mode(id="mode"),
+        class_="ms-auto",
+    ),
+)
+```
+
+### 3. KPI value box with period-over-period delta
+
+```python
+from faicons import icon_svg
+from shiny import ui
+
+
+def value_box_with_delta(
+    label: str,
+    value: str,
+    *,
+    delta: float | None = None,
+    delta_unit: str = "%",
+    higher_is_better: bool = True,
+    icon_name: str = "chart-line",
+    theme: str = "primary",
+):
+    """KPI value box that surfaces a directional delta vs. prior period."""
+    if delta is None:
+        delta_block = None
+    else:
+        improving = (delta >= 0) == higher_is_better
+        arrow = "arrow-up" if delta >= 0 else "arrow-down"
+        color = "text-success" if improving else "text-danger"
+        delta_block = ui.tags.div(
+            icon_svg(arrow),
+            f" {abs(delta):.1f}{delta_unit} vs prior period",
+            class_=f"small {color} d-flex align-items-center gap-1 mt-1",
+        )
+
+    return ui.value_box(
+        label,
+        value,
+        delta_block,
+        showcase=icon_svg(icon_name),
+        theme=theme,
+        full_screen=False,
+    )
+```
+
+Use it like:
+
+```python
+ui.layout_column_wrap(
+    value_box_with_delta("Door-to-provider", "27 min",
+                         delta=-4.1, higher_is_better=False, icon_name="stopwatch"),
+    value_box_with_delta("LWBS rate", "1.8%",
+                         delta=-0.3, higher_is_better=False, icon_name="user-xmark"),
+    value_box_with_delta("Throughput", "184 visits/day",
+                         delta=+6.2, icon_name="people-arrows"),
+    value_box_with_delta("Patient satisfaction", "4.3 / 5",
+                         delta=+0.1, icon_name="face-smile"),
+    width="240px",
+    fill=False,
+)
+```
+
+### 4. Plotly defaults that don't scream "auto-generated"
+
+```python
+import plotly.express as px
+
+PLOTLY_TEMPLATE = "plotly_white"
+PLOTLY_FONT = dict(family="-apple-system, system-ui, sans-serif", size=12, color="#374151")
+
+
+def styled_bar(df, *, x, y, color=None, title, subtitle):
+    fig = px.bar(
+        df, x=x, y=y, color=color,
+        color_discrete_sequence=BRAND_COLORS,
+        template=PLOTLY_TEMPLATE,
+    )
+    fig.update_layout(
+        title=dict(
+            text=title,
+            subtitle=dict(text=subtitle, font=dict(size=12, color="#6b7280")),
+            font=dict(size=16, color="#111827"),
+        ),
+        font=PLOTLY_FONT,
+        margin=dict(l=40, r=20, t=70, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor="white",
+        xaxis=dict(showgrid=False),
+        yaxis=dict(gridcolor="#e5e7eb"),
+    )
+    return fig
+```
+
+Wrap a single chart per `@render_plotly` and one chart per card. Reuse
+`PLOTLY_TEMPLATE`, `PLOTLY_FONT`, and `BRAND_COLORS` across every chart so the
+dashboard reads as one design system rather than a collage.
+
+### 5. Format numbers in DataGrid columns
+
+```python
+@render.data_frame
+def detail_table():
+    out = df.copy()
+    for col in ["los_hours", "boarding_hours", "satisfaction"]:
+        out[col] = out[col].map(lambda v: f"{v:,.1f}")
+    out["visits"] = out["visits"].map(lambda v: f"{int(v):,}")
+    return render.DataGrid(out, filters=True, height="420px")
+```
 
 ## Number formatting
 

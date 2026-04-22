@@ -84,7 +84,13 @@ WEB_SEARCH_TOOL_NAME: dict[str, str] = {
     "codex_cli": "web_search",
 }
 
-# Agent → skill directory path inside sandbox
+# Agent → skill directory path inside sandbox (per each CLI's documented
+# discovery rules). Codex CLI scans `.agents/skills` per
+# https://developers.openai.com/codex/skills. Claude Code uses `.claude/skills`.
+# Note: inspect_swe's codex_cli solver internally installs skills under
+# `$CODEX_HOME/skills` (i.e. `.codex/skills`), which is NOT one of Codex's
+# documented scan paths. shinygen.generate also stages the bundled skill into
+# `.agents/skills/<name>/` via Sample.files to guarantee discovery.
 AGENT_SKILLS_DIR: dict[str, str] = {
     "claude_code": ".claude/skills",
     "codex_cli": ".agents/skills",

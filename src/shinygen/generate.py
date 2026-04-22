@@ -459,6 +459,19 @@ def build_generation_task(
         helper_script = (Path(__file__).parent / "screenshot_helper.py").read_text()
         sample_files[".tools/screenshot_helper.py"] = helper_script
 
+    # For Codex CLI, also stage the bundled skill at `.agents/skills/<name>/`
+    # so Codex's documented discovery picks it up. inspect_swe writes skills
+    # under `$CODEX_HOME/skills` (i.e. `.codex/skills`), which is not a
+    # Codex-scanned path per https://developers.openai.com/codex/skills.
+    if agent == "codex_cli":
+        from .skills import collect_skill_sample_files
+
+        for rel_path, content in collect_skill_sample_files(
+            framework_key,
+            include_visual_qa=screenshot,
+        ).items():
+            sample_files.setdefault(rel_path, content)
+
     sample = Sample(
         id="shinygen/generate",
         input=[
