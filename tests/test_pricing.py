@@ -14,6 +14,10 @@ class TestGetPricing:
         result = get_pricing("anthropic/claude-opus-4-7")
         assert result == (5.00, 25.00)
 
+    def test_gpt55_release_returns_expected_price(self):
+        assert get_pricing("openai/gpt-5.5") == (5.00, 30.00)
+        assert get_pricing("openai/gpt-5.5-2026-04-23") == (5.00, 30.00)
+
     def test_unknown_model_returns_none(self):
         result = get_pricing("unknown/mystery-model")
         assert result is None
@@ -37,6 +41,19 @@ class TestCalculateCost:
         cost = calculate_cost("openai/gpt-5.4", 500_000, 50_000)
         assert cost is not None
         assert cost == 1.25 + 0.75
+
+    def test_known_openai_gpt55_model(self):
+        # gpt-5.5: $5/MTok input, $30/MTok output
+        cost = calculate_cost("openai/gpt-5.5", 200_000, 50_000)
+        assert cost is not None
+        assert cost == 1.00 + 1.50
+
+    def test_gpt55_long_context_surcharge(self):
+        # GPT-5.5 prompts over 272K input tokens are charged 2x input and
+        # 1.5x output for the session.
+        cost = calculate_cost("openai/gpt-5.5", 300_000, 10_000)
+        assert cost is not None
+        assert cost == 3.00 + 0.45
 
     def test_unknown_model_returns_none(self):
         cost = calculate_cost("unknown/mystery-model", 1000, 1000)
@@ -150,13 +167,13 @@ class TestCalculateCostWithCache:
 
     def test_openai_cache_discount(self):
         # gpt-5.4: $2.50/MTok input
-        # 10000 total, 0 write, 4000 read (0.5x)
+        # 10000 total, 0 write, 4000 read (0.1x)
         cost = calculate_cost(
             "openai/gpt-5.4", 10000, 0,
             cache_write_tokens=0, cache_read_tokens=4000,
         )
         assert cost is not None
-        expected = (6000 * 2.50 + 4000 * 2.50 * 0.50) / 1_000_000
+        expected = (6000 * 2.50 + 4000 * 2.50 * 0.10) / 1_000_000
         assert abs(cost - expected) < 1e-12
 
     def test_no_cache_same_as_before(self):

@@ -63,6 +63,19 @@ class TestResolveModel:
         assert agent == "codex_cli"
         assert model_id == "openai/gpt-5.4-nano"
 
+    @pytest.mark.parametrize(
+        ("alias", "expected_model_id"),
+        [
+            ("gpt55", "openai/gpt-5.5"),
+            ("gpt-5.5", "openai/gpt-5.5"),
+            ("gpt-5.5-2026-04-23", "openai/gpt-5.5-2026-04-23"),
+        ],
+    )
+    def test_openai_gpt55_aliases_resolve_to_codex_cli(self, alias, expected_model_id):
+        agent, model_id = resolve_model(alias)
+        assert agent == "codex_cli"
+        assert model_id == expected_model_id
+
     def test_exact_openai_codex_model_name_without_provider(self):
         agent, model_id = resolve_model("gpt-5.3-codex")
         assert agent == "codex_cli"

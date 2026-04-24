@@ -475,10 +475,10 @@ from great_tables import GT, md
 import polars as pl
 
 models = pl.DataFrame({
-    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
-    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI"],
-    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`"],
-    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI"],
+    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
+    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI"],
+    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`"],
+    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI"],
 })
 
 (
@@ -502,9 +502,9 @@ from great_tables import GT, md
 import polars as pl
 
 costs = pl.DataFrame({
-    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
-    "Input": [5.00, 3.00, 2.50, 0.75, 1.75],
-    "Output": [25.00, 15.00, 15.00, 4.50, 14.00],
+    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
+    "Input": [5.00, 3.00, 5.00, 2.50, 0.75, 1.75],
+    "Output": [25.00, 15.00, 30.00, 15.00, 4.50, 14.00],
 })
 
 (

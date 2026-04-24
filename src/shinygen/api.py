@@ -38,8 +38,8 @@ def generate(
     Args:
         prompt: Description of the desired Shiny app.
         model: Model alias or full model ID.
-            Aliases: "claude-opus", "claude-sonnet", "gpt54",
-            "gpt54-mini", "codex-gpt53".
+            Aliases: "claude-opus", "claude-sonnet", "gpt55",
+            "gpt54", "gpt54-mini", "codex-gpt53".
             Or pass a full model ID like "anthropic/claude-sonnet-4-6".
         framework: Target framework.
             Options: "shiny_python" (default), "shiny_r", "python", "r".
@@ -221,8 +221,8 @@ def batch(jobs: list[BatchJob | dict]) -> BatchResult:
                 },
                 {
                     "prompt": "Sales dashboard",
-                    "model": "gpt54",
-                    "output_dir": "./run-gpt54",
+                    "model": "gpt55",
+                    "output_dir": "./run-gpt55",
                     "screenshot": True,
                 },
             ])
@@ -235,8 +235,8 @@ def batch(jobs: list[BatchJob | dict]) -> BatchResult:
             jobs = [
                 BatchJob(prompt="Dashboard", model="claude-sonnet",
                          output_dir="./out-sonnet"),
-                BatchJob(prompt="Dashboard", model="gpt54-mini",
-                         output_dir="./out-gpt54-mini"),
+                BatchJob(prompt="Dashboard", model="gpt55",
+                         output_dir="./out-gpt55"),
             ]
             results = shinygen.batch(jobs)
     """

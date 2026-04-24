@@ -48,6 +48,20 @@ env:
   BENCHMARK_JUDGE_MODELS: |
     anthropic/claude-sonnet-4-6
     openai/gpt-5.4-mini-2026-03-17
+  BENCHMARK_EXPECTED_FRAMEWORKS: |
+    shiny_python
+    shiny_r
+  BENCHMARK_EXPECTED_MODELS: |
+    claude-opus-4-6
+    claude-opus-4-7
+    claude-sonnet-4-6
+    gpt-5.4
+    gpt-5.4-mini
+    gpt-5.4-nano
+    gpt-5.5
+  BENCHMARK_EXPECTED_ARMS: |
+    skills
+    vanilla
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
 
@@ -149,6 +163,8 @@ jobs:
             name: gpt-5.4-mini
           - idx: "06"
             name: gpt-5.4-nano
+          - idx: "07"
+            name: gpt-5.5
         # Control / treatment axis: each (framework, model) cell runs twice,
         # once with the bundled shinygen skill (`skills`) and once vanilla
         # (`vanilla`). Both arms keep web search enabled so the comparison
@@ -366,6 +382,20 @@ jobs:
       BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
       BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
       BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
+      BENCHMARK_EXPECTED_FRAMEWORKS: |
+        shiny_python
+        shiny_r
+      BENCHMARK_EXPECTED_MODELS: |
+        claude-opus-4-6
+        claude-opus-4-7
+        claude-sonnet-4-6
+        gpt-5.4
+        gpt-5.4-mini
+        gpt-5.4-nano
+        gpt-5.5
+      BENCHMARK_EXPECTED_ARMS: |
+        skills
+        vanilla
     steps:
       - name: Download all per-model benchmark artifacts
         uses: actions/download-artifact@v7
@@ -396,6 +426,17 @@ jobs:
           rows = []
           missing = []
 
+          def env_lines(name):
+              return [
+                line.strip()
+                for line in os.environ.get(name, "").splitlines()
+                if line.strip()
+              ]
+
+          expected_frameworks = env_lines("BENCHMARK_EXPECTED_FRAMEWORKS")
+          expected_models = env_lines("BENCHMARK_EXPECTED_MODELS")
+          expected_arms = env_lines("BENCHMARK_EXPECTED_ARMS")
+
           for artifact_dir in sorted(path for path in root.iterdir() if path.is_dir()):
               summary_paths = sorted(artifact_dir.rglob("run_summary.json"))
               if not summary_paths:
@@ -422,6 +463,7 @@ jobs:
                       "passed": summary.get("passed"),
                       "score": summary.get("score"),
                       "iterations": summary.get("iterations"),
+                      "screenshot_count": len(summary.get("screenshots") or []),
                       "total_cost": usage.get("total_cost"),
                       "generation_cost": usage.get("generation_cost"),
                       "judge_cost": usage.get("judge_cost"),
@@ -430,12 +472,33 @@ jobs:
                   }
               )
 
+          expected_cells = {
+              (framework, model, arm)
+              for framework in expected_frameworks
+              for model in expected_models
+              for arm in expected_arms
+          }
+          observed_cells = {
+              (row.get("framework"), row.get("model"), row.get("arm"))
+              for row in rows
+          }
+          missing_matrix_cells = [
+              {"framework": framework, "model": model, "arm": arm}
+              for framework, model, arm in sorted(expected_cells - observed_cells)
+          ]
+
           summary_json = {
               "benchmark": os.environ["BENCHMARK_CHALLENGE"],
               "dataset": os.environ["BENCHMARK_DATASET"],
               "prompt": os.environ["BENCHMARK_PROMPT"],
               "rows": rows,
               "missing_artifacts": missing,
+              "missing_matrix_cells": missing_matrix_cells,
+              "expected_matrix": {
+                "frameworks": expected_frameworks,
+                "models": expected_models,
+                "arms": expected_arms,
+              },
               "totals": {
                   "total_cost": sum(r.get("total_cost") or 0 for r in rows),
                   "generation_cost": sum(r.get("generation_cost") or 0 for r in rows),
@@ -467,13 +530,13 @@ jobs:
               f"Run ID: {os.environ['GHA_RUN_ID']}",
               f"Run attempt: {os.environ['GHA_RUN_ATTEMPT']}",
               "",
-              "| Framework | Model | Agent | Arm | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Agent | Arm | Passed | Score | Iterations | Screenshots | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
 
           for row in rows:
               lines.append(
-                "| {framework} | {model} | {agent} | {arm} | {passed} | {score} | {iterations} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
+                "| {framework} | {model} | {agent} | {arm} | {passed} | {score} | {iterations} | {screenshot_count} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
                   framework=row.get("framework") or "n/a",
                       model=row.get("model") or "n/a",
                       agent=row.get("agent") or "n/a",
@@ -481,6 +544,7 @@ jobs:
                       passed="yes" if row.get("passed") else "no",
                       score=fmt_score(row.get("score")),
                       iterations=row.get("iterations") if row.get("iterations") is not None else "n/a",
+                      screenshot_count=row.get("screenshot_count", 0),
                       total_cost=fmt_cost(row.get("total_cost")),
                       generation_cost=fmt_cost(row.get("generation_cost")),
                       judge_cost=fmt_cost(row.get("judge_cost")),
@@ -498,7 +562,7 @@ jobs:
           benchmark_output_tokens = sum(r.get("total_output_tokens") or 0 for r in rows)
 
           lines.append(
-              "| **Total** | | | | | | | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
+              "| **Total** | | | | | | | | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
                   total_cost=fmt_cost(benchmark_total_cost),
                   generation_cost=fmt_cost(benchmark_gen_cost),
                   judge_cost=fmt_cost(benchmark_judge_cost),
@@ -651,11 +715,48 @@ jobs:
               )
               lines.extend(f"- {name}" for name in missing)
 
+          if missing_matrix_cells:
+              lines.extend(
+                  [
+                      "",
+                      "## Missing matrix cells",
+                      "",
+                  ]
+              )
+              for cell in missing_matrix_cells:
+                  lines.append(
+                      f"- {cell['framework']} / {cell['model']} / {cell['arm']}"
+                  )
+
           (root / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          validation_messages = []
+          if missing:
+              validation_messages.append(
+                  "Missing benchmark artifact summaries: " + ", ".join(missing)
+              )
+          if missing_matrix_cells:
+              validation_messages.append(
+                  "Missing benchmark matrix cells: "
+                  + ", ".join(
+                      f"{cell['framework']}/{cell['model']}/{cell['arm']}"
+                      for cell in missing_matrix_cells
+                  )
+              )
+          if validation_messages:
+              (root / "benchmark_validation_failed.txt").write_text(
+                  "\n".join(validation_messages) + "\n",
+                  encoding="utf-8",
+              )
           PY
 
           if [[ -n "${GITHUB_STEP_SUMMARY:-}" && -f "${root}/INDEX.md" ]]; then
             cat "${root}/INDEX.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+          if [[ -f "${root}/benchmark_validation_failed.txt" ]]; then
+            cat "${root}/benchmark_validation_failed.txt" >&2
+            exit 1
           fi
 
       - name: Upload aggregate benchmark artifact

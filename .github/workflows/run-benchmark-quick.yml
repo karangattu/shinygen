@@ -3,7 +3,7 @@ name: Run benchmark (single model, skills vs vanilla)
 # Cheap counterpart to run-benchmark-matrix.yml. Runs exactly two jobs
 # (skills + vanilla) for ONE (framework, model, dataset) combination so
 # you can validate fixes without spending the full matrix budget. Use
-# this for iteration before kicking off the expensive 24-job matrix.
+# this for iteration before kicking off the expensive 28-job matrix.
 
 on:
   workflow_dispatch:
@@ -26,6 +26,7 @@ on:
           - claude-opus-4-6
           - claude-sonnet-4-6
           - claude-haiku-4-5
+          - gpt-5.5
           - gpt-5.4
           - gpt-5.4-mini
           - gpt-5.4-nano

@@ -15,6 +15,7 @@ on:
         options:
           - claude-opus
           - claude-sonnet
+          - gpt55
           - gpt54
           - gpt54-mini
           - codex-gpt53
@@ -40,6 +41,7 @@ on:
           - none
           - claude-opus
           - claude-sonnet
+          - gpt55
           - gpt54
           - gpt54-mini
           - codex-gpt53

@@ -54,6 +54,8 @@ _PRICING: dict[str, tuple[float, float]] = {
     "claude-3-opus": (15.00, 75.00),
     "claude-3-haiku": (0.25, 1.25),
     # OpenAI models
+    "gpt-5.5": (5.00, 30.00),
+    "gpt-5.5-2026-04-23": (5.00, 30.00),
     "gpt-5.4": (2.50, 15.00),
     "gpt-5.4-pro": (30.00, 180.00),
     "gpt-5.4-mini": (0.75, 4.50),
@@ -68,7 +70,13 @@ _PRICING: dict[str, tuple[float, float]] = {
 # Cache multipliers (write, read) relative to base input price per provider
 _CACHE_MULTIPLIERS: dict[str, tuple[float, float]] = {
     "anthropic": (1.25, 0.10),
-    "openai": (1.00, 0.50),
+    "openai": (1.00, 0.10),
+}
+
+# model_short_name -> (input_token_threshold, input_multiplier, output_multiplier)
+_LONG_CONTEXT_SURCHARGES: dict[str, tuple[int, float, float]] = {
+    "gpt-5.5": (272_000, 2.0, 1.5),
+    "gpt-5.5-2026-04-23": (272_000, 2.0, 1.5),
 }
 
 
@@ -113,6 +121,14 @@ def calculate_cost(
     if price is None:
         return None
     input_price, output_price = price
+    normalized_name = _normalize_model_name(model_id)
+
+    surcharge = _LONG_CONTEXT_SURCHARGES.get(normalized_name)
+    if surcharge is not None:
+        threshold, input_multiplier, output_multiplier = surcharge
+        if input_tokens > threshold:
+            input_price *= input_multiplier
+            output_price *= output_multiplier
 
     if cache_write_tokens > 0 or cache_read_tokens > 0:
         provider = _detect_provider(model_id)

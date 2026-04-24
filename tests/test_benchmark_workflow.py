@@ -105,6 +105,29 @@ def test_benchmark_workflow_runs_both_opus_generations_for_comparison():
     assert 'name: claude-opus-4-7' in workflow
 
 
+def test_benchmark_workflow_includes_gpt55_in_generation_matrix():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert 'name: gpt-5.5' in workflow
+
+
+def test_benchmark_aggregate_validates_expected_matrix_cells():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert 'BENCHMARK_EXPECTED_FRAMEWORKS' in workflow
+    assert 'BENCHMARK_EXPECTED_MODELS' in workflow
+    assert 'BENCHMARK_EXPECTED_ARMS' in workflow
+    assert 'missing_matrix_cells' in workflow
+    assert 'benchmark_validation_failed.txt' in workflow
+
+
+def test_benchmark_aggregate_reports_screenshot_counts():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert 'screenshot_count' in workflow
+    assert '| Screenshots |' in workflow
+
+
 def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
     batch_config = json.loads(BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
 

@@ -29,7 +29,7 @@ def main() -> None:
     show_default=True,
     help=(
         'Model alias or full ID. Aliases: "claude-opus", "claude-sonnet", '
-        '"gpt54", "gpt54-mini", "codex-gpt53".'
+        '"gpt55", "gpt54", "gpt54-mini", "codex-gpt53".'
     ),
 )
 @click.option(
@@ -364,8 +364,8 @@ def batch(config: str, verbose: bool) -> None:
           },
           {
             "prompt": "Sales dashboard",
-            "model": "gpt54",
-            "output_dir": "./run-gpt54",
+                        "model": "gpt55",
+                        "output_dir": "./run-gpt55",
             "screenshot": true
           }
         ]

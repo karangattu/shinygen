@@ -10,7 +10,7 @@ on:
       models:
         description: "Comma or newline separated models (max 8)"
         required: true
-        default: "claude-opus, claude-sonnet, gpt54, gpt54-mini, codex-gpt53"
+        default: "claude-opus, claude-sonnet, gpt55, gpt54, gpt54-mini, codex-gpt53"
         type: string
       framework:
         description: "Target framework"
@@ -34,6 +34,7 @@ on:
           - none
           - claude-opus
           - claude-sonnet
+          - gpt55
           - gpt54
           - gpt54-mini
           - codex-gpt53

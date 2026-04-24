@@ -209,6 +209,50 @@ class TestBuildGenerationTask:
         else:
             assert sample_files == {"sales.csv": "x,y\n1,2\n"}
 
+    @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
+    def test_screenshot_skills_arm_adds_visual_qa_skill_only_when_enabled(
+        self,
+        tmp_path,
+        monkeypatch,
+        agent,
+    ):
+        captured = {}
+        sentinel_solver = object()
+
+        def fake_solver(**kwargs):
+            captured.update(kwargs)
+            return sentinel_solver
+
+        if agent == "claude_code":
+            monkeypatch.setattr("shinygen.generate.claude_code", fake_solver)
+        else:
+            monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
+
+        skills = load_default_skills("shiny_python")
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent=agent,
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+            skills=skills,
+            use_skills=True,
+            screenshot=True,
+        )
+
+        assert task.solver is sentinel_solver
+        skill_names = [skill.name for skill in captured["skills"]]
+        assert skill_names == ["shiny-python-dashboard", "visual-qa"]
+
+        sample_files = task.dataset.samples[0].files or {}
+        assert ".tools/screenshot_helper.py" in sample_files
+        staged = [key for key in sample_files if key.startswith(".agents/skills/")]
+        if agent == "codex_cli":
+            assert all(not key.startswith("/") for key in staged)
+            assert any(key.startswith(".agents/skills/shiny-python-dashboard/") for key in staged)
+            assert any(key.startswith(".agents/skills/visual-qa/") for key in staged)
+        else:
+            assert staged == []
+
     @pytest.mark.parametrize(
         ("framework_key", "expected_limit"),
         [
