@@ -139,8 +139,15 @@ def build_system_prompt(
         "- Do not spend time on package version checks, repeated filesystem "
         "exploration, or broad reconnaissance.\n"
         f"- Read only the files you need, then create /home/user/project/{artifact} early.\n"
+        f"- Save a complete, runnable {artifact} as a checkpoint as soon as "
+        "you have a minimal working version (basic layout + at least one "
+        "input bound to one output that uses the data). You may then keep "
+        "refining the same file in further edits — but the file on disk "
+        "must always be runnable, never a partial draft.\n"
         f"- If time or output tokens are running low, stop analysis and write "
-        f"the best complete working {artifact} immediately.\n"
+        f"the best complete working {artifact} immediately. A simple "
+        "dashboard that runs is always better than a sophisticated one that "
+        "was never written.\n"
     )
 
     if screenshot:
@@ -199,11 +206,16 @@ def build_truncation_retry_prompt(
     return (
         f"{user_prompt}\n\n"
         "IMPORTANT: The previous attempt hit the output token limit before "
-        f"producing {artifact}. Do not repeat reconnaissance, package version "
-        "checks, or skill-file exploration. Immediately write a complete "
-        f"working {artifact} to /home/user/project/{artifact} using {label} "
-        f"and {language} code. If you need data context, inspect only the "
-        f"required columns or a small sample, then finish {artifact}."
+        f"producing {artifact}. Skip ALL exploration this time:\n"
+        "- Do NOT read skills files, do NOT inspect packages, do NOT preview "
+        "the data beyond the column names you already need.\n"
+        f"- Your FIRST action must be to write a complete, runnable {artifact} "
+        f"to /home/user/project/{artifact} using {label} and {language}. "
+        "Aim for a small but complete dashboard (one sidebar + one main panel "
+        "with one chart and one table is fine). Do not stream the file in "
+        "tiny edits — emit the whole thing in one write.\n"
+        "- Only after that file exists and runs may you refine it. If you run "
+        "out of tokens again, the checkpoint already on disk will be used."
     )
 
 

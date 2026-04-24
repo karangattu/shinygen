@@ -73,7 +73,11 @@ class TestBuildTruncationRetryPrompt:
         )
         assert "previous attempt hit the output token limit" in prompt
         assert "/home/user/project/app.py" in prompt
-        assert "Do not repeat reconnaissance" in prompt
+        # Retry prompt should suppress exploration and demand a single
+        # complete-file write of a small but runnable dashboard.
+        assert "Skip ALL exploration" in prompt
+        assert "in one write" in prompt
+        assert "checkpoint" in prompt
 
 
 class TestBuildRefinementPrompt:

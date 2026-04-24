@@ -1,12 +1,35 @@
-name: Run dataset benchmark matrix
+name: Run benchmark (single model, skills vs vanilla)
+
+# Cheap counterpart to run-benchmark-matrix.yml. Runs exactly two jobs
+# (skills + vanilla) for ONE (framework, model, dataset) combination so
+# you can validate fixes without spending the full matrix budget. Use
+# this for iteration before kicking off the expensive 24-job matrix.
 
 on:
   workflow_dispatch:
     inputs:
-      challenge:
-        description: "Optional short benchmark label used in artifact names and summaries"
+      framework:
+        description: "Target framework"
         required: true
-        default: ""
+        default: shiny_python
+        type: choice
+        options:
+          - shiny_python
+          - shiny_r
+      model:
+        description: "Single generation model to benchmark"
+        required: true
+        default: gpt-5.4-mini
+        type: choice
+        options:
+          - claude-opus-4-7
+          - claude-opus-4-6
+          - claude-sonnet-4-6
+          - claude-haiku-4-5
+          - gpt-5.4
+          - gpt-5.4-mini
+          - gpt-5.4-nano
+          - gpt-5.3-codex
       dataset:
         description: "Bundled CSV dataset from test_data_csv_files/"
         required: true
@@ -19,22 +42,45 @@ on:
           - ev_charging_stations.csv
           - supply_chain.csv
           - trials_short_50.csv
+      arms:
+        description: "Which arm(s) to run (skills + vanilla = paired delta; single arm = even cheaper)"
+        required: true
+        default: "skills+vanilla"
+        type: choice
+        options:
+          - skills+vanilla
+          - skills
+          - vanilla
+      challenge:
+        description: "Optional short benchmark label used in artifact names and summaries"
+        required: false
+        default: ""
       benchmark_prompt:
-        description: "Prompt passed to shinygen generate for every matrix entry"
+        description: "Prompt passed to shinygen generate"
         required: true
         default: >-
           Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.
+      max_iterations:
+        description: "Max iteration count (lower = cheaper; 1 = smoke test)"
+        required: true
+        default: "2"
       quality_threshold:
         description: "Minimum quality score"
         required: true
         default: "7.0"
-      max_iterations:
-        description: "Max iteration count"
+      enable_screenshot:
+        description: "Enable --screenshot (adds visual judging; slower & more expensive)"
         required: true
-        default: "3"
+        default: true
+        type: boolean
+      enable_judges:
+        description: "Run the judge panel (uncheck for the cheapest possible smoke run)"
+        required: true
+        default: true
+        type: boolean
 
 concurrency:
-  group: benchmark-${{ github.workflow }}-${{ inputs.challenge || 'benchmark' }}
+  group: benchmark-quick-${{ github.workflow }}-${{ inputs.framework }}-${{ inputs.model }}
   cancel-in-progress: false
 
 permissions:
@@ -42,13 +88,11 @@ permissions:
   packages: read
 
 env:
-  # Panel of judges. Each entry produces one --judge-model flag, and the
-  # generator averages per-criterion scores across the panel. Keep this in
-  # sync with the README docs in any update.
+  # Same panel as run-benchmark-matrix.yml so deltas are comparable.
   BENCHMARK_JUDGE_MODELS: |
     anthropic/claude-sonnet-4-6
     openai/gpt-5.4-mini-2026-03-17
-  BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
+  BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '2' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
 
 jobs:
@@ -61,6 +105,7 @@ jobs:
       benchmark_dataset_stem: ${{ steps.normalize.outputs.benchmark_dataset_stem }}
       benchmark_prompt: ${{ steps.normalize.outputs.benchmark_prompt }}
       benchmark_slug: ${{ steps.normalize.outputs.benchmark_slug }}
+      arms_json: ${{ steps.normalize.outputs.arms_json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -72,6 +117,8 @@ jobs:
           RAW_BENCHMARK_PROMPT: ${{ inputs.benchmark_prompt }}
           RAW_CHALLENGE: ${{ inputs.challenge }}
           RAW_DATASET: ${{ inputs.dataset }}
+          RAW_ARMS: ${{ inputs.arms }}
+          RAW_MODEL: ${{ inputs.model }}
         run: |
           set -euo pipefail
 
@@ -97,7 +144,7 @@ jobs:
 
           challenge="${RAW_CHALLENGE}"
           if [[ -z "$(printf '%s' "${challenge}" | tr -d '[:space:]')" ]]; then
-            challenge="${dataset_stem}"
+            challenge="quick-${RAW_MODEL}-${dataset_stem}"
           fi
 
           if [[ -z "$(printf '%s' "${RAW_BENCHMARK_PROMPT}" | tr -d '[:space:]')" ]]; then
@@ -107,8 +154,24 @@ jobs:
 
           benchmark_slug="$(printf '%s' "${challenge}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
           if [[ -z "${benchmark_slug}" ]]; then
-            benchmark_slug="${dataset_stem}"
+            benchmark_slug="quick-${RAW_MODEL}-${dataset_stem}"
           fi
+
+          case "${RAW_ARMS}" in
+            skills+vanilla)
+              arms_json='[{"name":"skills","use_skills":"true"},{"name":"vanilla","use_skills":"false"}]'
+              ;;
+            skills)
+              arms_json='[{"name":"skills","use_skills":"true"}]'
+              ;;
+            vanilla)
+              arms_json='[{"name":"vanilla","use_skills":"false"}]'
+              ;;
+            *)
+              echo "Unknown arms selection: ${RAW_ARMS}" >&2
+              exit 1
+              ;;
+          esac
 
           {
             echo "benchmark_challenge=${challenge}"
@@ -116,6 +179,7 @@ jobs:
             echo "benchmark_dataset_basename=${dataset_basename}"
             echo "benchmark_dataset_stem=${dataset_stem}"
             echo "benchmark_slug=${benchmark_slug}"
+            echo "arms_json=${arms_json}"
             echo "benchmark_prompt<<EOF"
             printf '%s\n' "${RAW_BENCHMARK_PROMPT}"
             echo "EOF"
@@ -124,47 +188,19 @@ jobs:
   run:
     needs: prepare
     runs-on: ubuntu-latest
-    # Bumped from 120 → 150 after run 24787647185: claude-opus-4-7+skills hit
-    # the hard 2h job timeout, was canceled, and uploaded no run_summary.json
-    # (so its row was lost from the aggregate). 150 min keeps headroom over
-    # the 25-min sandbox time_limit × 3 iterations + judging + screenshotting.
-    timeout-minutes: 150
+    timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 2
       matrix:
-        framework:
-          - shiny_python
-          - shiny_r
-        model:
-          - idx: "01"
-            name: claude-opus-4-6
-          - idx: "02"
-            name: claude-opus-4-7
-          - idx: "03"
-            name: claude-sonnet-4-6
-          - idx: "04"
-            name: gpt-5.4
-          - idx: "05"
-            name: gpt-5.4-mini
-          - idx: "06"
-            name: gpt-5.4-nano
-        # Control / treatment axis: each (framework, model) cell runs twice,
-        # once with the bundled shinygen skill (`skills`) and once vanilla
-        # (`vanilla`). Both arms keep web search enabled so the comparison
-        # isolates the skill's contribution.
-        arm:
-          - name: skills
-            use_skills: "true"
-          - name: vanilla
-            use_skills: "false"
+        arm: ${{ fromJson(needs.prepare.outputs.arms_json) }}
     env:
       BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
       BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
       BENCHMARK_DATASET_BASENAME: ${{ needs.prepare.outputs.benchmark_dataset_basename }}
       BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
       BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
-      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}-${{ matrix.arm.name }}
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ inputs.framework }}/${{ inputs.model }}-${{ matrix.arm.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
@@ -213,7 +249,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
+          if [[ "${{ inputs.framework }}" == "shiny_python" ]]; then
             image="${SHINYGEN_SANDBOX_PYTHON_IMAGE}"
           else
             image="${SHINYGEN_SANDBOX_R_IMAGE}"
@@ -225,16 +261,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Install with [screenshot] extras so the host-side screenshot
-          # fallback in iterate.py can capture an image when the in-sandbox
-          # screenshot is missing (e.g. agent SIGTERMed mid-run).
           python -m pip install -e ".[screenshot]"
           python -m playwright install --with-deps chromium
-          # Runtime deps so the fallback can actually start the generated
-          # app on the runner. Shiny-R apps have R + system Shiny baked
-          # into the sandbox image only, so host-side fallback for R
-          # is best-effort and will gracefully degrade to code-only judging.
-          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
+          if [[ "${{ inputs.framework }}" == "shiny_python" ]]; then
             python -m pip install \
               shiny plotly faicons pandas matplotlib seaborn shinywidgets
           fi
@@ -245,21 +274,27 @@ jobs:
           set -euo pipefail
           mkdir -p "${OUTPUT_DIR}"
 
-          # Build one --judge-model flag per non-empty line in BENCHMARK_JUDGE_MODELS.
           judge_args=()
-          while IFS= read -r line; do
-            line="${line//[$'\t\r ']/}"
-            [[ -z "${line}" ]] && continue
-            judge_args+=(--judge-model "${line}")
-          done <<< "${BENCHMARK_JUDGE_MODELS}"
+          if [[ "${{ inputs.enable_judges }}" == "true" ]]; then
+            while IFS= read -r line; do
+              line="${line//[$'\t\r ']/}"
+              [[ -z "${line}" ]] && continue
+              judge_args+=(--judge-model "${line}")
+            done <<< "${BENCHMARK_JUDGE_MODELS}"
+          fi
+
+          screenshot_flag="--no-screenshot"
+          if [[ "${{ inputs.enable_screenshot }}" == "true" ]]; then
+            screenshot_flag="--screenshot"
+          fi
 
           shinygen generate \
             --prompt "${BENCHMARK_PROMPT}" \
-            --model "${{ matrix.model.name }}" \
-            --framework "${{ matrix.framework }}" \
+            --model "${{ inputs.model }}" \
+            --framework "${{ inputs.framework }}" \
             --output "${OUTPUT_DIR}" \
             --csv-file "${BENCHMARK_DATASET}" \
-            --screenshot \
+            "${screenshot_flag}" \
             "${judge_args[@]}" \
             --max-iterations "${BENCHMARK_MAX_ITERATIONS}" \
             --quality-threshold "${BENCHMARK_QUALITY_THRESHOLD}" \
@@ -275,8 +310,8 @@ jobs:
           mkdir -p "${OUTPUT_DIR}"
 
           OUTPUT_DIR="${OUTPUT_DIR}" \
-          MODEL="${{ matrix.model.name }}" \
-          FRAMEWORK="${{ matrix.framework }}" \
+          MODEL="${{ inputs.model }}" \
+          FRAMEWORK="${{ inputs.framework }}" \
           ARM="${{ matrix.arm.name }}" \
           GHA_RUN_ID="${{ github.run_id }}" \
           GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
@@ -296,7 +331,7 @@ jobs:
           metrics_path = output_dir / "run_metrics.txt"
 
           lines = [
-              "shinygen benchmark summary",
+              "shinygen benchmark summary (quick)",
               f"run_id: {os.environ['GHA_RUN_ID']}",
               f"run_attempt: {os.environ['GHA_RUN_ATTEMPT']}",
               f"workflow: {os.environ['GHA_WORKFLOW']}",
@@ -346,11 +381,11 @@ jobs:
           metrics_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
 
-      - name: Upload per-model benchmark artifact
+      - name: Upload per-arm benchmark artifact
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-${{ matrix.framework }}-${{ matrix.model.idx }}-${{ matrix.model.name }}-${{ matrix.arm.name }}
+          name: shinygen-quick-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-${{ inputs.framework }}-${{ inputs.model }}-${{ matrix.arm.name }}
           path: ${{ env.OUTPUT_DIR }}
           if-no-files-found: warn
 
@@ -360,17 +395,17 @@ jobs:
       - run
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
       BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
       BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
       BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
     steps:
-      - name: Download all per-model benchmark artifacts
+      - name: Download per-arm benchmark artifacts
         uses: actions/download-artifact@v7
         with:
-          pattern: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-*
+          pattern: shinygen-quick-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-*
           path: gha_runs/aggregate-${{ github.run_id }}
           merge-multiple: false
 
@@ -396,12 +431,15 @@ jobs:
           rows = []
           missing = []
 
-          for artifact_dir in sorted(path for path in root.iterdir() if path.is_dir()):
+          if not root.exists():
+              print(f"No aggregate root at {root}; nothing to summarize.")
+              raise SystemExit(0)
+
+          for artifact_dir in sorted(p for p in root.iterdir() if p.is_dir()):
               summary_paths = sorted(artifact_dir.rglob("run_summary.json"))
               if not summary_paths:
                   missing.append(artifact_dir.name)
                   continue
-
               summary = json.loads(summary_paths[0].read_text(encoding="utf-8"))
               usage = summary.get("usage") or {}
               model = summary.get("model") or {}
@@ -413,11 +451,9 @@ jobs:
                       "artifact_dir": artifact_dir.name,
                       "framework": summary.get("framework"),
                       "model": model.get("requested"),
-                      "resolved_model_id": model.get("resolved_id"),
                       "agent": model.get("agent"),
                       "arm": summary.get("arm"),
                       "use_skills": summary.get("use_skills"),
-                      "web_fetch": summary.get("web_fetch"),
                       "judge_models": judge_models,
                       "passed": summary.get("passed"),
                       "score": summary.get("score"),
@@ -440,215 +476,66 @@ jobs:
                   "total_cost": sum(r.get("total_cost") or 0 for r in rows),
                   "generation_cost": sum(r.get("generation_cost") or 0 for r in rows),
                   "judge_cost": sum(r.get("judge_cost") or 0 for r in rows),
-                  "total_input_tokens": sum(r.get("total_input_tokens") or 0 for r in rows),
-                  "total_output_tokens": sum(r.get("total_output_tokens") or 0 for r in rows),
               },
           }
           (root / "benchmark_summary.json").write_text(
-              json.dumps(summary_json, indent=2),
-              encoding="utf-8",
+              json.dumps(summary_json, indent=2), encoding="utf-8"
           )
 
-          def fmt_cost(value):
-              if value is None:
-                  return "n/a"
-              return f"${value:.4f}"
+          def fmt_cost(v):
+              return "n/a" if v is None else f"${v:.4f}"
 
-          def fmt_score(value):
-              if value is None:
-                  return "n/a"
-              return f"{value:.2f}"
+          def fmt_score(v):
+              return "n/a" if v is None else f"{v:.2f}"
 
           lines = [
-              f"# Benchmark: {os.environ['BENCHMARK_CHALLENGE']}",
+              f"# Quick benchmark: {os.environ['BENCHMARK_CHALLENGE']}",
               "",
               f"Dataset: {os.environ['BENCHMARK_DATASET']}",
+              f"Run ID: {os.environ['GHA_RUN_ID']} (attempt {os.environ['GHA_RUN_ATTEMPT']})",
               "",
-              f"Run ID: {os.environ['GHA_RUN_ID']}",
-              f"Run attempt: {os.environ['GHA_RUN_ATTEMPT']}",
-              "",
-              "| Framework | Model | Agent | Arm | Passed | Score | Iterations | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Arm | Passed | Score | Iter | Total $ | Gen $ | Judge $ | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
-
-          for row in rows:
+          for r in rows:
               lines.append(
-                "| {framework} | {model} | {agent} | {arm} | {passed} | {score} | {iterations} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
-                  framework=row.get("framework") or "n/a",
-                      model=row.get("model") or "n/a",
-                      agent=row.get("agent") or "n/a",
-                      arm=row.get("arm") or "n/a",
-                      passed="yes" if row.get("passed") else "no",
-                      score=fmt_score(row.get("score")),
-                      iterations=row.get("iterations") if row.get("iterations") is not None else "n/a",
-                      total_cost=fmt_cost(row.get("total_cost")),
-                      generation_cost=fmt_cost(row.get("generation_cost")),
-                      judge_cost=fmt_cost(row.get("judge_cost")),
-                      input_tokens=row.get("total_input_tokens") if row.get("total_input_tokens") is not None else "n/a",
-                      output_tokens=row.get("total_output_tokens") if row.get("total_output_tokens") is not None else "n/a",
-                      artifact_dir=row.get("artifact_dir"),
+                  "| {f} | {m} | {a} | {p} | {s} | {it} | {tc} | {gc} | {jc} | {ad} |".format(
+                      f=r.get("framework") or "n/a",
+                      m=r.get("model") or "n/a",
+                      a=r.get("arm") or "n/a",
+                      p="yes" if r.get("passed") else "no",
+                      s=fmt_score(r.get("score")),
+                      it=r.get("iterations") if r.get("iterations") is not None else "n/a",
+                      tc=fmt_cost(r.get("total_cost")),
+                      gc=fmt_cost(r.get("generation_cost")),
+                      jc=fmt_cost(r.get("judge_cost")),
+                      ad=r.get("artifact_dir"),
                   )
               )
 
-          # Compute totals across all rows
-          benchmark_total_cost = sum(r.get("total_cost") or 0 for r in rows)
-          benchmark_gen_cost = sum(r.get("generation_cost") or 0 for r in rows)
-          benchmark_judge_cost = sum(r.get("judge_cost") or 0 for r in rows)
-          benchmark_input_tokens = sum(r.get("total_input_tokens") or 0 for r in rows)
-          benchmark_output_tokens = sum(r.get("total_output_tokens") or 0 for r in rows)
-
-          lines.append(
-              "| **Total** | | | | | | | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
-                  total_cost=fmt_cost(benchmark_total_cost),
-                  generation_cost=fmt_cost(benchmark_gen_cost),
-                  judge_cost=fmt_cost(benchmark_judge_cost),
-                  input_tokens=benchmark_input_tokens,
-                  output_tokens=benchmark_output_tokens,
-              )
-          )
-
-          # ----------------------------------------------------------------
-          # Skills (treatment) vs vanilla (control) delta per (framework, model)
-          # ----------------------------------------------------------------
-          def fmt_delta(value):
-              if value is None:
-                  return "n/a"
-              sign = "+" if value > 0 else ("" if value == 0 else "-")
-              return f"{sign}{abs(value):.2f}"
-
-          def fmt_pct(value):
-              if value is None:
-                  return "n/a"
-              sign = "+" if value > 0 else ("" if value == 0 else "-")
-              return f"{sign}{abs(value):.1f}%"
-
-          pairs: dict[tuple[str, str], dict[str, dict]] = {}
-          for row in rows:
-              framework = row.get("framework") or "n/a"
-              model = row.get("model") or "n/a"
-              arm = row.get("arm") or "n/a"
-              if arm not in {"skills", "vanilla"}:
-                  continue
-              pairs.setdefault((framework, model), {})[arm] = row
-
-          arm_comparison = []
-          for (framework, model), arms in sorted(pairs.items()):
-              skills = arms.get("skills") or {}
-              vanilla = arms.get("vanilla") or {}
-              skills_score = skills.get("score")
-              vanilla_score = vanilla.get("score")
-              delta = (
-                  skills_score - vanilla_score
-                  if skills_score is not None and vanilla_score is not None
-                  else None
-              )
-              pct = (
-                  (delta / vanilla_score * 100.0)
-                  if delta is not None and vanilla_score not in (None, 0)
-                  else None
-              )
-              if delta is None:
-                  winner = "incomplete pair"
-              elif delta > 0.05:
-                  winner = "skills"
-              elif delta < -0.05:
-                  winner = "vanilla"
-              else:
-                  winner = "tie"
-              skills_cost = skills.get("total_cost")
-              vanilla_cost = vanilla.get("total_cost")
-              cost_delta = (
-                  skills_cost - vanilla_cost
-                  if skills_cost is not None and vanilla_cost is not None
-                  else None
-              )
-              arm_comparison.append(
-                  {
-                      "framework": framework,
-                      "model": model,
-                      "skills_score": skills_score,
-                      "vanilla_score": vanilla_score,
-                      "score_delta": delta,
-                      "score_delta_pct": pct,
-                      "skills_passed": skills.get("passed"),
-                      "vanilla_passed": vanilla.get("passed"),
-                      "skills_iterations": skills.get("iterations"),
-                      "vanilla_iterations": vanilla.get("iterations"),
-                      "skills_total_cost": skills_cost,
-                      "vanilla_total_cost": vanilla_cost,
-                      "cost_delta": cost_delta,
-                      "winner": winner,
-                  }
-              )
-
-          summary_json["arm_comparison"] = arm_comparison
-          (root / "benchmark_summary.json").write_text(
-              json.dumps(summary_json, indent=2),
-              encoding="utf-8",
-          )
-
-          if arm_comparison:
+          # Skills vs vanilla delta when both arms present
+          by_arm = {r.get("arm"): r for r in rows if r.get("arm") in {"skills", "vanilla"}}
+          if "skills" in by_arm and "vanilla" in by_arm:
+              s = by_arm["skills"]
+              v = by_arm["vanilla"]
+              ss, vs = s.get("score"), v.get("score")
+              delta = ss - vs if ss is not None and vs is not None else None
+              sc, vc = s.get("total_cost"), v.get("total_cost")
+              cost_delta = sc - vc if sc is not None and vc is not None else None
               lines.extend(
                   [
                       "",
-                      "## Skills vs vanilla delta (per model)",
+                      "## Skills vs vanilla",
                       "",
-                      "Positive `Δ score` means the bundled skill helped that model on this benchmark.",
-                      "",
-                      "| Framework | Model | Skills score | Vanilla score | Δ score | Δ % | Winner | Δ cost | Skills passed | Vanilla passed |",
-                      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-                  ]
-              )
-              skills_wins = 0
-              vanilla_wins = 0
-              ties = 0
-              deltas: list[float] = []
-              for item in arm_comparison:
-                  if item["winner"] == "skills":
-                      skills_wins += 1
-                  elif item["winner"] == "vanilla":
-                      vanilla_wins += 1
-                  elif item["winner"] == "tie":
-                      ties += 1
-                  if item["score_delta"] is not None:
-                      deltas.append(item["score_delta"])
-                  lines.append(
-                      "| {framework} | {model} | {skills_score} | {vanilla_score} | {delta} | {pct} | {winner} | {cost_delta} | {skills_passed} | {vanilla_passed} |".format(
-                          framework=item["framework"],
-                          model=item["model"],
-                          skills_score=fmt_score(item["skills_score"]),
-                          vanilla_score=fmt_score(item["vanilla_score"]),
-                          delta=fmt_delta(item["score_delta"]),
-                          pct=fmt_pct(item["score_delta_pct"]),
-                          winner=item["winner"],
-                          cost_delta=(
-                              fmt_cost(item["cost_delta"])
-                              if item["cost_delta"] is not None
-                              else "n/a"
-                          ),
-                          skills_passed="yes" if item["skills_passed"] else ("no" if item["skills_passed"] is not None else "n/a"),
-                          vanilla_passed="yes" if item["vanilla_passed"] else ("no" if item["vanilla_passed"] is not None else "n/a"),
-                      )
-                  )
-
-              mean_delta = sum(deltas) / len(deltas) if deltas else None
-              lines.extend(
-                  [
-                      "",
-                      "**Arm scoreboard:** "
-                      f"skills wins = {skills_wins}, vanilla wins = {vanilla_wins}, ties = {ties}, "
-                      f"mean Δ score = {fmt_delta(mean_delta)} (n={len(deltas)})",
+                      f"- Skills score: {fmt_score(ss)}",
+                      f"- Vanilla score: {fmt_score(vs)}",
+                      f"- Δ score (skills - vanilla): {fmt_score(delta)}",
+                      f"- Δ cost (skills - vanilla): {fmt_cost(cost_delta)}",
                   ]
               )
 
           if missing:
-              lines.extend(
-                  [
-                      "",
-                      "## Missing summaries",
-                      "",
-                  ]
-              )
+              lines.extend(["", "## Missing summaries", ""])
               lines.extend(f"- {name}" for name in missing)
 
           (root / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -662,6 +549,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: shinygen-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-aggregate
+          name: shinygen-quick-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-aggregate
           path: gha_runs/aggregate-${{ github.run_id }}
           if-no-files-found: warn

@@ -575,7 +575,9 @@ def generate_and_refine(
 
         code: str | None = None
         generation_usage_rows: list[dict[str, object]] = []
-        max_retries = 2
+        # 3 attempts: original prompt, direct-write retry on truncation,
+        # and one more direct-write attempt if the second still fails.
+        max_retries = 3
         prompt_for_attempt = current_prompt
         hit_output_token_limit = False
         for attempt in range(1, max_retries + 1):
