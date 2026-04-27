@@ -94,15 +94,35 @@ from shinywidgets import output_widget, render_plotly
 
 app_ui = ui.card(
     ui.card_header("Scatterplot"),
+    ui.input_select(
+        "color_column",
+        "Color by",
+        choices={"Meal time": "time", "Day": "day", "Smoker": "smoker"},
+        selected="time",
+    ),
     output_widget("scatterplot"),
     full_screen=True,
 )
 
+COLOR_LABELS = {"time": "Meal time", "day": "Day", "smoker": "Smoker"}
+
 
 @render_plotly
 def scatterplot():
-    return px.scatter(filtered_data(), x="total_bill", y="tip", color=input.color())
+    frame = filtered_data()
+    color_column = input.color_column()
+    if color_column not in frame.columns:
+        color_column = "time"
+    return px.scatter(
+        frame,
+        x="total_bill",
+        y="tip",
+        color=color_column,
+        labels={color_column: COLOR_LABELS[color_column]},
+    )
 ```
+
+When an input controls a Plotly aesthetic (`color=`, `symbol=`, `facet_col=`, `x=`, `y=`), the input value must be an actual dataframe column name. For named `ui.input_select()` choices, put the display label on the left and the column value on the right, as above; do not invert that mapping.
 
 Avoid duplicate keys when you merge Plotly layout dictionaries:
 

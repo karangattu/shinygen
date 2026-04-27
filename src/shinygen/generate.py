@@ -59,8 +59,14 @@ DOCKERFILES_DIR = Path(__file__).parent / "dockerfiles"
 
 # Image name env vars and defaults (must match compose.yaml / compose-python.yaml)
 _SANDBOX_IMAGE_DEFAULTS: dict[str, tuple[str, str]] = {
-    "shiny_r": ("SHINYGEN_SANDBOX_R_IMAGE", "ghcr.io/karangattu/shinygen-sandbox-r:latest"),
-    "shiny_python": ("SHINYGEN_SANDBOX_PYTHON_IMAGE", "ghcr.io/karangattu/shinygen-sandbox-python:latest"),
+    "shiny_r": (
+        "SHINYGEN_SANDBOX_R_IMAGE",
+        "ghcr.io/karangattu/shinygen-sandbox-r:latest",
+    ),
+    "shiny_python": (
+        "SHINYGEN_SANDBOX_PYTHON_IMAGE",
+        "ghcr.io/karangattu/shinygen-sandbox-python:latest",
+    ),
 }
 
 
@@ -100,9 +106,7 @@ def stage_docker_context(
     compose_file = FRAMEWORK_COMPOSE.get(framework_key, "compose-python.yaml")
 
     # Resolve the sandbox image name from environment / defaults.
-    env_var, default_image = _SANDBOX_IMAGE_DEFAULTS.get(
-        framework_key, ("", "")
-    )
+    env_var, default_image = _SANDBOX_IMAGE_DEFAULTS.get(framework_key, ("", ""))
     image_name = os.environ.get(env_var, default_image) if env_var else default_image
 
     if image_name and _docker_image_exists_locally(image_name):
@@ -129,7 +133,9 @@ def stage_docker_context(
         if framework_key == "shiny_r":
             shutil.copy2(DOCKERFILES_DIR / "Dockerfile.r", tmp / "Dockerfile.r")
         else:
-            shutil.copy2(DOCKERFILES_DIR / "Dockerfile.python", tmp / "Dockerfile.python")
+            shutil.copy2(
+                DOCKERFILES_DIR / "Dockerfile.python", tmp / "Dockerfile.python"
+            )
 
     # Create results dir for volume mount
     results = tmp / "results"
@@ -236,12 +242,35 @@ async def _ensure_sandbox_screenshot(
     screenshot_path = f"{project}/screenshot.png"
     helper_path = f"{project}/.tools/screenshot_helper.py"
 
-    try:
-        existing = await sb.exec(["test", "-f", screenshot_path])
-        if existing.returncode == 0:
+    async def mirror_existing_screenshot() -> bool:
+        find_existing = (
+            f"find {project} -maxdepth 1 -type f "
+            "\\( -name 'screenshot_[0-9][0-9]_*.png' "
+            "-o -name 'screenshot.png' "
+            "-o -name 'agent_last_screenshot.png' \\) "
+            "| sort | head -n 1"
+        )
+        try:
+            found = await sb.exec(["sh", "-lc", find_existing])
+            existing_path = (
+                getattr(found, "stdout", "") or getattr(found, "output", "")
+            ).strip()
+            if not existing_path:
+                return False
+            await sb.exec(
+                [
+                    "sh",
+                    "-lc",
+                    f"test -f {screenshot_path} || cp {shlex.quote(existing_path)} {screenshot_path}",
+                ]
+            )
             return True
-    except Exception as exc:
-        logger.debug("test -f %s failed: %s", screenshot_path, exc)
+        except Exception as exc:
+            logger.debug("Existing screenshot discovery failed: %s", exc)
+            return False
+
+    if await mirror_existing_screenshot():
+        return True
 
     try:
         helper_check = await sb.exec(["test", "-f", helper_path])
@@ -255,7 +284,7 @@ async def _ensure_sandbox_screenshot(
     if framework == "shiny_r":
         start_cmd = (
             "cd {p} && nohup Rscript -e \"shiny::runApp('app.R', port=8000, "
-            "launch.browser=FALSE)\" > /tmp/auto_app.log 2>&1 &"
+            'launch.browser=FALSE)" > /tmp/auto_app.log 2>&1 &'
         ).format(p=project)
         stop_cmd = "pkill -f 'Rscript' || true"
     else:
@@ -293,12 +322,18 @@ async def _ensure_sandbox_screenshot(
             await sb.exec(["sh", "-lc", stop_cmd])
         except Exception:
             pass
+        try:
+            await sb.exec(
+                [
+                    "sh",
+                    "-lc",
+                    f"test -f /tmp/auto_app.log && cp /tmp/auto_app.log {project}/auto_app.log || true",
+                ]
+            )
+        except Exception:
+            pass
 
-    try:
-        check = await sb.exec(["test", "-f", screenshot_path])
-        return check.returncode == 0
-    except Exception:
-        return False
+    return await mirror_existing_screenshot()
 
 
 @scorer(metrics=[])

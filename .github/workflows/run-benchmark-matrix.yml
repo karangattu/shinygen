@@ -64,6 +64,7 @@ env:
     vanilla
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
+  SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"
 
 jobs:
   prepare:
@@ -252,7 +253,9 @@ jobs:
           # is best-effort and will gracefully degrade to code-only judging.
           if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
             python -m pip install \
-              shiny plotly faicons pandas matplotlib seaborn shinywidgets
+              shiny shinyswatch plotly faicons pandas matplotlib seaborn \
+              shinywidgets great-tables itables htmltools folium pydeck \
+              lonboard geopandas numpy
           fi
 
       - name: Run shinygen benchmark generation

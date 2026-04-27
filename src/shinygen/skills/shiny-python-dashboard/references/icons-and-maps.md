@@ -105,6 +105,8 @@ Default to `lonboard` for point, hex, and text layers. Reach for the next tier o
 ```python
 import lonboard
 import numpy as np
+import geopandas as gpd
+import pandas as pd
 from lonboard import Map, ScatterplotLayer
 from shinywidgets import output_widget, render_widget
 
@@ -124,6 +126,24 @@ def _short_keys(frame):
     })[["name", "$", "type", "rev", "score", "latitude", "longitude"]]
 
 
+def _to_lonboard_geo(frame):
+    # Keep lonboard inputs on plain pandas/numpy dtypes. Arrow-backed or
+    # nullable extension dtypes can surface as runtime ArrowDtype failures.
+    geo = frame.copy().reset_index(drop=True)
+    geo["latitude"] = pd.to_numeric(geo["latitude"], errors="coerce").astype("float64")
+    geo["longitude"] = pd.to_numeric(geo["longitude"], errors="coerce").astype("float64")
+    geo = geo.dropna(subset=["latitude", "longitude"])
+    for column in ["name", "type"]:
+        geo[column] = geo[column].fillna("").astype(str).astype(object)
+    for column in ["$", "rev", "score"]:
+        geo[column] = pd.to_numeric(geo[column], errors="coerce").astype("float64")
+    return gpd.GeoDataFrame(
+        geo,
+        geometry=gpd.points_from_xy(geo["longitude"], geo["latitude"]),
+        crs="EPSG:4326",
+    )
+
+
 @render_widget
 def listings_map():
     frame = filtered_listings()
@@ -132,7 +152,7 @@ def listings_map():
         dtype=np.uint8,
     )
     layer = ScatterplotLayer.from_geopandas(
-        _short_keys(frame).pipe(_to_geo),
+        _short_keys(frame).pipe(_to_lonboard_geo),
         get_fill_color=colors,
         get_radius=40,
         radius_min_pixels=2,
@@ -145,6 +165,7 @@ Guidelines:
 
 - Build the `numpy.uint8` color array once per render and pass it as `get_fill_color`.
 - Project to GeoDataFrame once; do not repeat the conversion across layers.
+- Before `from_geopandas()`, reset the index and convert coordinates to `float64`, popup labels to plain Python/object strings, and scalar popup numbers to numpy numeric dtypes. Do not pass pandas Arrow-backed dtypes, nullable extension dtypes, or `convert_dtypes(dtype_backend="pyarrow")` output into lonboard.
 - Keep popup column names short — lonboard renders the dict keys verbatim.
 - Use a Positron / light Carto basemap.
 

@@ -95,6 +95,7 @@ env:
     openai/gpt-5.4-mini-2026-03-17
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '2' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
+  SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"
 
 jobs:
   prepare:
@@ -266,7 +267,9 @@ jobs:
           python -m playwright install --with-deps chromium
           if [[ "${{ inputs.framework }}" == "shiny_python" ]]; then
             python -m pip install \
-              shiny plotly faicons pandas matplotlib seaborn shinywidgets
+              shiny shinyswatch plotly faicons pandas matplotlib seaborn \
+              shinywidgets great-tables itables htmltools folium pydeck \
+              lonboard geopandas numpy
           fi
 
       - name: Run shinygen benchmark generation

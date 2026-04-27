@@ -52,17 +52,47 @@ class TestLoadDefaultSkills:
         assert len(skills) == 1
         instructions = skills[0].instructions
 
-        assert "nohup Rscript -e \"shiny::runApp('app.R', port=8000, launch.browser=FALSE)\"" in instructions
+        assert (
+            "nohup Rscript -e \"shiny::runApp('app.R', port=8000, launch.browser=FALSE)\""
+            in instructions
+        )
         assert "python3 /home/user/project/.tools/screenshot_helper.py" in instructions
-        assert "pkill -f \"Rscript\" || true" in instructions
+        assert 'pkill -f "Rscript" || true' in instructions
 
     def test_shiny_python_skill_teaches_non_squished_dashboard_layouts(self):
         instructions = load_skill_context_text("shiny_python")
 
         assert 'width="240px"' in instructions
-        assert 'Use `fillable=False` for dense dashboards' in instructions
+        assert "Use `fillable=False` for dense dashboards" in instructions
         assert 'min_height="320px"' in instructions
-        assert 'Do not place more than 2 medium or large visualization cards in a row' in instructions
+        assert (
+            "Do not place more than 2 medium or large visualization cards in a row"
+            in instructions
+        )
+
+    def test_shiny_python_skill_wraps_great_tables_html(self):
+        instructions = load_skill_context_text("shiny_python")
+
+        assert "return ui.HTML(table.as_raw_html())" in instructions
+        assert "return `.as_raw_html()`" not in instructions
+        assert "returning the raw string directly" in instructions
+
+    def test_shiny_python_skill_warns_about_lonboard_arrow_dtypes(self):
+        instructions = load_skill_context_text("shiny_python")
+
+        assert "ArrowDtype" in instructions
+        assert 'convert_dtypes(dtype_backend="pyarrow")' in instructions
+        assert 'astype("float64")' in instructions
+
+    def test_shiny_python_skill_maps_plotly_inputs_to_column_values(self):
+        instructions = load_skill_context_text("shiny_python")
+
+        assert (
+            'choices={"Meal time": "time", "Day": "day", "Smoker": "smoker"}'
+            in instructions
+        )
+        assert "the input value must be an actual dataframe column name" in instructions
+        assert "do not invert that mapping" in instructions
 
 
 class TestBuildGenerationTask:
@@ -248,7 +278,10 @@ class TestBuildGenerationTask:
         staged = [key for key in sample_files if key.startswith(".agents/skills/")]
         if agent == "codex_cli":
             assert all(not key.startswith("/") for key in staged)
-            assert any(key.startswith(".agents/skills/shiny-python-dashboard/") for key in staged)
+            assert any(
+                key.startswith(".agents/skills/shiny-python-dashboard/")
+                for key in staged
+            )
             assert any(key.startswith(".agents/skills/visual-qa/") for key in staged)
         else:
             assert staged == []

@@ -161,7 +161,7 @@ Use `great_tables.GT(...)` for short, presentation-quality summary tables — le
 
 ```python
 from great_tables import GT, md, style, loc
-from shiny import render
+from shiny import render, ui
 
 
 @render.ui
@@ -172,7 +172,7 @@ def revenue_summary():
         .agg(revenue=("revenue", "sum"), orders=("order_id", "nunique"))
         .sort_values("revenue", ascending=False)
     )
-    return (
+    table = (
         GT(summary)
         .tab_header(title="Revenue by region", subtitle=md("Last 30 days"))
         .fmt_currency(columns="revenue", currency="USD", decimals=0)
@@ -188,8 +188,8 @@ def revenue_summary():
             column_labels_font_weight="600",
             table_border_top_style="hidden",
         )
-        .as_raw_html()
     )
+    return ui.HTML(table.as_raw_html())
 ```
 
 Wire it into the UI with `ui.output_ui("revenue_summary")` inside a card.
@@ -201,7 +201,7 @@ Guidelines:
 - Format every numeric column (`fmt_currency`, `fmt_percent`, `fmt_integer`, `fmt_number`).
 - Use a single soft `data_color` ramp on the most important column instead of coloring every column.
 - Rename columns with `cols_label()` so headers are human-readable.
-- Return `.as_raw_html()` and render through `@render.ui`.
+- Wrap `.as_raw_html()` with `ui.HTML(...)` and render through `@render.ui`; returning the raw string directly makes Shiny escape or display the HTML source.
 
 ## Accordions
 

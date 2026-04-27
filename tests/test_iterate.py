@@ -83,9 +83,7 @@ class TestExtractGenerationUsageRows:
 
 class TestGenerationExtraConfig:
     def test_claude_generation_uses_medium_reasoning_effort(self):
-        assert _generation_extra_config("claude_code") == {
-            "reasoning_effort": "medium"
-        }
+        assert _generation_extra_config("claude_code") == {"reasoning_effort": "medium"}
 
     def test_codex_generation_uses_default_config(self):
         assert _generation_extra_config("codex_cli") == {}
@@ -177,6 +175,23 @@ class TestCopyAgentScreenshotArtifact:
         assert copied == output_path / "agent_last_screenshot.png"
         assert copied.read_bytes() == b"full-page"
 
+    def test_accepts_legacy_agent_last_from_results_volume(self, tmp_path):
+        results_dir = tmp_path / "results" / "sample"
+        results_dir.mkdir(parents=True)
+        (results_dir / "agent_last_screenshot.png").write_bytes(b"legacy-agent")
+
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+
+        copied = _copy_agent_screenshot_artifact(
+            output_path,
+            results_dir=tmp_path / "results",
+            log_path=None,
+        )
+
+        assert copied == output_path / "agent_last_screenshot.png"
+        assert copied.read_bytes() == b"legacy-agent"
+
     def test_falls_back_to_last_eval_log_image_attachment(self, tmp_path):
         log_path = tmp_path / "sample.eval"
         output_path = tmp_path / "output"
@@ -215,7 +230,9 @@ class TestCopyAgentScreenshotArtifact:
         }
 
         with zipfile.ZipFile(log_path, "w") as archive:
-            archive.writestr("samples/shinygen/generate_epoch_1.json", json.dumps(sample))
+            archive.writestr(
+                "samples/shinygen/generate_epoch_1.json", json.dumps(sample)
+            )
 
         copied = _copy_agent_screenshot_artifact(
             output_path,
@@ -291,11 +308,17 @@ class TestRecoverCodeFromEvalLogs:
 
 
 class TestResolveJudgeScreenshotPaths:
-    def test_prefers_agent_screenshot_from_output_dir(self, tmp_path):
+    def test_strict_mode_uses_legacy_agent_screenshot_from_output_dir(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
         output_path = tmp_path / "output"
         output_path.mkdir()
         agent_screenshot = output_path / "agent_last_screenshot.png"
         agent_screenshot.write_bytes(b"agent")
+
+        monkeypatch.setenv("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", "1")
 
         screenshot_paths = _resolve_judge_screenshot_paths(
             output_path,
@@ -305,6 +328,49 @@ class TestResolveJudgeScreenshotPaths:
         )
 
         assert screenshot_paths == [agent_screenshot]
+
+    def test_augments_legacy_agent_screenshot_with_host_multitab_capture(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        agent_screenshot = output_path / "agent_last_screenshot.png"
+        agent_screenshot.write_bytes(b"legacy")
+
+        eval_dir = tmp_path / "eval"
+        eval_dir.mkdir()
+        landing = eval_dir / "screenshot_01_landing.png"
+        details = eval_dir / "screenshot_02_details.png"
+        landing.write_bytes(b"host-landing")
+        details.write_bytes(b"host-details")
+
+        monkeypatch.delenv("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", raising=False)
+
+        def fake_take_screenshots(app_dir, framework_key, port):
+            assert app_dir == eval_dir
+            assert framework_key == "shiny_python"
+            assert port == 18801
+            return [landing, details]
+
+        monkeypatch.setattr(
+            "shinygen.screenshot.take_screenshots", fake_take_screenshots
+        )
+
+        screenshot_paths = _resolve_judge_screenshot_paths(
+            output_path,
+            eval_dir,
+            "shiny_python",
+            18801,
+        )
+
+        copied_landing = output_path / "screenshot_01_landing.png"
+        copied_details = output_path / "screenshot_02_details.png"
+        assert screenshot_paths == [copied_landing, copied_details]
+        assert copied_landing.read_bytes() == b"host-landing"
+        assert copied_details.read_bytes() == b"host-details"
+        assert agent_screenshot.read_bytes() == b"host-landing"
 
     def test_falls_back_to_host_side_capture_when_sandbox_missing(
         self,
@@ -406,7 +472,9 @@ class TestResolveJudgeScreenshotPaths:
 
 
 class TestCopyOutputScreenshots:
-    def test_keeps_output_resident_screenshot_without_recopied_same_file(self, tmp_path):
+    def test_keeps_output_resident_screenshot_without_recopied_same_file(
+        self, tmp_path
+    ):
         output_path = tmp_path / "output"
         output_path.mkdir()
         screenshot_path = output_path / "agent_last_screenshot.png"

@@ -92,6 +92,37 @@ def stop_app(proc: subprocess.Popen) -> None:
             pass
 
 
+def _write_process_log(proc: subprocess.Popen, destination: Path) -> None:
+    """Persist captured app stdout/stderr for screenshot diagnostics."""
+    try:
+        stdout, stderr = proc.communicate(timeout=1)
+    except Exception as exc:  # pragma: no cover - process-state dependent
+        logger.debug("Could not collect app process output: %s", exc)
+        return
+
+    stdout_text = (
+        stdout.decode("utf-8", errors="replace")
+        if isinstance(stdout, bytes)
+        else (stdout or "")
+    )
+    stderr_text = (
+        stderr.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes)
+        else (stderr or "")
+    )
+    if not stdout_text and not stderr_text:
+        return
+
+    destination.write_text(
+        "# Host-side screenshot app log\n\n"
+        "## stdout\n"
+        f"{stdout_text}\n\n"
+        "## stderr\n"
+        f"{stderr_text}\n",
+        encoding="utf-8",
+    )
+
+
 def _wait_for_shiny_render(page: "Page", wait: float = PAGE_LOAD_WAIT) -> None:
     """Wait for Shiny to connect and render outputs.
 
@@ -261,7 +292,9 @@ def _capture_app_views(
         page.screenshot(path=str(landing), full_page=True, timeout=30000)
         paths.append(landing)
     except Exception as exc:
-        logger.warning("landing full_page screenshot failed (%s); viewport fallback", exc)
+        logger.warning(
+            "landing full_page screenshot failed (%s); viewport fallback", exc
+        )
         try:
             page.screenshot(path=str(landing), full_page=False, timeout=15000)
             paths.append(landing)
@@ -311,7 +344,9 @@ def _capture_app_views(
                 idx,
             )
             if not clicked:
-                logger.debug("tab '%s' (idx=%d) was not clickable; skipping", label, idx)
+                logger.debug(
+                    "tab '%s' (idx=%d) was not clickable; skipping", label, idx
+                )
                 continue
         except Exception as exc:
             logger.debug("tab '%s' click failed: %s", label, exc)
@@ -325,12 +360,18 @@ def _capture_app_views(
             page.screenshot(path=str(target), full_page=True, timeout=30000)
             paths.append(target)
         except Exception as exc:
-            logger.warning("tab '%s' full_page screenshot failed (%s); viewport fallback", label, exc)
+            logger.warning(
+                "tab '%s' full_page screenshot failed (%s); viewport fallback",
+                label,
+                exc,
+            )
             try:
                 page.screenshot(path=str(target), full_page=False, timeout=15000)
                 paths.append(target)
             except Exception as exc2:
-                logger.warning("tab '%s' viewport screenshot also failed: %s", label, exc2)
+                logger.warning(
+                    "tab '%s' viewport screenshot also failed: %s", label, exc2
+                )
 
     return paths
 
@@ -371,7 +412,11 @@ def take_screenshots(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    proc = start_app(app_dir, artifact, language, port)
+    try:
+        proc = start_app(app_dir, artifact, language, port)
+    except Exception as exc:
+        logger.warning("Failed to start app for screenshot capture: %s", exc)
+        return []
     width, height = SCREENSHOT_VIEWPORT
 
     try:
@@ -396,3 +441,4 @@ def take_screenshots(
         return []
     finally:
         stop_app(proc)
+        _write_process_log(proc, output_dir / "host_app.log")

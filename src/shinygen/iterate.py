@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import tempfile
 import zipfile
@@ -31,6 +32,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 AGENT_LAST_SCREENSHOT_NAME = "agent_last_screenshot.png"
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").lower() in ("1", "true", "yes")
 
 
 @dataclass
@@ -148,7 +153,9 @@ def _log_hit_output_token_limit(log_path: Path | None) -> bool:
             )
 
             for sample_file in sample_files:
-                sample = json.loads(_read_zip_member(archive, archive.getinfo(sample_file)))
+                sample = json.loads(
+                    _read_zip_member(archive, archive.getinfo(sample_file))
+                )
                 for message in sample.get("messages", []):
                     content = message.get("content")
                     if isinstance(content, str):
@@ -166,7 +173,9 @@ def _log_hit_output_token_limit(log_path: Path | None) -> bool:
                     if any("Output token limit hit" in text for text in texts):
                         return True
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
-        logger.debug("Failed to inspect eval log %s for token limits: %s", log_path, exc)
+        logger.debug(
+            "Failed to inspect eval log %s for token limits: %s", log_path, exc
+        )
 
     return False
 
@@ -220,24 +229,25 @@ def _find_agent_screenshot_in_results(results_dir: Path | None) -> Path | None:
     # Prefer the new numbered landing screenshot, then any legacy single-file
     # capture, then anything else that looks like a screenshot.
     landing_matches = [
-        path
-        for path in results_dir.rglob("screenshot_01_*.png")
-        if path.is_file()
+        path for path in results_dir.rglob("screenshot_01_*.png") if path.is_file()
     ]
     preferred = _latest_path(landing_matches)
     if preferred is not None:
         return preferred
 
-    full_page_matches = [path for path in results_dir.rglob("screenshot.png") if path.is_file()]
+    full_page_matches = [
+        path for path in results_dir.rglob("screenshot.png") if path.is_file()
+    ]
     preferred = _latest_path(full_page_matches)
     if preferred is not None:
         return preferred
 
     fallback_matches = [
-        path
-        for path in results_dir.rglob("screenshot*.png")
-        if path.is_file()
+        path for path in results_dir.rglob("screenshot*.png") if path.is_file()
     ]
+    fallback_matches.extend(
+        path for path in results_dir.rglob(AGENT_LAST_SCREENSHOT_NAME) if path.is_file()
+    )
     return _latest_path(fallback_matches)
 
 
@@ -254,14 +264,24 @@ def _collect_agent_screenshots_in_results(results_dir: Path | None) -> list[Path
 
     # New layout: ``screenshot_01_landing.png``, ``screenshot_02_<slug>.png``...
     numbered = sorted(
-        (path for path in results_dir.rglob("screenshot_[0-9][0-9]_*.png") if path.is_file()),
+        (
+            path
+            for path in results_dir.rglob("screenshot_[0-9][0-9]_*.png")
+            if path.is_file()
+        ),
         key=lambda p: p.name,
     )
     if numbered:
         return numbered
 
-    # Legacy layout: a single ``screenshot.png``.
-    legacy = [path for path in results_dir.rglob("screenshot.png") if path.is_file()]
+    # Legacy layout: a single ``screenshot.png`` or the explicit
+    # ``agent_last_screenshot.png`` requested by older prompts.
+    legacy = [
+        path
+        for name in ("screenshot.png", AGENT_LAST_SCREENSHOT_NAME)
+        for path in results_dir.rglob(name)
+        if path.is_file()
+    ]
     latest_legacy = _latest_path(legacy)
     if latest_legacy is not None:
         return [latest_legacy]
@@ -299,7 +319,9 @@ def _copy_agent_screenshot_artifact(
         try:
             shutil.copy2(captures[0], destination)
         except Exception as exc:  # pragma: no cover - filesystem dependent
-            logger.warning("Failed to copy landing screenshot to %s: %s", destination, exc)
+            logger.warning(
+                "Failed to copy landing screenshot to %s: %s", destination, exc
+            )
         return destination
 
     if log_path is not None and log_path.exists():
@@ -315,21 +337,18 @@ def _copy_agent_screenshot_artifact(
     return None
 
 
-def _gather_existing_screenshots(output_path: Path) -> list[Path]:
-    """Return every per-tab screenshot already present in ``output_path``.
-
-    Numbered ``screenshot_NN_<slug>.png`` files come first (landing then
-    tabs in DOM order). The canonical ``agent_last_screenshot.png`` is
-    only returned when no numbered captures exist, so the judge never sees
-    the same landing image twice.
-    """
-    numbered = sorted(
-        (path for path in output_path.glob("screenshot_[0-9][0-9]_*.png") if path.is_file()),
+def _gather_numbered_screenshots(output_path: Path) -> list[Path]:
+    return sorted(
+        (
+            path
+            for path in output_path.glob("screenshot_[0-9][0-9]_*.png")
+            if path.is_file()
+        ),
         key=lambda p: p.name,
     )
-    if numbered:
-        return numbered
 
+
+def _gather_legacy_screenshots(output_path: Path) -> list[Path]:
     legacy = output_path / AGENT_LAST_SCREENSHOT_NAME
     if legacy.exists():
         return [legacy]
@@ -339,6 +358,21 @@ def _gather_existing_screenshots(output_path: Path) -> list[Path]:
         return [fallback]
 
     return []
+
+
+def _gather_existing_screenshots(output_path: Path) -> list[Path]:
+    """Return every per-tab screenshot already present in ``output_path``.
+
+    Numbered ``screenshot_NN_<slug>.png`` files come first (landing then
+    tabs in DOM order). The canonical ``agent_last_screenshot.png`` is
+    only returned when no numbered captures exist, so the judge never sees
+    the same landing image twice.
+    """
+    numbered = _gather_numbered_screenshots(output_path)
+    if numbered:
+        return numbered
+
+    return _gather_legacy_screenshots(output_path)
 
 
 def _resolve_judge_screenshot_paths(
@@ -351,38 +385,35 @@ def _resolve_judge_screenshot_paths(
 
     Preference order:
     1. Sandbox-captured per-tab series (``screenshot_01_landing.png``,
-       ``screenshot_02_<slug>.png``, ...). Falls back to the legacy single
-       ``agent_last_screenshot.png`` when the agent only captured one view.
+         ``screenshot_02_<slug>.png``, ...).
     2. Host-side capture of the extracted code (best-effort fallback when
-       the sandbox screenshots are missing — e.g. agent SIGTERMed mid-task).
+         numbered sandbox screenshots are missing — e.g. agent SIGTERMed mid-task).
        Captures every tab via the same multi-view helper.
-    3. Raise ``RuntimeError`` so the caller can decide whether to retry or
+     3. Legacy single ``agent_last_screenshot.png`` / ``screenshot.png`` only
+         when multi-tab capture is unavailable.
+     4. Raise ``RuntimeError`` so the caller can decide whether to retry or
        proceed with code-only judging.
 
     Set ``SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1`` to disable the host-side
-    fallback and preserve the original strict behavior.
+     fallback and use only sandbox screenshots.
 
     Multi-image judging matters because multi-tab dashboards used to be
     judged on the landing page only, biasing visual_ux_quality scores
     against ``page_navbar`` / ``navset_*`` apps that hide secondary
     content behind tabs.
     """
-    import os
-
-    existing = _gather_existing_screenshots(output_path)
-    if existing:
+    numbered = _gather_numbered_screenshots(output_path)
+    if numbered:
         logger.info(
             "Using %d agent screenshot(s) for judge: %s",
-            len(existing),
-            ", ".join(p.name for p in existing),
+            len(numbered),
+            ", ".join(p.name for p in numbered),
         )
-        return existing
+        return numbered
 
-    strict = os.environ.get("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", "").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    legacy = _gather_legacy_screenshots(output_path)
+
+    strict = _env_truthy("SHINYGEN_STRICT_SANDBOX_SCREENSHOT")
     if not strict:
         try:
             from . import screenshot as host_screenshot
@@ -432,10 +463,24 @@ def _resolve_judge_screenshot_paths(
             )
             return destinations
 
+        if legacy:
+            logger.warning(
+                "Host-side screenshot fallback did not produce an image; "
+                "falling back to the legacy single screenshot."
+            )
+        else:
+            logger.warning(
+                "Host-side screenshot fallback did not produce an image; "
+                "judge will need to operate without a screenshot."
+            )
+
+    if legacy:
         logger.warning(
-            "Host-side screenshot fallback did not produce an image; "
-            "judge will need to operate without a screenshot."
+            "Using legacy single screenshot for judge after multi-tab capture "
+            "was unavailable: %s",
+            ", ".join(p.name for p in legacy),
         )
+        return legacy
 
     raise RuntimeError(
         "Missing sandbox screenshot: expected "
@@ -444,7 +489,9 @@ def _resolve_judge_screenshot_paths(
     )
 
 
-def _copy_output_screenshots(output_path: Path, screenshot_paths: list[Path]) -> list[Path]:
+def _copy_output_screenshots(
+    output_path: Path, screenshot_paths: list[Path]
+) -> list[Path]:
     """Copy screenshots into the output directory and return normalized paths."""
     output_screenshots: list[Path] = []
 
@@ -585,6 +632,7 @@ def generate_and_refine(
                 # Clear stale screenshots from previous attempts so the
                 # judge never sees images from a discarded iteration.
                 (output_path / AGENT_LAST_SCREENSHOT_NAME).unlink(missing_ok=True)
+                (output_path / "screenshot.png").unlink(missing_ok=True)
                 for stale in output_path.glob("screenshot_[0-9][0-9]_*.png"):
                     stale.unlink(missing_ok=True)
 
@@ -616,7 +664,11 @@ def generate_and_refine(
                     cache_read_tokens=int(row.get("cache_read_tokens", 0) or 0),
                 )
             if code is not None:
-                if hit_output_token_limit and screenshot and not (output_path / AGENT_LAST_SCREENSHOT_NAME).exists():
+                if (
+                    hit_output_token_limit
+                    and screenshot
+                    and not (output_path / AGENT_LAST_SCREENSHOT_NAME).exists()
+                ):
                     logger.warning(
                         "Iteration %d: Output token limit hit and screenshot missing, treating extraction as failed",
                         iteration,
@@ -636,7 +688,9 @@ def generate_and_refine(
             if attempt < max_retries:
                 logger.warning(
                     "Iteration %d: No code extracted (attempt %d/%d), retrying...",
-                    iteration, attempt, max_retries,
+                    iteration,
+                    attempt,
+                    max_retries,
                 )
 
         if code is None:
@@ -680,6 +734,18 @@ def generate_and_refine(
                     len(screenshot_paths),
                 )
             except RuntimeError as exc:
+                if _env_truthy("SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE"):
+                    logger.error(
+                        "Iteration %d: %s Screenshot-backed judging is required; "
+                        "stopping without code-only judging.",
+                        iteration,
+                        exc,
+                    )
+                    result.error = str(exc)
+                    if best_code is None:
+                        best_code = code
+                        best_score = 0.0
+                    break
                 if iteration == max_iterations:
                     # Final iteration: don't hard-fail the whole run just
                     # because the screenshot pipeline broke. Proceed with
@@ -960,7 +1026,11 @@ def _run_generation(
                 artifact_name,
                 iteration,
             )
-            return recovered_code, generation_usage_rows, _log_hit_output_token_limit(log_path)
+            return (
+                recovered_code,
+                generation_usage_rows,
+                _log_hit_output_token_limit(log_path),
+            )
         return None, generation_usage_rows, _log_hit_output_token_limit(log_path)
     finally:
         if output_path is not None:
