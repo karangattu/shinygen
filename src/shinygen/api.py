@@ -59,7 +59,9 @@ def generate(
             ``["anthropic/claude-sonnet-4-6", "openai/gpt-5.4-mini-2026-03-17"]``)
             to run a panel of judges and average their scores.
         max_iterations: Maximum number of generate-judge-refine cycles.
-        quality_threshold: Minimum composite quality score (1-10) to accept.
+        quality_threshold: Minimum value-adjusted score (1-10) to accept when
+            judging is enabled. Raw judge quality is still returned as
+            ``quality_score``.
         web_fetch: If True (default), allow the agent to use web search tools.
         use_skills: If True (default), inject the bundled framework skill
             (and any ``skills_dir``) into the agent context. Set to False to
@@ -68,8 +70,9 @@ def generate(
         port: Port for running the app during screenshots.        verbose: If True, enable debug logging.
 
     Returns:
-        A GenerationResult containing the app path, source code, quality
-        score, number of iterations, and any screenshots.
+        A GenerationResult containing the app path, source code,
+        value-adjusted score, raw quality score, number of iterations, and
+        any screenshots.
 
     Examples:
         Basic generation::

@@ -19,11 +19,12 @@ from .config import (
     DEFAULT_QUALITY_THRESHOLD,
     FRAMEWORKS,
     find_free_port,
+    prepare_model_environment,
     preflight_checks,
     resolve_framework,
     resolve_model,
 )
-from .pricing import Timer, UsageStats
+from .pricing import Timer, UsageStats, calculate_value_score
 from .extract import _read_zip_member, extract_from_log
 
 if TYPE_CHECKING:
@@ -45,9 +46,12 @@ class GenerationResult:
     app_dir: Path | None = None
     source_code: str = ""
     score: float = 0.0
+    quality_score: float = 0.0
+    value_score: float = 0.0
     iterations: int = 0
     passed: bool = False
     judge_feedback: dict | None = None
+    score_breakdown: dict | None = None
     screenshot_paths: list[Path] = field(default_factory=list)
     error: str | None = None
     usage: UsageStats = field(default_factory=UsageStats)
@@ -85,6 +89,9 @@ def _write_run_summary(
         "web_fetch": web_fetch,
         "passed": result.passed,
         "score": result.score,
+        "quality_score": result.quality_score,
+        "value_score": result.value_score,
+        "score_breakdown": result.score_breakdown,
         "iterations": result.iterations,
         "error": result.error,
         "data_files": sorted(data_file_names),
@@ -546,7 +553,9 @@ def generate_and_refine(
             to run a panel of judges and average their scores per
             criterion. ``None`` skips judging entirely.
         max_iterations: Maximum refinement iterations.
-        quality_threshold: Minimum composite score to accept (1-10 scale).
+        quality_threshold: Minimum value-adjusted score to accept (1-10
+            scale) when judging is enabled. Raw judge quality is preserved
+            separately on ``GenerationResult.quality_score``.
         web_fetch: Allow web search tools in the sandbox (default: True).
         use_skills: When True (default), inject the bundled framework skill
             (and any ``skills_dir``) into the agent context. When False, run
@@ -566,9 +575,10 @@ def generate_and_refine(
     # Resolve configuration
     framework_key = resolve_framework(framework)
     agent, model_id = resolve_model(model)
+    prepare_model_environment(model_id)
 
     # Pre-flight: Docker running + API key present
-    preflight_checks(agent)
+    preflight_checks(agent, model_id)
 
     if judge_model:
         if isinstance(judge_model, str):
@@ -611,7 +621,9 @@ def generate_and_refine(
     current_prompt = prompt
     best_code: str | None = None
     best_score: float = 0.0
+    best_quality_score: float = 0.0
     best_feedback: dict | None = None
+    best_score_breakdown: dict | None = None
 
     for iteration in range(1, max_iterations + 1):
         logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
@@ -745,6 +757,7 @@ def generate_and_refine(
                     if best_code is None:
                         best_code = code
                         best_score = 0.0
+                        best_quality_score = 0.0
                     break
                 if iteration == max_iterations:
                     # Final iteration: don't hard-fail the whole run just
@@ -812,7 +825,13 @@ def generate_and_refine(
                         elapsed=judge_timer.elapsed,
                         iteration=iteration,
                     )
-                score = judge_result.composite
+                quality_score = judge_result.composite
+                value_score = calculate_value_score(
+                    quality_score=quality_score,
+                    iterations=iteration,
+                    generation_cost=result.usage.generation_cost,
+                )
+                score = value_score.value_score
                 if len(judge_models) > 1:
                     panel_breakdown = ", ".join(
                         f"{entry.get('model')}={entry.get('composite', 0):.2f}"
@@ -820,29 +839,42 @@ def generate_and_refine(
                         if "error" not in entry
                     )
                     logger.info(
-                        "Iteration %d: Panel score = %.2f (threshold = %.2f) [%s]",
+                        "Iteration %d: Panel quality = %.2f, value score = %.2f "
+                        "(threshold = %.2f, cost penalty = %.2f, iteration penalty = %.2f) [%s]",
                         iteration,
+                        quality_score,
                         score,
                         quality_threshold,
+                        value_score.cost_penalty,
+                        value_score.iteration_penalty,
                         panel_breakdown or "no judges responded",
                     )
                 else:
                     logger.info(
-                        "Iteration %d: Quality score = %.2f (threshold = %.2f)",
+                        "Iteration %d: Quality = %.2f, value score = %.2f "
+                        "(threshold = %.2f, cost penalty = %.2f, iteration penalty = %.2f)",
                         iteration,
+                        quality_score,
                         score,
                         quality_threshold,
+                        value_score.cost_penalty,
+                        value_score.iteration_penalty,
                     )
 
                 if score > best_score:
                     best_score = score
+                    best_quality_score = quality_score
                     best_code = code
                     best_feedback = judge_result.feedback_dict()
+                    best_score_breakdown = value_score.to_dict()
                     result.screenshot_paths = screenshot_paths
 
                 if score >= quality_threshold:
-                    logger.info("Quality threshold met! Accepting app.")
+                    logger.info("Value threshold met! Accepting app.")
                     result.score = score
+                    result.quality_score = quality_score
+                    result.value_score = score
+                    result.score_breakdown = value_score.to_dict()
                     result.judge_feedback = judge_result.feedback_dict()
                     result.passed = True
                     break
@@ -863,12 +895,16 @@ def generate_and_refine(
                 logger.warning("Judge failed: %s", exc)
                 best_code = code
                 best_score = 0.0
+                best_quality_score = 0.0
         else:
             # No judge — accept first successful generation
             best_code = code
             best_score = 10.0
+            best_quality_score = 10.0
             result.passed = True
             result.score = 10.0
+            result.quality_score = 10.0
+            result.value_score = 10.0
             result.screenshot_paths = screenshot_paths
             break
 
@@ -892,6 +928,9 @@ def generate_and_refine(
         result.source_code = best_code
         if not result.passed:
             result.score = best_score
+            result.quality_score = best_quality_score
+            result.value_score = best_score
+            result.score_breakdown = best_score_breakdown
             result.judge_feedback = best_feedback
 
         logger.info(

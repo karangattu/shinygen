@@ -113,7 +113,7 @@ flowchart TD
 2. **Pre-flight + setup** — shinygen verifies Docker/API access, resolves the framework and model, and loads bundled skills, custom skills, and any data files.
 3. **Fresh sandbox generation** — each iteration stages a fresh Docker sandbox, installs agent skills in the agent's native home, and asks Claude Code or Codex CLI to generate `app.py` or `app.R`.
 4. **Visual self-evaluation** — when screenshot mode is enabled, the agent runs the app inside the sandbox, uses `screenshot_helper.py`, waits 7 seconds before capture, and refines visually before submission.
-5. **Extraction + optional judge panel** — shinygen extracts the app from the results volume or eval log, preserves the final in-agent screenshot as `agent_last_screenshot.png`, and, if `--judge-model` is set, runs the extracted app on the host for a separate Playwright screenshot and one or more external LLM judges. Repeat the `--judge-model` flag (e.g. `--judge-model anthropic/claude-sonnet-4-6 --judge-model openai/gpt-5.4-mini-2026-03-17`) to run a panel: shinygen averages per-criterion scores across judges and concatenates each judge's rationale into the refinement prompt. The benchmark workflow defaults to this dual-judge panel to cancel per-vendor bias.
+5. **Extraction + optional judge** — shinygen extracts the app from the results volume or eval log, preserves the final in-agent screenshot as `agent_last_screenshot.png`, and, if `--judge-model` is set, runs the extracted app on the host for a separate Playwright screenshot and one or more external LLM judges. shinygen and the benchmark workflow currently default to a single visual judge, `anthropic/claude-opus-4-7`, since it is the strongest multimodal scorer available. Repeat the `--judge-model` flag (e.g. `--judge-model anthropic/claude-opus-4-7 --judge-model openai/gpt-5.4-mini-2026-03-17`) to run a panel: shinygen averages per-criterion scores across judges and concatenates each judge's rationale into the refinement prompt.
 6. **Final output** — the final app, screenshots, eval logs, and structured run summary are written to your output directory.
 :::
 
@@ -328,7 +328,7 @@ Create a JSON config file. Each object is one job — same keys as the Python AP
     "output_dir": "./batch/sonnet",
     "csv_file": "./test_data_csv_files/trials_short_50.csv",
     "screenshot": true,
-        "judge_model": "openai/gpt-5.4-mini-2026-03-17",
+        "judge_model": "anthropic/claude-opus-4-7",
     "max_iterations": 3
   },
   { "model": "gpt54",       "output_dir": "./batch/gpt54", "..." : "same prompt/settings" },
@@ -365,7 +365,7 @@ results = shinygen.batch([
         "output_dir": "./batch/sonnet",
         "data_csv": "./test_data_csv_files/trials_short_50.csv",
         "screenshot": True,
-        "judge_model": "openai/gpt-5.4-mini-2026-03-17",
+        "judge_model": "anthropic/claude-opus-4-7",
     },
     # Add more jobs with different models/prompts...
 ])
@@ -467,6 +467,73 @@ For day-to-day app generation, leave skills on — they're the default for a rea
 
 ---
 
+## {{< fa coins >}} Value Scoring
+
+When a judge model is enabled, `score` is now a **value-adjusted score** rather than raw quality alone. The raw panel score is preserved as `quality_score`; `value_score` and `score_breakdown` show the deductions applied for extra generation iterations and generation cost.
+
+```json
+{
+    "score": 7.15,
+    "quality_score": 7.90,
+    "value_score": 7.15,
+    "score_breakdown": {
+        "quality_score": 7.90,
+        "value_score": 7.15,
+        "iteration_penalty": 0.35,
+        "cost_penalty": 0.40,
+        "generation_cost": 0.40,
+        "cost_known": true
+    }
+}
+```
+
+The default formula is intentionally simple and auditable:
+
+```text
+value_score = quality_score - iteration_penalty - cost_penalty
+iteration_penalty = 0.35 * each extra generation iteration
+cost_penalty = $1 generation cost = 1 score point, capped at 2.5 points
+```
+
+Judge cost is still recorded in `usage`, but it does not penalize the generating model because it is benchmark overhead rather than app-generation spend.
+
+---
+
+## {{< fa globe >}} OpenCode Go Models
+
+shinygen can route OpenCode Go's OpenAI-compatible models through Inspect's `openai-api` provider and the `mini_swe_agent` Inspect SWE solver. This is the recommended path for value benchmarking because model calls are still proxied through Inspect, so eval logs, token usage, model usage, and the skills-vs-vanilla arm comparison remain intact.
+
+Set your subscription key after signing up for OpenCode Go:
+
+```bash
+export OPENCODE_GO_API_KEY="sk-..."
+```
+
+Then run any supported OpenCode Go alias:
+
+```bash
+shinygen generate \
+        --prompt "Build a polished dashboard for this dataset" \
+        --model opencode-go/kimi-k2.6 \
+        --csv-file ./test_data_csv_files/airbnb-asheville-short.csv \
+        --screenshot \
+        --judge-model anthropic/claude-opus-4-7
+```
+
+The alias `opencode-go/kimi-k2.6` resolves to `openai-api/opencode-go/kimi-k2.6`, and shinygen automatically sets `OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1`. Supported aliases include `glm-5.1`, `glm-5`, `kimi-k2.5`, `kimi-k2.6`, `deepseek-v4-pro`, `deepseek-v4-flash`, `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5`, `qwen3.6-plus`, and `qwen3.5-plus`.
+
+For a local value benchmark template that compares frontier US models and OpenCode Go models across both `skills` and `vanilla` arms, start from `batch-opencode-go.json`.
+
+::: {.callout-note}
+## About the OpenCode SDK and MiniMax models
+
+OpenCode's TypeScript SDK controls an OpenCode server/session, which is useful for building a native OpenCode runner later. For this benchmark, using the SDK or `opencode run` directly would move model calls outside Inspect unless we also parse OpenCode session stats, so the first implementation uses Inspect's model bridge instead.
+
+OpenCode Go currently exposes MiniMax M2.5 and M2.7 on an Anthropic-style `/messages` endpoint, while the implemented Inspect path targets the OpenAI-compatible `/chat/completions` models. Testing MiniMax through OpenCode Go should use a future native OpenCode CLI/SDK solver or a dedicated Inspect model extension so usage and cost stay measurable.
+:::
+
+---
+
 ## {{< fa microchip >}} Supported Models
 
 ```{python}
@@ -475,10 +542,10 @@ from great_tables import GT, md
 import polars as pl
 
 models = pl.DataFrame({
-    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
-    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI"],
-    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`"],
-    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI"],
+    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`", "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`"],
+    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Mini SWE Agent", "Mini SWE Agent", "Mini SWE Agent"],
+    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`", "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`"],
+    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenCode Go", "OpenCode Go", "OpenCode Go"],
 })
 
 (
@@ -563,7 +630,7 @@ import polars as pl
 
 reqs = pl.DataFrame({
     "Requirement": ["Python", "Docker", "API Key"],
-    "Details": ["3.10+", "Running daemon", "ANTHROPIC_API_KEY or OPENAI_API_KEY"],
+    "Details": ["3.10+", "Running daemon", "ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENCODE_GO_API_KEY"],
 })
 
 (
@@ -572,7 +639,7 @@ reqs = pl.DataFrame({
     .cols_align(align="left")
     .opt_stylize(style=1, color="blue")
     .tab_source_note(
-        md("`export ANTHROPIC_API_KEY='sk-ant-...'` or `export OPENAI_API_KEY='sk-...'`")
+        md("`export ANTHROPIC_API_KEY='sk-ant-...'`, `export OPENAI_API_KEY='sk-...'`, or `export OPENCODE_GO_API_KEY='sk-...'`")
     )
 )
 ```

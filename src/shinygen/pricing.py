@@ -18,6 +18,95 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+VALUE_SCORE_ITERATION_PENALTY = 0.35
+VALUE_SCORE_COST_PENALTY_PER_DOLLAR = 1.0
+VALUE_SCORE_MAX_ITERATION_PENALTY = 2.0
+VALUE_SCORE_MAX_COST_PENALTY = 2.5
+
+
+@dataclass(frozen=True)
+class ValueScore:
+    """Cost- and iteration-adjusted score derived from judge quality."""
+
+    quality_score: float
+    value_score: float
+    iteration_penalty: float
+    cost_penalty: float
+    iterations: int
+    generation_cost: float | None
+    cost_known: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "quality_score": self.quality_score,
+            "value_score": self.value_score,
+            "iteration_penalty": self.iteration_penalty,
+            "cost_penalty": self.cost_penalty,
+            "iterations": self.iterations,
+            "generation_cost": self.generation_cost,
+            "cost_known": self.cost_known,
+        }
+
+
+def _clamp_score(value: float) -> float:
+    return max(0.0, min(10.0, value))
+
+
+def calculate_value_score(
+    quality_score: float,
+    iterations: int,
+    generation_cost: float | None,
+    *,
+    iteration_penalty: float = VALUE_SCORE_ITERATION_PENALTY,
+    cost_penalty_per_dollar: float = VALUE_SCORE_COST_PENALTY_PER_DOLLAR,
+    max_iteration_penalty: float = VALUE_SCORE_MAX_ITERATION_PENALTY,
+    max_cost_penalty: float = VALUE_SCORE_MAX_COST_PENALTY,
+) -> ValueScore:
+    """Return a value-adjusted 1-10 score from quality, cost, and retries.
+
+    The judge supplies the raw quality signal. This deterministic adjustment
+    makes repeated expensive generations lose ground against similarly good,
+    cheaper one-shot generations, which keeps benchmark rankings focused on
+    value rather than quality alone.
+    """
+    normalized_quality = round(_clamp_score(float(quality_score)), 2)
+    normalized_iterations = max(0, int(iterations or 0))
+    extra_iterations = max(0, normalized_iterations - 1)
+    iteration_penalty_value = min(
+        max_iteration_penalty,
+        extra_iterations * iteration_penalty,
+    )
+
+    cost_known = generation_cost is not None
+    if generation_cost is None:
+        cost_penalty_value = 0.0
+        normalized_generation_cost = None
+    else:
+        normalized_generation_cost = max(0.0, float(generation_cost))
+        cost_penalty_value = min(
+            max_cost_penalty,
+            normalized_generation_cost * cost_penalty_per_dollar,
+        )
+
+    value_score = _clamp_score(
+        normalized_quality - iteration_penalty_value - cost_penalty_value
+    )
+
+    return ValueScore(
+        quality_score=normalized_quality,
+        value_score=round(value_score, 2),
+        iteration_penalty=round(iteration_penalty_value, 2),
+        cost_penalty=round(cost_penalty_value, 2),
+        iterations=normalized_iterations,
+        generation_cost=(
+            round(normalized_generation_cost, 6)
+            if normalized_generation_cost is not None
+            else None
+        ),
+        cost_known=cost_known,
+    )
+
+
 class Timer:
     """Context-manager timer. Use as:  with Timer() as t: ..."""
 

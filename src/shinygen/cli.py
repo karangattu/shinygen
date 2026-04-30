@@ -98,7 +98,7 @@ def main() -> None:
     default=7.0,
     show_default=True,
     type=float,
-    help="Minimum composite quality score (1-10) to accept.",
+    help="Minimum value-adjusted judged score (1-10) to accept.",
 )
 @click.option(
     "--web-fetch/--no-web-fetch",
@@ -193,6 +193,18 @@ def generate(
     click.secho(f"App generated successfully!", fg="green")
     click.echo(f"  Output:     {result.app_dir}")
     click.echo(f"  Score:      {result.score:.2f}")
+    if result.quality_score and result.quality_score != result.score:
+        click.echo(f"  Quality:    {result.quality_score:.2f}")
+    if result.score_breakdown:
+        iteration_penalty = float(
+            result.score_breakdown.get("iteration_penalty") or 0.0
+        )
+        cost_penalty = float(result.score_breakdown.get("cost_penalty") or 0.0)
+        click.echo(
+            "  Penalties:  "
+            f"iterations -{iteration_penalty:.2f}, "
+            f"cost -{cost_penalty:.2f}"
+        )
     click.echo(f"  Iterations: {result.iterations}")
     click.echo(f"  Passed:     {result.passed}")
 

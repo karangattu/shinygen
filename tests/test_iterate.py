@@ -98,10 +98,20 @@ class TestWriteRunSummary:
             app_dir=tmp_path,
             source_code="print('hello')\n",
             score=8.7,
+            quality_score=9.1,
+            value_score=8.7,
             iterations=2,
             passed=True,
             judge_feedback={"summary": "Strong dashboard structure."},
             screenshot_paths=[screenshot_path],
+            score_breakdown={
+                "quality_score": 9.1,
+                "value_score": 8.7,
+                "iteration_penalty": 0.35,
+                "cost_penalty": 0.05,
+                "generation_cost": 0.05,
+                "cost_known": True,
+            },
         )
         result.usage.add(
             stage="generate",
@@ -146,6 +156,10 @@ class TestWriteRunSummary:
         assert summary["judge_models"] == ["anthropic/claude-sonnet-4-6"]
         assert summary["passed"] is True
         assert summary["score"] == 8.7
+        assert summary["quality_score"] == 9.1
+        assert summary["value_score"] == 8.7
+        assert summary["score_breakdown"]["iteration_penalty"] == 0.35
+        assert summary["score_breakdown"]["cost_penalty"] == 0.05
         assert summary["iterations"] == 2
         assert summary["data_files"] == ["airbnb-asheville-short.csv"]
         assert summary["screenshots"] == ["overview.png"]

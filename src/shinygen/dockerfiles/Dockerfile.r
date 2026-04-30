@@ -12,6 +12,7 @@
 #   - Python + visualization packages (so the same image works for both
 #     framework variants when needed)
 #   - Playwright + Chromium browser
+#   - uv (used by inspect_swe mini_swe_agent)
 #   - `claude` (Anthropic Claude Code) standalone binary on PATH
 #   - `codex` (OpenAI Codex CLI) standalone binary on PATH
 
@@ -71,6 +72,7 @@ RUN Rscript -e ' \
 # Python packages (so the image can also exercise Python helpers when
 # needed; keeps a single image surface for both framework variants).
 RUN pip3 install --break-system-packages --no-cache-dir \
+    uv \
     shiny \
     plotly \
     faicons \

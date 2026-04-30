@@ -9,6 +9,7 @@
 #   - System libraries needed by Chromium (Playwright)
 #   - Shiny + visualization packages used by generated apps
 #   - Playwright + Chromium browser
+#   - uv (used by inspect_swe mini_swe_agent)
 #   - `claude` (Anthropic Claude Code) standalone binary on PATH
 #   - `codex` (OpenAI Codex CLI) standalone binary on PATH
 #
@@ -37,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Pre-install Python packages used by generated Shiny apps
 RUN pip install --no-cache-dir \
+    uv \
     "shiny>=1.6" \
     shinyswatch \
     plotly \

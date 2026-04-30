@@ -65,18 +65,21 @@ def test_benchmark_workflow_uses_generic_benchmark_metadata():
     assert "# Benchmark:" in workflow
 
 
-def test_benchmark_workflow_uses_dual_judge_panel():
-    """Benchmarks default to a panel of two judges (anthropic + openai) so
-    every score is the average of an independent Claude and GPT review.
-    Keeping both vendors in the panel cancels per-vendor bias.
+def test_benchmark_workflow_uses_claude_opus_judge():
+    """Benchmarks default to a single visual judge: anthropic/claude-opus-4-7.
+
+    Opus 4.7 is the strongest multimodal scorer we have access to, so we
+    trust its judgment over a vendor-averaged panel. The workflow keeps
+    `BENCHMARK_JUDGE_MODELS` as a newline-separated list so additional
+    judges can be added back later by editing one env var.
     """
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "BENCHMARK_JUDGE_MODELS:" in workflow
-    assert "anthropic/claude-sonnet-4-6" in workflow
-    assert "openai/gpt-5.4-mini-2026-03-17" in workflow
-    # The generation step must expand the panel into repeated --judge-model
-    # flags rather than the old single-flag form.
+    assert "anthropic/claude-opus-4-7" in workflow
+    # The generation step must expand the list into repeated --judge-model
+    # flags rather than the old single-flag form, even with one entry, so
+    # adding more judges later remains a one-line change.
     assert "BENCHMARK_JUDGE_MODEL " not in workflow
     assert '--judge-model "${BENCHMARK_JUDGE_MODEL}"' not in workflow
     assert "judge_args+=(--judge-model" in workflow
@@ -143,4 +146,4 @@ def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
 
     assert batch_config
     for entry in batch_config:
-        assert entry["judge_model"] == "openai/gpt-5.4-mini-2026-03-17"
+        assert entry["judge_model"] == "anthropic/claude-opus-4-7"

@@ -1,0 +1,112 @@
+[
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "claude-sonnet",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/claude-sonnet-skills",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": true
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "claude-sonnet",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/claude-sonnet-vanilla",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": false
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "gpt-5.4-mini",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/gpt-5.4-mini-skills",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": true
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "gpt-5.4-mini",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/gpt-5.4-mini-vanilla",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": false
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "opencode-go/kimi-k2.6",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/kimi-k2.6-skills",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": true
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "opencode-go/kimi-k2.6",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/kimi-k2.6-vanilla",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": false
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "opencode-go/deepseek-v4-flash",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/deepseek-v4-flash-skills",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": true
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "opencode-go/deepseek-v4-flash",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/deepseek-v4-flash-vanilla",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": false
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "opencode-go/qwen3.6-plus",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/qwen3.6-plus-skills",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": true
+  },
+  {
+    "prompt": "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.",
+    "model": "opencode-go/qwen3.6-plus",
+    "framework": "shiny_python",
+    "output_dir": "./batch_opencode_go/qwen3.6-plus-vanilla",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-opus-4-7",
+    "max_iterations": 3,
+    "use_skills": false
+  }
+]

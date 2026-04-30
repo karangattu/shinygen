@@ -1,6 +1,12 @@
 """Tests for shinygen.pricing."""
 
-from shinygen.pricing import Timer, UsageStats, calculate_cost, get_pricing
+from shinygen.pricing import (
+    Timer,
+    UsageStats,
+    calculate_cost,
+    calculate_value_score,
+    get_pricing,
+)
 
 
 class TestGetPricing:
@@ -149,6 +155,52 @@ class TestUsageStats:
         d = usage.details[0]
         assert d["cache_write_tokens"] == 3000
         assert d["cache_read_tokens"] == 2000
+
+
+class TestCalculateValueScore:
+    def test_value_score_penalizes_extra_iterations_and_generation_cost(self):
+        baseline = calculate_value_score(
+            quality_score=8.0,
+            iterations=1,
+            generation_cost=0.0,
+        )
+        expensive_retry = calculate_value_score(
+            quality_score=8.0,
+            iterations=3,
+            generation_cost=1.25,
+        )
+
+        assert baseline.value_score == 8.0
+        assert expensive_retry.iteration_penalty == 0.70
+        assert expensive_retry.cost_penalty == 1.25
+        assert expensive_retry.value_score == 6.05
+        assert expensive_retry.value_score < baseline.value_score
+
+    def test_unknown_generation_cost_is_reported_without_cost_penalty(self):
+        result = calculate_value_score(
+            quality_score=7.5,
+            iterations=2,
+            generation_cost=None,
+        )
+
+        assert result.cost_known is False
+        assert result.cost_penalty == 0.0
+        assert result.value_score == 7.15
+
+    def test_value_score_is_clamped_to_zero_to_ten(self):
+        high = calculate_value_score(
+            quality_score=12.0,
+            iterations=1,
+            generation_cost=0.0,
+        )
+        low = calculate_value_score(
+            quality_score=1.0,
+            iterations=10,
+            generation_cost=100.0,
+        )
+
+        assert high.value_score == 10.0
+        assert low.value_score == 0.0
 
 
 class TestCalculateCostWithCache:

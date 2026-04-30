@@ -18,7 +18,7 @@ from inspect_ai.model import ChatMessageSystem, ChatMessageUser
 from inspect_ai.scorer import Score, Target, scorer
 from inspect_ai.solver import TaskState
 from inspect_ai.tool import Skill
-from inspect_swe import claude_code, codex_cli
+from inspect_swe import claude_code, codex_cli, mini_swe_agent
 
 if TYPE_CHECKING:
     from inspect_ai.util import SandboxEnvironment
@@ -543,7 +543,7 @@ def build_generation_task(
             attempts=1,
             skills=resolved_skills or None,
         )
-    else:
+    elif agent == "codex_cli":
         solver = codex_cli(
             cwd=SANDBOX_WORK_DIR,
             attempts=1,
@@ -552,6 +552,26 @@ def build_generation_task(
             config_overrides=CODEX_CONFIG_OVERRIDES,
             disallowed_tools=codex_disallowed_tools,
         )
+    elif agent == "mini_swe_agent":
+        mini_system_prompt = None
+        if use_skills:
+            from .skills import load_skill_context_text
+
+            skill_context = load_skill_context_text(framework_key).strip()
+            if skill_context:
+                mini_system_prompt = (
+                    "Use these additional shinygen dashboard generation "
+                    "guidelines when planning and editing files:\n\n"
+                    f"{skill_context}"
+                )
+        solver = mini_swe_agent(
+            cwd=SANDBOX_WORK_DIR,
+            attempts=1,
+            system_prompt=mini_system_prompt,
+            version="stable",
+        )
+    else:
+        raise ValueError(f"Unknown generation agent: {agent}")
 
     time_limit = sandbox_time_limit_for_framework(framework_key)
 

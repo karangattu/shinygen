@@ -36,6 +36,41 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "gpt-5.3-codex": ("codex_cli", "openai/gpt-5.3-codex"),
 }
 
+OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
+
+# OpenCode Go models that expose OpenAI-compatible chat completions endpoints.
+# MiniMax M2.5 / M2.7 currently use an Anthropic-style messages endpoint in
+# OpenCode Go, so they need a native OpenCode/Anthropic bridge before they can
+# be driven through Inspect's `openai-api` provider.
+OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
+    "glm-5.1",
+    "glm-5",
+    "kimi-k2.5",
+    "kimi-k2.6",
+    "deepseek-v4-pro",
+    "deepseek-v4-flash",
+    "mimo-v2-pro",
+    "mimo-v2-omni",
+    "mimo-v2.5-pro",
+    "mimo-v2.5",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+)
+
+
+def _register_opencode_go_aliases() -> None:
+    for model_name in OPENCODE_GO_OPENAI_COMPATIBLE_MODELS:
+        inspect_model_id = f"openai-api/opencode-go/{model_name}"
+        for alias in (
+            model_name,
+            f"opencode-go/{model_name}",
+            f"opencode-go-{model_name}",
+        ):
+            MODEL_ALIASES.setdefault(alias, ("mini_swe_agent", inspect_model_id))
+
+
+_register_opencode_go_aliases()
+
 # ---------------------------------------------------------------------------
 # Framework configuration
 # ---------------------------------------------------------------------------
@@ -156,10 +191,29 @@ def resolve_model(alias: str) -> tuple[str, str]:
         return ("claude_code", alias)
     if key.startswith("openai/"):
         return ("codex_cli", alias)
+    if key.startswith("openai-api/"):
+        return ("mini_swe_agent", alias)
     raise ValueError(
         f"Unknown model '{alias}'. Choose from: "
         f"{', '.join(sorted(MODEL_ALIASES.keys()))}"
     )
+
+
+def is_opencode_go_model(model_id: str) -> bool:
+    """Return True when a resolved Inspect model points at OpenCode Go."""
+    return model_id.lower().strip().startswith("openai-api/opencode-go/")
+
+
+def prepare_model_environment(model_id: str) -> None:
+    """Set provider defaults needed by resolved model IDs.
+
+    Inspect's `openai-api/<provider>/<model>` provider reads
+    `<PROVIDER>_API_KEY` and `<PROVIDER>_BASE_URL`. OpenCode Go's base URL is
+    stable, so shinygen supplies it automatically while leaving the API key to
+    the caller's environment or CI secret.
+    """
+    if is_opencode_go_model(model_id):
+        os.environ.setdefault("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL)
 
 
 def resolve_framework(alias: str) -> str:
@@ -214,11 +268,21 @@ def check_docker() -> None:
         )
 
 
-def check_api_key(agent: str) -> None:
+def check_api_key(agent: str, model_id: str | None = None) -> None:
     """Verify the required API key is set for the given agent.
 
     Raises APIKeyMissingError with a descriptive message.
     """
+    if model_id and is_opencode_go_model(model_id):
+        if not os.environ.get("OPENCODE_GO_API_KEY"):
+            raise APIKeyMissingError(
+                "OPENCODE_GO_API_KEY environment variable is not set.\n"
+                "Subscribe to OpenCode Go, copy your API key from "
+                "https://opencode.ai/auth, and run:\n"
+                "  export OPENCODE_GO_API_KEY='sk-...'"
+            )
+        return
+
     if agent == "claude_code":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise APIKeyMissingError(
@@ -233,12 +297,18 @@ def check_api_key(agent: str) -> None:
                 "Get your API key from https://platform.openai.com/api-keys and run:\n"
                 "  export OPENAI_API_KEY='sk-...'"
             )
+    elif agent == "mini_swe_agent":
+        if not model_id:
+            raise APIKeyMissingError(
+                "mini_swe_agent requires a resolved Inspect model ID so shinygen "
+                "can determine which provider API key is needed."
+            )
 
 
-def preflight_checks(agent: str) -> None:
+def preflight_checks(agent: str, model_id: str | None = None) -> None:
     """Run all pre-flight checks before starting generation.
 
     Raises DockerNotAvailableError or APIKeyMissingError on failure.
     """
     check_docker()
-    check_api_key(agent)
+    check_api_key(agent, model_id)

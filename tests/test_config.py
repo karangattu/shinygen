@@ -1,5 +1,6 @@
 """Tests for shinygen.config"""
 
+import os
 from unittest.mock import patch
 
 from shinygen.config import (
@@ -10,6 +11,7 @@ from shinygen.config import (
     check_api_key,
     check_docker,
     find_free_port,
+    prepare_model_environment,
     preflight_checks,
     resolve_framework,
     resolve_model,
@@ -80,6 +82,21 @@ class TestResolveModel:
         agent, model_id = resolve_model("gpt-5.3-codex")
         assert agent == "codex_cli"
         assert model_id == "openai/gpt-5.3-codex"
+
+    def test_opencode_go_alias_resolves_to_mini_swe_agent(self):
+        agent, model_id = resolve_model("opencode-go/kimi-k2.6")
+        assert agent == "mini_swe_agent"
+        assert model_id == "openai-api/opencode-go/kimi-k2.6"
+
+    def test_opencode_go_short_alias_resolves_to_openai_api_provider(self):
+        agent, model_id = resolve_model("deepseek-v4-flash")
+        assert agent == "mini_swe_agent"
+        assert model_id == "openai-api/opencode-go/deepseek-v4-flash"
+
+    def test_full_openai_api_id_uses_mini_swe_agent(self):
+        agent, model_id = resolve_model("openai-api/opencode-go/qwen3.6-plus")
+        assert agent == "mini_swe_agent"
+        assert model_id == "openai-api/opencode-go/qwen3.6-plus"
 
     def test_unknown_raises(self):
         with pytest.raises(ValueError, match="Unknown model"):
@@ -194,6 +211,20 @@ class TestCheckAPIKey:
     def test_openai_key_present(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}):
             check_api_key("codex_cli")  # should not raise
+
+    def test_opencode_go_key_missing(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(APIKeyMissingError, match="OPENCODE_GO_API_KEY"):
+                check_api_key("mini_swe_agent", "openai-api/opencode-go/kimi-k2.6")
+
+    def test_opencode_go_key_present(self):
+        with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
+            check_api_key("mini_swe_agent", "openai-api/opencode-go/kimi-k2.6")
+
+    def test_prepare_model_environment_sets_opencode_go_base_url(self):
+        with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
+            prepare_model_environment("openai-api/opencode-go/kimi-k2.6")
+            assert os.environ["OPENCODE_GO_BASE_URL"] == "https://opencode.ai/zen/go/v1"
 
 
 class TestPreflightChecks:
