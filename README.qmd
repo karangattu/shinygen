@@ -520,16 +520,14 @@ shinygen generate \
         --judge-model anthropic/claude-opus-4-7
 ```
 
-The alias `opencode-go/kimi-k2.6` resolves to `openai-api/opencode-go/kimi-k2.6`, and shinygen automatically sets `OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1`. Supported aliases include `glm-5.1`, `glm-5`, `kimi-k2.5`, `kimi-k2.6`, `deepseek-v4-pro`, `deepseek-v4-flash`, `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5`, `qwen3.6-plus`, and `qwen3.5-plus`.
+The alias `opencode-go/kimi-k2.6` resolves to `openai-api/opencode-go/kimi-k2.6`, and shinygen automatically sets `OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1`. MiniMax aliases resolve to an Anthropic-compatible OpenCode Go route. Supported aliases include `glm-5.1`, `glm-5`, `kimi-k2.5`, `kimi-k2.6`, `mimo-v2.5`, `mimo-v2.5-pro`, `minimax-m2.5`, `minimax-m2.7`, `qwen3.5-plus`, `qwen3.6-plus`, `deepseek-v4-pro`, and `deepseek-v4-flash`.
 
 For a local value benchmark template that compares frontier US models and OpenCode Go models across both `skills` and `vanilla` arms, start from `batch-opencode-go.json`.
 
 ::: {.callout-note}
-## About the OpenCode SDK and MiniMax models
+## About the OpenCode SDK
 
 OpenCode's TypeScript SDK controls an OpenCode server/session, which is useful for building a native OpenCode runner later. For this benchmark, using the SDK or `opencode run` directly would move model calls outside Inspect unless we also parse OpenCode session stats, so the first implementation uses Inspect's model bridge instead.
-
-OpenCode Go currently exposes MiniMax M2.5 and M2.7 on an Anthropic-style `/messages` endpoint, while the implemented Inspect path targets the OpenAI-compatible `/chat/completions` models. Testing MiniMax through OpenCode Go should use a future native OpenCode CLI/SDK solver or a dedicated Inspect model extension so usage and cost stay measurable.
 :::
 
 ---

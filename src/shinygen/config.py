@@ -39,9 +39,6 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 
 # OpenCode Go models that expose OpenAI-compatible chat completions endpoints.
-# MiniMax M2.5 / M2.7 currently use an Anthropic-style messages endpoint in
-# OpenCode Go, so they need a native OpenCode/Anthropic bridge before they can
-# be driven through Inspect's `openai-api` provider.
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "glm-5.1",
     "glm-5",
@@ -57,10 +54,28 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "qwen3.5-plus",
 )
 
+# OpenCode Go MiniMax models expose an Anthropic-compatible messages endpoint.
+# Keep a distinct resolved-id marker so generation can route these through
+# Inspect's Anthropic provider with the OpenCode Go base URL/API key without
+# mutating the normal Anthropic environment used by the judge.
+OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
+    "minimax-m2.5",
+    "minimax-m2.7",
+)
+
 
 def _register_opencode_go_aliases() -> None:
     for model_name in OPENCODE_GO_OPENAI_COMPATIBLE_MODELS:
         inspect_model_id = f"openai-api/opencode-go/{model_name}"
+        for alias in (
+            model_name,
+            f"opencode-go/{model_name}",
+            f"opencode-go-{model_name}",
+        ):
+            MODEL_ALIASES.setdefault(alias, ("mini_swe_agent", inspect_model_id))
+
+    for model_name in OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS:
+        inspect_model_id = f"anthropic/opencode-go/{model_name}"
         for alias in (
             model_name,
             f"opencode-go/{model_name}",
@@ -201,7 +216,22 @@ def resolve_model(alias: str) -> tuple[str, str]:
 
 def is_opencode_go_model(model_id: str) -> bool:
     """Return True when a resolved Inspect model points at OpenCode Go."""
-    return model_id.lower().strip().startswith("openai-api/opencode-go/")
+    model = model_id.lower().strip()
+    return model.startswith("openai-api/opencode-go/") or model.startswith(
+        "anthropic/opencode-go/"
+    )
+
+
+def is_opencode_go_anthropic_model(model_id: str) -> bool:
+    """Return True for OpenCode Go models served via Anthropic messages."""
+    return model_id.lower().strip().startswith("anthropic/opencode-go/")
+
+
+def opencode_go_anthropic_model_name(model_id: str) -> str:
+    """Return the API model name for an Anthropic-compatible OpenCode Go ID."""
+    if not is_opencode_go_anthropic_model(model_id):
+        raise ValueError(f"Not an OpenCode Go Anthropic-compatible model: {model_id}")
+    return model_id.split("/", 2)[2]
 
 
 def prepare_model_environment(model_id: str) -> None:

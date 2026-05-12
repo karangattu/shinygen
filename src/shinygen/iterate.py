@@ -18,7 +18,10 @@ from .config import (
     DEFAULT_MAX_ITERATIONS,
     DEFAULT_QUALITY_THRESHOLD,
     FRAMEWORKS,
+    OPENCODE_GO_BASE_URL,
     find_free_port,
+    is_opencode_go_anthropic_model,
+    opencode_go_anthropic_model_name,
     prepare_model_environment,
     preflight_checks,
     resolve_framework,
@@ -1006,9 +1009,20 @@ def _run_generation(
         # thinking.type=enabled.
         extra_config = _generation_extra_config(agent)
 
+        eval_model = model_id
+        if is_opencode_go_anthropic_model(model_id):
+            from inspect_ai.model import get_model
+
+            eval_model = get_model(
+                f"anthropic/{opencode_go_anthropic_model_name(model_id)}",
+                base_url=os.environ.get("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL),
+                api_key=os.environ["OPENCODE_GO_API_KEY"],
+                memoize=False,
+            )
+
         logs = inspect_eval(
             task,
-            model=model_id,
+            model=eval_model,
             log_dir=str(logs_dir),
             **extra_config,
         )

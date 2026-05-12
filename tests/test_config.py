@@ -11,6 +11,8 @@ from shinygen.config import (
     check_api_key,
     check_docker,
     find_free_port,
+    is_opencode_go_anthropic_model,
+    opencode_go_anthropic_model_name,
     prepare_model_environment,
     preflight_checks,
     resolve_framework,
@@ -92,6 +94,35 @@ class TestResolveModel:
         agent, model_id = resolve_model("deepseek-v4-flash")
         assert agent == "mini_swe_agent"
         assert model_id == "openai-api/opencode-go/deepseek-v4-flash"
+
+    def test_opencode_go_minimax_alias_resolves_to_anthropic_provider_marker(self):
+        agent, model_id = resolve_model("minimax-m2.7")
+        assert agent == "mini_swe_agent"
+        assert model_id == "anthropic/opencode-go/minimax-m2.7"
+        assert is_opencode_go_anthropic_model(model_id)
+        assert opencode_go_anthropic_model_name(model_id) == "minimax-m2.7"
+
+    @pytest.mark.parametrize(
+        "alias",
+        [
+            "glm-5",
+            "glm-5.1",
+            "kimi-k2.5",
+            "kimi-k2.6",
+            "mimo-v2.5",
+            "mimo-v2.5-pro",
+            "minimax-m2.5",
+            "minimax-m2.7",
+            "qwen3.5-plus",
+            "qwen3.6-plus",
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
+        ],
+    )
+    def test_all_documented_opencode_go_aliases_resolve(self, alias):
+        agent, model_id = resolve_model(alias)
+        assert agent == "mini_swe_agent"
+        assert model_id.endswith(alias)
 
     def test_full_openai_api_id_uses_mini_swe_agent(self):
         agent, model_id = resolve_model("openai-api/opencode-go/qwen3.6-plus")

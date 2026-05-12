@@ -3,7 +3,7 @@ name: Run benchmark (single model, skills vs vanilla)
 # Cheap counterpart to run-benchmark-matrix.yml. Runs exactly two jobs
 # (skills + vanilla) for ONE (framework, model, dataset) combination so
 # you can validate fixes without spending the full matrix budget. Use
-# this for iteration before kicking off the expensive 28-job matrix.
+# this for iteration before kicking off the expensive full matrix.
 
 on:
   workflow_dispatch:
@@ -31,6 +31,18 @@ on:
           - gpt-5.4-mini
           - gpt-5.4-nano
           - gpt-5.3-codex
+          - glm-5
+          - glm-5.1
+          - kimi-k2.5
+          - kimi-k2.6
+          - mimo-v2.5
+          - mimo-v2.5-pro
+          - minimax-m2.5
+          - minimax-m2.7
+          - qwen3.5-plus
+          - qwen3.6-plus
+          - deepseek-v4-pro
+          - deepseek-v4-flash
       dataset:
         description: "Bundled CSV dataset from test_data_csv_files/"
         required: true
@@ -206,6 +218,7 @@ jobs:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ inputs.framework }}/${{ inputs.model }}-${{ matrix.arm.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
       SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
       SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
     steps:
@@ -228,16 +241,40 @@ jobs:
           fi
 
           missing=0
-          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+          needs_anthropic=0
+          needs_openai=0
+          needs_opencode_go=0
+
+          if [[ "${{ inputs.enable_judges }}" == "true" ]]; then
+            needs_anthropic=1
+          fi
+
+          case "${{ inputs.model }}" in
+            claude-*)
+              needs_anthropic=1
+              ;;
+            gpt-*)
+              needs_openai=1
+              ;;
+            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*)
+              needs_opencode_go=1
+              ;;
+          esac
+
+          if [[ "${needs_anthropic}" -eq 1 && -z "${ANTHROPIC_API_KEY:-}" ]]; then
             echo "Missing required secret: ANTHROPIC_API_KEY" >&2
             missing=1
           fi
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+          if [[ "${needs_openai}" -eq 1 && -z "${OPENAI_API_KEY:-}" ]]; then
             echo "Missing required secret: OPENAI_API_KEY" >&2
             missing=1
           fi
+          if [[ "${needs_opencode_go}" -eq 1 && -z "${OPENCODE_GO_API_KEY:-}" ]]; then
+            echo "Missing required secret: OPENCODE_GO_API_KEY" >&2
+            missing=1
+          fi
           if [[ "${missing}" -ne 0 ]]; then
-            echo "Configure both repository secrets before running this workflow." >&2
+            echo "Configure the required repository secrets before running this workflow." >&2
             exit 1
           fi
 

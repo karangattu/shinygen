@@ -55,7 +55,7 @@ When a judge model is enabled, shinygen now records both raw `quality_score` and
 
 ## OpenCode Go models
 
-OpenCode Go's OpenAI-compatible models can be tested through Inspect's `openai-api` provider and the `mini_swe_agent` sandbox solver:
+OpenCode Go models can be tested through Inspect and the `mini_swe_agent` sandbox solver. Most route through Inspect's `openai-api` provider; MiniMax M2.5/M2.7 route through OpenCode Go's Anthropic-compatible messages endpoint.
 
 ```bash
 export OPENCODE_GO_API_KEY="sk-..."
@@ -68,6 +68,6 @@ shinygen generate \
     --judge-model anthropic/claude-opus-4-7
 ```
 
-Supported OpenCode Go aliases include `glm-5.1`, `glm-5`, `kimi-k2.5`, `kimi-k2.6`, `deepseek-v4-pro`, `deepseek-v4-flash`, `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5`, `qwen3.6-plus`, and `qwen3.5-plus`. MiniMax Go models use an Anthropic-style endpoint, so they need a future native OpenCode CLI/SDK solver or Inspect model extension to keep usage and cost measurable.
+Supported OpenCode Go aliases include `glm-5.1`, `glm-5`, `kimi-k2.5`, `kimi-k2.6`, `mimo-v2.5`, `mimo-v2.5-pro`, `minimax-m2.5`, `minimax-m2.7`, `qwen3.5-plus`, `qwen3.6-plus`, `deepseek-v4-pro`, and `deepseek-v4-flash`.
 
 See `batch-opencode-go.json` for a ready-to-edit local benchmark template that compares frontier US models and OpenCode Go models across `skills` and `vanilla` arms.

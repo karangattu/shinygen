@@ -59,6 +59,18 @@ env:
     gpt-5.4-mini
     gpt-5.4-nano
     gpt-5.5
+    glm-5
+    glm-5.1
+    kimi-k2.5
+    kimi-k2.6
+    mimo-v2.5
+    mimo-v2.5-pro
+    minimax-m2.5
+    minimax-m2.7
+    qwen3.5-plus
+    qwen3.6-plus
+    deepseek-v4-pro
+    deepseek-v4-flash
   BENCHMARK_EXPECTED_ARMS: |
     skills
     vanilla
@@ -166,6 +178,30 @@ jobs:
             name: gpt-5.4-nano
           - idx: "07"
             name: gpt-5.5
+          - idx: "08"
+            name: glm-5
+          - idx: "09"
+            name: glm-5.1
+          - idx: "10"
+            name: kimi-k2.5
+          - idx: "11"
+            name: kimi-k2.6
+          - idx: "12"
+            name: mimo-v2.5
+          - idx: "13"
+            name: mimo-v2.5-pro
+          - idx: "14"
+            name: minimax-m2.5
+          - idx: "15"
+            name: minimax-m2.7
+          - idx: "16"
+            name: qwen3.5-plus
+          - idx: "17"
+            name: qwen3.6-plus
+          - idx: "18"
+            name: deepseek-v4-pro
+          - idx: "19"
+            name: deepseek-v4-flash
         # Control / treatment axis: each (framework, model) cell runs twice,
         # once with the bundled shinygen skill (`skills`) and once vanilla
         # (`vanilla`). Both arms keep web search enabled so the comparison
@@ -184,6 +220,7 @@ jobs:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ matrix.framework }}/${{ matrix.model.idx }}-${{ matrix.model.name }}-${{ matrix.arm.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
       SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
       SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
     steps:
@@ -214,8 +251,12 @@ jobs:
             echo "Missing required secret: OPENAI_API_KEY" >&2
             missing=1
           fi
+          if [[ -z "${OPENCODE_GO_API_KEY:-}" ]]; then
+            echo "Missing required secret: OPENCODE_GO_API_KEY" >&2
+            missing=1
+          fi
           if [[ "${missing}" -ne 0 ]]; then
-            echo "Configure both repository secrets before running this workflow." >&2
+            echo "Configure ANTHROPIC_API_KEY, OPENAI_API_KEY, and OPENCODE_GO_API_KEY before running this workflow." >&2
             exit 1
           fi
 
@@ -398,6 +439,18 @@ jobs:
         gpt-5.4-mini
         gpt-5.4-nano
         gpt-5.5
+        glm-5
+        glm-5.1
+        kimi-k2.5
+        kimi-k2.6
+        mimo-v2.5
+        mimo-v2.5-pro
+        minimax-m2.5
+        minimax-m2.7
+        qwen3.5-plus
+        qwen3.6-plus
+        deepseek-v4-pro
+        deepseek-v4-flash
       BENCHMARK_EXPECTED_ARMS: |
         skills
         vanilla

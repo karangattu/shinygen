@@ -9,6 +9,12 @@ WORKFLOW_PATH = (
     / "workflows"
     / "run-benchmark-matrix.yml"
 )
+QUICK_WORKFLOW_PATH = (
+    Path(__file__).resolve().parents[1]
+    / ".github"
+    / "workflows"
+    / "run-benchmark-quick.yml"
+)
 
 BATCH_CONFIG_PATH = Path(__file__).resolve().parents[1] / "batch.json"
 
@@ -122,6 +128,31 @@ def test_benchmark_workflow_includes_gpt55_in_generation_matrix():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "name: gpt-5.5" in workflow
+
+
+def test_benchmark_workflows_include_all_documented_opencode_go_models():
+    matrix_workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    quick_workflow = QUICK_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    for model in [
+        "glm-5",
+        "glm-5.1",
+        "kimi-k2.5",
+        "kimi-k2.6",
+        "mimo-v2.5",
+        "mimo-v2.5-pro",
+        "minimax-m2.5",
+        "minimax-m2.7",
+        "qwen3.5-plus",
+        "qwen3.6-plus",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+    ]:
+        assert f"name: {model}" in matrix_workflow
+        assert f"- {model}" in quick_workflow
+
+    assert "OPENCODE_GO_API_KEY" in matrix_workflow
+    assert "OPENCODE_GO_API_KEY" in quick_workflow
 
 
 def test_benchmark_aggregate_validates_expected_matrix_cells():
