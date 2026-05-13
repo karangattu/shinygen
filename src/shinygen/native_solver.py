@@ -1,10 +1,9 @@
 """
-Native Inspect AI ReAct solver for OpenCode Go models.
+Native Inspect AI solvers for OpenCode Go models.
 
 This bypasses ``inspect_swe.mini_swe_agent`` (and its litellm/openai-bridge
 shim) entirely and instead drives the model via Inspect's own
-``react()`` agent with ``bash`` + ``text_editor`` tools running inside
-the existing Docker sandbox.
+Inspect solvers running inside the existing Docker sandbox.
 
 Why a separate solver?
 
@@ -24,18 +23,23 @@ Why a separate solver?
    about OpenCode Go's synthetic provider names and crashes the run before
    the first turn unless ``MSWEA_COST_TRACKING=ignore_errors`` is set.
 
-Calling Inspect's model API directly avoids all three problems and gives
+Calling Inspect's model API directly avoids these bridge problems and gives
 us native ``ModelUsage`` accounting that flows straight into the existing
-``shinygen.pricing`` lookup.
+``shinygen.pricing`` lookup. For Kimi specifically, shinygen now uses a
+single-turn direct artifact solver because the OpenCode Go provider returns
+repeated 500s on the second tool-turn.
 """
 
 from __future__ import annotations
 
 import os
+import shlex
 
 from inspect_ai.agent import Agent, AgentPrompt, react
-from inspect_ai.model import Model, get_model
+from inspect_ai.model import ChatMessageSystem, ChatMessageUser, Model, get_model
+from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.tool import bash, text_editor
+from inspect_ai.util import sandbox
 
 from .config import (
     OPENCODE_GO_BASE_URL,
@@ -43,10 +47,13 @@ from .config import (
     is_opencode_go_model,
     opencode_go_anthropic_model_name,
 )
+from .extract import find_app_code_in_text
+from .validation import validate_framework_artifact
 
 # Default per-tool execution timeout (seconds). Generous because some
 # OpenCode Go models like to run package installs / linters between edits.
 _TOOL_TIMEOUT = 180
+_DATA_CONTEXT_CHAR_LIMIT = 12_000
 
 
 _REACT_INSTRUCTIONS_TEMPLATE = (
@@ -75,6 +82,159 @@ _REACT_INSTRUCTIONS_TEMPLATE = (
     "and user messages already describe the dashboard requirements in "
     "detail — follow them carefully."
 )
+
+
+def _build_direct_artifact_instructions(
+    *,
+    framework: str,
+    artifact: str,
+    cwd: str,
+    extra_instructions: str | None = None,
+) -> str:
+    """Build the no-tool prompt used for OpenCode Go artifact generation."""
+    if framework == "shiny_r":
+        language = "R"
+        framework_label = "Shiny for R"
+    else:
+        language = "Python"
+        framework_label = "Shiny for Python"
+
+    instructions = (
+        "You are generating a complete Shiny dashboard artifact for an "
+        "automated benchmark.\n\n"
+        f"Target file: `{cwd.rstrip('/')}/{artifact}`\n"
+        f"Framework: {framework_label}\n"
+        f"Language: {language}\n\n"
+        "Do not call tools, do not ask follow-up questions, and do not describe "
+        "a plan. The harness will write your answer to the target file.\n\n"
+        "Return exactly one fenced code block containing the full contents of "
+        f"`{artifact}`. Do not include prose outside the code block.\n\n"
+        "The code must be complete, runnable, and robust to the provided CSV "
+        "data. Prefer a working dashboard with clear KPIs, charts, filters, "
+        "and a table over a complex app that may fail at startup."
+    )
+
+    if extra_instructions and extra_instructions.strip():
+        instructions = f"{instructions}\n\nAdditional guidance:\n{extra_instructions.strip()}"
+
+    return instructions
+
+
+def _extract_direct_artifact_code(
+    text: str,
+    *,
+    framework: str,
+    artifact: str,
+) -> str | None:
+    """Extract and validate direct model output for the target artifact."""
+    code = find_app_code_in_text(text, artifact)
+    if not code:
+        return None
+
+    valid, _reason = validate_framework_artifact(framework, artifact, code)
+    return code if valid else None
+
+
+async def _collect_sandbox_data_context(cwd: str) -> str:
+    """Collect a compact, host-driven data preview without model tool calls."""
+    quoted_cwd = shlex.quote(cwd)
+    command = f"""
+set +e
+cd {quoted_cwd} || exit 0
+echo "Files in working directory:"
+find . -maxdepth 1 -type f -printf '%f\\n' | sort
+for f in *.csv; do
+  [ -f "$f" ] || continue
+  echo
+  echo "### $f"
+  python3 - "$f" <<'PY' 2>/dev/null || head -n 8 "$f"
+import csv
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+with path.open(newline="", encoding="utf-8", errors="replace") as handle:
+    reader = csv.reader(handle)
+    rows = []
+    for index, row in enumerate(reader):
+        if index < 8:
+            rows.append(row)
+        elif index > 2000:
+            break
+    handle.seek(0)
+    total_rows = max(sum(1 for _ in handle) - 1, 0)
+
+if rows:
+    print("columns: " + ", ".join(rows[0]))
+    print(f"data_rows: {{total_rows}}")
+    print("preview_csv:")
+    for row in rows:
+        print(",".join(row))
+PY
+done
+""".strip()
+
+    try:
+        result = await sandbox().exec(["sh", "-lc", command])
+    except Exception:
+        return ""
+
+    output = (result.stdout or "").strip()
+    if len(output) > _DATA_CONTEXT_CHAR_LIMIT:
+        return output[:_DATA_CONTEXT_CHAR_LIMIT] + "\n... [truncated]"
+    return output
+
+
+@solver
+def native_direct_artifact_solver(
+    *,
+    cwd: str,
+    framework: str,
+    artifact: str,
+    extra_instructions: str | None = None,
+) -> Solver:
+    """Single-turn OpenCode Go solver that writes the generated artifact.
+
+    OpenCode Go Kimi currently returns repeated provider 500s on the second
+    tool-turn when driven through Inspect's ReAct loop. This solver avoids
+    provider tool-call state entirely: shinygen gathers a small data preview,
+    asks for one complete artifact, extracts it, and writes it into the
+    sandbox for the normal scorer.
+    """
+
+    async def solve(state: TaskState, generate: Generate) -> TaskState:
+        instructions = _build_direct_artifact_instructions(
+            framework=framework,
+            artifact=artifact,
+            cwd=cwd,
+            extra_instructions=extra_instructions,
+        )
+        state.messages.insert(0, ChatMessageSystem(content=instructions))
+
+        data_context = await _collect_sandbox_data_context(cwd)
+        if data_context:
+            state.messages.append(
+                ChatMessageUser(
+                    content=(
+                        "Dataset context gathered from the sandbox. Use these "
+                        "columns and preview rows when writing the app:\n\n"
+                        f"{data_context}"
+                    )
+                )
+            )
+
+        state = await generate(state, tool_calls="none")
+        code = _extract_direct_artifact_code(
+            state.output.completion,
+            framework=framework,
+            artifact=artifact,
+        )
+        if code:
+            await sandbox().write_file(f"{cwd.rstrip('/')}/{artifact}", code)
+
+        return state
+
+    return solve
 
 
 def _build_opencode_go_model(model_id: str) -> Model:

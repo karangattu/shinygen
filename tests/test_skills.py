@@ -149,14 +149,13 @@ class TestBuildGenerationTask:
 
         assert captured["disallowed_tools"] == ["web_search"]
 
-    def test_opencode_go_openai_model_uses_native_react_solver(
+    def test_opencode_go_openai_model_uses_native_direct_solver(
         self,
         tmp_path,
         monkeypatch,
     ):
-        """OpenCode Go (OpenAI-compatible) routes to native_react_solver
-        instead of mini_swe_agent — bypasses the litellm/openai-bridge
-        shim that strips reasoning_content and breaks cost tracking."""
+        """OpenCode Go (OpenAI-compatible) routes to the direct native solver
+        instead of mini_swe_agent or a multi-turn tool loop."""
         captured = {}
         sentinel_solver = object()
 
@@ -165,7 +164,7 @@ class TestBuildGenerationTask:
             return sentinel_solver
 
         monkeypatch.setattr(
-            "shinygen.native_solver.native_react_solver", fake_native
+            "shinygen.native_solver.native_direct_artifact_solver", fake_native
         )
 
         task = build_generation_task(
@@ -177,16 +176,16 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_solver
-        assert captured["model_id"] == "openai-api/opencode-go/deepseek-v4-flash"
+        assert captured["framework"] == "shiny_python"
+        assert captured["artifact"] == "app.py"
 
-    def test_opencode_go_minimax_model_uses_native_react_solver(
+    def test_opencode_go_minimax_model_uses_native_direct_solver(
         self,
         tmp_path,
         monkeypatch,
     ):
         """OpenCode Go MiniMax (Anthropic-compatible) also routes to the
-        native solver, which handles the Anthropic SDK's /v1/messages
-        auto-suffix internally."""
+        direct native solver."""
         captured = {}
         sentinel_solver = object()
 
@@ -195,7 +194,7 @@ class TestBuildGenerationTask:
             return sentinel_solver
 
         monkeypatch.setattr(
-            "shinygen.native_solver.native_react_solver", fake_native
+            "shinygen.native_solver.native_direct_artifact_solver", fake_native
         )
 
         task = build_generation_task(
@@ -207,7 +206,8 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_solver
-        assert captured["model_id"] == "anthropic/opencode-go/minimax-m2.7"
+        assert captured["framework"] == "shiny_python"
+        assert captured["artifact"] == "app.py"
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_use_skills_false_runs_vanilla_baseline(

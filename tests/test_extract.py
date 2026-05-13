@@ -118,6 +118,23 @@ That should work!
         assert "from shiny" in result
         assert "App(" in result
 
+    def test_python_filename_code_block(self):
+        text = """```app.py
+from shiny import App, ui, render
+
+app_ui = ui.page_fluid(ui.output_text("result"))
+
+def server(input, output, session):
+    @render.text
+    def result():
+        return "ok"
+
+app = App(app_ui, server)
+```"""
+        result = find_app_code_in_text(text, "app.py")
+        assert result is not None
+        assert result.startswith("from shiny import")
+
     def test_r_code_block(self):
         text = """```r
 library(shiny)

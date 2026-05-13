@@ -15,9 +15,7 @@ from pathlib import Path
 
 from .validation import validate_framework_artifact
 
-# Code block patterns
-CODE_PATTERN_PYTHON = re.compile(r"```python\s*\n(.*?)```", re.DOTALL)
-CODE_PATTERN_R = re.compile(r"```r\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
+CODE_FENCE_PATTERN = re.compile(r"```([^\n`]*)\n(.*?)```", re.DOTALL)
 APP_ARTIFACTS = ("app.py", "app.R")
 ATTACHMENT_PREFIX = "attachment://"
 
@@ -164,6 +162,34 @@ def _candidate_score(code: str, artifact_name: str) -> tuple[int, int]:
     return score, len(code)
 
 
+def _extract_code_fence_candidates(
+    text: str,
+    artifact_name: str,
+    language_labels: tuple[str, ...],
+    excluded_labels: tuple[str, ...],
+) -> list[str]:
+    """Return code fences that plausibly contain the target artifact."""
+    artifact_label = artifact_name.lower()
+    candidates: list[str] = []
+    for info, body in CODE_FENCE_PATTERN.findall(text):
+        code = body.strip()
+        if not code:
+            continue
+
+        info_text = info.strip().lower()
+        label = info_text.split(maxsplit=1)[0] if info_text else ""
+        if label in excluded_labels:
+            continue
+        if (
+            not label
+            or label in language_labels
+            or label == artifact_label
+            or artifact_label in info_text
+        ):
+            candidates.append(code)
+    return candidates
+
+
 def _extract_python_from_text(text: str) -> str | None:
     """Extract Python app code from text content."""
     text = _clean_text(text)
@@ -183,7 +209,12 @@ def _extract_python_from_text(text: str) -> str | None:
         if best_candidate is not None:
             return best_candidate
 
-    matches = [m.strip() for m in CODE_PATTERN_PYTHON.findall(text) if m.strip()]
+    matches = _extract_code_fence_candidates(
+        text,
+        "app.py",
+        ("python", "py"),
+        ("bash", "sh", "shell", "console", "json", "text", "r", "rscript"),
+    )
 
     if matches:
         best_candidate: str | None = None
@@ -231,7 +262,12 @@ def _extract_r_from_text(text: str) -> str | None:
     if heredoc_candidates:
         return max(heredoc_candidates, key=lambda x: _candidate_score(x, "app.R"))
 
-    matches = [m.strip() for m in CODE_PATTERN_R.findall(text) if m.strip()]
+    matches = _extract_code_fence_candidates(
+        text,
+        "app.R",
+        ("r", "rscript"),
+        ("bash", "sh", "shell", "console", "json", "text", "python", "py"),
+    )
 
     if matches:
         return max(matches, key=lambda x: _candidate_score(x, "app.R"))

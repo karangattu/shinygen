@@ -1014,9 +1014,12 @@ def _run_generation(
         if is_opencode_go_anthropic_model(model_id):
             from inspect_ai.model import get_model
 
+            base_url = os.environ.get("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL)
+            if base_url.rstrip("/").endswith("/v1"):
+                base_url = base_url.rstrip("/")[: -len("/v1")]
             eval_model = get_model(
                 f"anthropic/{opencode_go_anthropic_model_name(model_id)}",
-                base_url=os.environ.get("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL),
+                base_url=base_url,
                 api_key=os.environ["OPENCODE_GO_API_KEY"],
                 memoize=False,
             )
