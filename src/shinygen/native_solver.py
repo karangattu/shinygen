@@ -54,6 +54,8 @@ from .validation import validate_framework_artifact
 # OpenCode Go models like to run package installs / linters between edits.
 _TOOL_TIMEOUT = 180
 _DATA_CONTEXT_CHAR_LIMIT = 12_000
+_DIRECT_ARTIFACT_ATTEMPTS = 2
+_SERVER_VALIDATION_TIMEOUT = 45
 
 
 _REACT_INSTRUCTIONS_TEMPLATE = (
@@ -135,6 +137,79 @@ def _extract_direct_artifact_code(
     return code if valid else None
 
 
+def _server_validation_command(*, framework: str, artifact: str, cwd: str) -> str:
+    """Return a shell command that starts the app and prints server logs."""
+    quoted_cwd = shlex.quote(cwd)
+    quoted_artifact = shlex.quote(artifact)
+    log_path = "/tmp/shinygen_app_validation.log"
+
+    if framework == "shiny_r":
+        start_cmd = (
+            f"Rscript -e \"shiny::runApp('{artifact}', port=8000, "
+            "launch.browser=FALSE)\""
+        )
+        process_pattern = "Rscript"
+    else:
+        start_cmd = f"python3 -m shiny run {quoted_artifact} --port 8000"
+        process_pattern = "shiny run"
+
+    return f"""
+set +e
+cd {quoted_cwd} || exit 1
+rm -f {log_path}
+({start_cmd}) > {log_path} 2>&1 &
+app_pid=$!
+sleep 6
+if kill -0 "$app_pid" 2>/dev/null; then
+  tail -n 120 {log_path} || true
+  pkill -f {shlex.quote(process_pattern)} || kill "$app_pid" 2>/dev/null || true
+  exit 0
+fi
+wait "$app_pid"
+status=$?
+tail -n 120 {log_path} || true
+exit "$status"
+""".strip()
+
+
+def _build_direct_repair_prompt(*, artifact: str, validation_output: str) -> str:
+    """Build a no-tool repair prompt from server validation output."""
+    trimmed = validation_output.strip()
+    if len(trimmed) > 8_000:
+        trimmed = trimmed[-8_000:]
+
+    return (
+        f"The generated `{artifact}` server validation failed. The harness "
+        "started the app and captured these server logs:\n\n"
+        f"```\n{trimmed}\n```\n\n"
+        f"Return a corrected complete `{artifact}` as exactly one fenced code "
+        "block. Do not call tools and do not include prose outside the code "
+        "block."
+    )
+
+
+async def _validate_artifact_server(
+    *,
+    cwd: str,
+    framework: str,
+    artifact: str,
+) -> tuple[bool, str]:
+    """Start the generated app in the sandbox and return server logs."""
+    command = _server_validation_command(framework=framework, artifact=artifact, cwd=cwd)
+    try:
+        result = await sandbox().exec(
+            ["sh", "-lc", command],
+            timeout=_SERVER_VALIDATION_TIMEOUT,
+        )
+    except Exception as exc:
+        return False, str(exc)
+
+    stdout = getattr(result, "stdout", "") or getattr(result, "output", "") or ""
+    stderr = getattr(result, "stderr", "") or ""
+    output = "\n".join(part for part in (stdout, stderr) if part).strip()
+    return getattr(result, "returncode", 1) == 0, output
+
+
 async def _collect_sandbox_data_context(cwd: str) -> str:
     """Collect a compact, host-driven data preview without model tool calls."""
     quoted_cwd = shlex.quote(cwd)
@@ -193,13 +268,13 @@ def native_direct_artifact_solver(
     artifact: str,
     extra_instructions: str | None = None,
 ) -> Solver:
-    """Single-turn OpenCode Go solver that writes the generated artifact.
+    """Direct OpenCode Go solver that writes and validates the artifact.
 
     OpenCode Go Kimi currently returns repeated provider 500s on the second
     tool-turn when driven through Inspect's ReAct loop. This solver avoids
     provider tool-call state entirely: shinygen gathers a small data preview,
-    asks for one complete artifact, extracts it, and writes it into the
-    sandbox for the normal scorer.
+    asks for one complete artifact, writes it, starts the app, and gives the
+    model server logs for one no-tool repair attempt if startup fails.
     """
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
@@ -223,14 +298,43 @@ def native_direct_artifact_solver(
                 )
             )
 
-        state = await generate(state, tool_calls="none")
-        code = _extract_direct_artifact_code(
-            state.output.completion,
-            framework=framework,
-            artifact=artifact,
-        )
-        if code:
+        for attempt in range(1, _DIRECT_ARTIFACT_ATTEMPTS + 1):
+            state = await generate(state, tool_calls="none")
+            code = _extract_direct_artifact_code(
+                state.output.completion,
+                framework=framework,
+                artifact=artifact,
+            )
+            if not code:
+                if attempt < _DIRECT_ARTIFACT_ATTEMPTS:
+                    state.messages.append(
+                        ChatMessageUser(
+                            content=(
+                                f"No valid `{artifact}` code block was found. "
+                                f"Return exactly one fenced code block with the "
+                                f"complete `{artifact}` contents."
+                            )
+                        )
+                    )
+                continue
+
             await sandbox().write_file(f"{cwd.rstrip('/')}/{artifact}", code)
+            valid, validation_output = await _validate_artifact_server(
+                cwd=cwd,
+                framework=framework,
+                artifact=artifact,
+            )
+            if valid or attempt >= _DIRECT_ARTIFACT_ATTEMPTS:
+                break
+
+            state.messages.append(
+                ChatMessageUser(
+                    content=_build_direct_repair_prompt(
+                        artifact=artifact,
+                        validation_output=validation_output,
+                    )
+                )
+            )
 
         return state
 

@@ -164,6 +164,14 @@ def test_benchmark_aggregate_reports_screenshot_counts():
     assert "| Screenshots |" in workflow
 
 
+def test_benchmark_artifacts_report_generation_timing_and_iteration_usage():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "generation_time_seconds" in workflow
+    assert "iteration_usage" in workflow
+    assert "| Generation Time |" in workflow
+
+
 def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
     batch_config = json.loads(BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
 

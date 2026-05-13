@@ -99,11 +99,68 @@ class TestUsageStats:
 
     def test_add_time_only(self):
         usage = UsageStats()
-        usage.add_time("generate", 10.5)
+        usage.add_time("generate", 10.5, iteration=1, attempt=2)
         assert usage.generation_time_seconds == 10.5
         assert usage.total_time_seconds == 10.5
         assert usage.total_input_tokens == 0
         assert usage.generation_cost == 0.0
+        assert usage.details == [
+            {
+                "stage": "generate",
+                "model": None,
+                "iteration": 1,
+                "attempt": 2,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_write_tokens": 0,
+                "cache_read_tokens": 0,
+                "elapsed": 10.5,
+                "cost": 0.0,
+                "timing_only": True,
+            }
+        ]
+
+    def test_to_dict_includes_iteration_rollups(self):
+        usage = UsageStats()
+        usage.add_time("generate", 3.0, iteration=1, attempt=1)
+        usage.add(
+            "generate",
+            "openai/gpt-5.4-mini",
+            1000,
+            200,
+            0.0,
+            iteration=1,
+            cache_read_tokens=50,
+        )
+        usage.add("judge", "anthropic/claude-sonnet-4-6", 500, 100, 2.0, iteration=1)
+
+        data = usage.to_dict()
+
+        assert data["iterations"] == [
+            {
+                "iteration": 1,
+                "generation_time_seconds": 3.0,
+                "judge_time_seconds": 2.0,
+                "total_time_seconds": 5.0,
+                "generation_cost": usage.details[1]["cost"],
+                "judge_cost": usage.details[2]["cost"],
+                "total_cost": usage.details[1]["cost"] + usage.details[2]["cost"],
+                "input_tokens": 1500,
+                "output_tokens": 300,
+                "cache_write_tokens": 0,
+                "cache_read_tokens": 50,
+                "generation_input_tokens": 1000,
+                "generation_output_tokens": 200,
+                "generation_cache_write_tokens": 0,
+                "generation_cache_read_tokens": 50,
+                "judge_input_tokens": 500,
+                "judge_output_tokens": 100,
+                "judge_cache_write_tokens": 0,
+                "judge_cache_read_tokens": 0,
+                "generation_attempts": 1,
+                "models": ["anthropic/claude-sonnet-4-6", "openai/gpt-5.4-mini"],
+            }
+        ]
 
     def test_generation_and_judge_costs_split(self):
         usage = UsageStats()

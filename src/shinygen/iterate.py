@@ -665,7 +665,12 @@ def generate_and_refine(
                     output_path,
                     use_skills=use_skills,
                 )
-            result.usage.add_time("generate", gen_timer.elapsed)
+            result.usage.add_time(
+                "generate",
+                gen_timer.elapsed,
+                iteration=iteration,
+                attempt=attempt,
+            )
             for row in generation_usage_rows:
                 result.usage.add(
                     stage="generate",

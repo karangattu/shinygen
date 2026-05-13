@@ -377,13 +377,125 @@ class UsageStats:
             }
         )
 
-    def add_time(self, stage: str, elapsed: float) -> None:
+    def add_time(
+        self,
+        stage: str,
+        elapsed: float,
+        iteration: int = 0,
+        attempt: int | None = None,
+    ) -> None:
         """Record wall-clock time for a pipeline stage (generate / judge)."""
         self.total_time_seconds += elapsed
         if stage == "generate":
             self.generation_time_seconds += elapsed
         elif stage == "judge":
             self.judge_time_seconds += elapsed
+
+        self.details.append(
+            {
+                "stage": stage,
+                "model": None,
+                "iteration": iteration,
+                "attempt": attempt,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_write_tokens": 0,
+                "cache_read_tokens": 0,
+                "elapsed": elapsed,
+                "cost": 0.0,
+                "timing_only": True,
+            }
+        )
+
+    def iteration_rollups(self) -> list[dict[str, Any]]:
+        """Summarize timing, cost, and token usage by benchmark iteration."""
+        rollups: dict[int, dict[str, Any]] = {}
+
+        for detail in self.details:
+            iteration = int(detail.get("iteration", 0) or 0)
+            if iteration not in rollups:
+                rollups[iteration] = {
+                    "iteration": iteration,
+                    "generation_time_seconds": 0.0,
+                    "judge_time_seconds": 0.0,
+                    "total_time_seconds": 0.0,
+                    "generation_cost": 0.0,
+                    "judge_cost": 0.0,
+                    "total_cost": 0.0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_write_tokens": 0,
+                    "cache_read_tokens": 0,
+                    "generation_input_tokens": 0,
+                    "generation_output_tokens": 0,
+                    "generation_cache_write_tokens": 0,
+                    "generation_cache_read_tokens": 0,
+                    "judge_input_tokens": 0,
+                    "judge_output_tokens": 0,
+                    "judge_cache_write_tokens": 0,
+                    "judge_cache_read_tokens": 0,
+                    "generation_attempts": 0,
+                    "_models": set(),
+                    "_cost_unknown": False,
+                }
+
+            rollup = rollups[iteration]
+            stage = str(detail.get("stage") or "")
+            elapsed = float(detail.get("elapsed") or 0.0)
+            input_tokens = int(detail.get("input_tokens", 0) or 0)
+            output_tokens = int(detail.get("output_tokens", 0) or 0)
+            cache_write_tokens = int(detail.get("cache_write_tokens", 0) or 0)
+            cache_read_tokens = int(detail.get("cache_read_tokens", 0) or 0)
+            cost = detail.get("cost")
+            timing_only = bool(detail.get("timing_only"))
+
+            if stage == "generate":
+                rollup["generation_time_seconds"] += elapsed
+                if timing_only:
+                    rollup["generation_attempts"] += 1
+                else:
+                    rollup["generation_input_tokens"] += input_tokens
+                    rollup["generation_output_tokens"] += output_tokens
+                    rollup["generation_cache_write_tokens"] += cache_write_tokens
+                    rollup["generation_cache_read_tokens"] += cache_read_tokens
+                    if cost is None:
+                        rollup["_cost_unknown"] = True
+                    else:
+                        rollup["generation_cost"] += float(cost)
+            elif stage == "judge":
+                rollup["judge_time_seconds"] += elapsed
+                rollup["judge_input_tokens"] += input_tokens
+                rollup["judge_output_tokens"] += output_tokens
+                rollup["judge_cache_write_tokens"] += cache_write_tokens
+                rollup["judge_cache_read_tokens"] += cache_read_tokens
+                if cost is None:
+                    rollup["_cost_unknown"] = True
+                else:
+                    rollup["judge_cost"] += float(cost)
+
+            if not timing_only:
+                rollup["input_tokens"] += input_tokens
+                rollup["output_tokens"] += output_tokens
+                rollup["cache_write_tokens"] += cache_write_tokens
+                rollup["cache_read_tokens"] += cache_read_tokens
+
+            model = detail.get("model")
+            if model:
+                rollup["_models"].add(str(model))
+
+        result: list[dict[str, Any]] = []
+        for iteration, rollup in sorted(rollups.items()):
+            rollup["total_time_seconds"] = (
+                rollup["generation_time_seconds"] + rollup["judge_time_seconds"]
+            )
+            if rollup.pop("_cost_unknown"):
+                rollup["total_cost"] = None
+            else:
+                rollup["total_cost"] = rollup["generation_cost"] + rollup["judge_cost"]
+            rollup["models"] = sorted(rollup.pop("_models"))
+            result.append(rollup)
+
+        return result
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -397,5 +509,6 @@ class UsageStats:
             "total_time_seconds": self.total_time_seconds,
             "generation_time_seconds": self.generation_time_seconds,
             "judge_time_seconds": self.judge_time_seconds,
+            "iterations": self.iteration_rollups(),
             "details": self.details,
         }

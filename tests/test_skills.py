@@ -45,6 +45,7 @@ class TestLoadDefaultSkills:
         assert skills[0].name == "visual-qa"
         assert "visually verify" in skills[0].description.lower()
         assert "screenshot" in skills[0].instructions.lower()
+        assert "tail -n 80 /tmp/app.log" in skills[0].instructions
 
     def test_visual_qa_skill_includes_r_screenshot_workflow(self):
         skills = load_visual_qa_skills()

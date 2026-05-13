@@ -285,7 +285,10 @@ def generate(
             f"judge: ${total_judge:.4f}, cumulative: ${total_cost:.4f}"
         )
 
-        if total_generate == 0.0 and any(d.get("stage") == "generate" for d in usage.details):
+        if total_generate == 0.0 and any(
+            d.get("stage") == "generate" and not d.get("timing_only")
+            for d in usage.details
+        ):
             click.echo(
                 "    Note: generation usage was captured but cost could not "
                 "be priced for one or more models."

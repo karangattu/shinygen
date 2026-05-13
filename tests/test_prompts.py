@@ -42,6 +42,7 @@ class TestBuildSystemPrompt:
         assert "screenshot_helper.py" in prompt
         assert "shiny run" in prompt
         assert "7 seconds" in prompt
+        assert "tail -n 80 /tmp/app.log" in prompt
 
     def test_screenshot_r_adds_visual_qa(self):
         prompt = build_system_prompt("shiny_r", screenshot=True)
@@ -49,6 +50,7 @@ class TestBuildSystemPrompt:
         assert "screenshot_helper.py" in prompt
         assert "Rscript" in prompt
         assert "7 seconds" in prompt
+        assert "tail -n 80 /tmp/app.log" in prompt
 
     def test_no_screenshot_omits_visual_qa(self):
         prompt = build_system_prompt("shiny_python")

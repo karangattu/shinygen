@@ -168,6 +168,11 @@ class TestWriteRunSummary:
         assert summary["usage"]["total_cost"] == result.usage.total_cost
         assert summary["usage"]["total_input_tokens"] == 2_600
         assert summary["usage"]["total_output_tokens"] == 700
+        assert summary["usage"]["iterations"][0]["iteration"] == 1
+        assert summary["usage"]["iterations"][0]["generation_input_tokens"] == 2_000
+        assert summary["usage"]["iterations"][0]["generation_output_tokens"] == 500
+        assert summary["usage"]["iterations"][0]["judge_input_tokens"] == 600
+        assert summary["usage"]["iterations"][0]["judge_output_tokens"] == 200
 
 
 class TestCopyAgentScreenshotArtifact:

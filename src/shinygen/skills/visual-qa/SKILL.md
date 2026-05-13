@@ -20,7 +20,11 @@ result. Playwright and Chromium are pre-installed in this environment.
    # R
    nohup Rscript -e "shiny::runApp('app.R', port=8000, launch.browser=FALSE)" > /tmp/app.log 2>&1 &
    ```
-3. **Capture every view** once the server is up:
+3. **Inspect server logs** before screenshotting so startup errors are visible:
+   ```bash
+   tail -n 80 /tmp/app.log
+   ```
+4. **Capture every view** once the server is up:
    ```bash
    # Python
    python /home/user/project/.tools/screenshot_helper.py
@@ -43,11 +47,15 @@ result. Playwright and Chromium are pre-installed in this environment.
    for backwards compatibility — but **all numbered files must remain in
    place** so the judge can score the whole app, not just the first tab.
 
-4. **View every screenshot** to evaluate the visual output across the app.
+5. **If capture fails or a screenshot is blank**, inspect logs before editing:
+   ```bash
+   tail -n 80 /tmp/app.log
+   ```
+6. **View every screenshot** to evaluate the visual output across the app.
    Multi-tab dashboards are scored against the *combined* set of views, not
    just the landing page. A polished landing page with broken tabs is
    worse than a uniformly polished multi-tab app.
-5. **Evaluate** every screenshot against these criteria:
+7. **Evaluate** every screenshot against these criteria:
    - Does each tab render correctly (no blank panels, no overlapping elements)?
    - Are charts/plots visible and properly sized **on every tab**?
    - Are titles, labels, and text readable on every view?
@@ -55,10 +63,10 @@ result. Playwright and Chromium are pre-installed in this environment.
    - Is the sidebar/navigation functional-looking and consistent?
    - Are value boxes, cards, and UI components properly styled on every view?
    - **Coverage**: do all tabs feel intentional, or is one a near-empty placeholder?
-6. **Fix any issues** you spot and repeat steps 2-5. Pay extra attention to
+8. **Fix any issues** you spot and repeat steps 2-7. Pay extra attention to
    tabs that look thin compared to the landing page — fill them out instead
    of leaving them as stubs.
-7. **Stop the app** when done:
+9. **Stop the app** when done:
    ```bash
    pkill -f "Rscript" || true
    pkill -f "shiny run" || true
