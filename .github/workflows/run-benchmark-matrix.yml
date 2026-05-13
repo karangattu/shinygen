@@ -32,6 +32,16 @@ on:
         description: "Max iteration count"
         required: true
         default: "3"
+      enable_screenshot:
+        description: "Enable --screenshot (adds visual judging; slower & more expensive)"
+        required: true
+        default: true
+        type: boolean
+      enable_judges:
+        description: "Run the judge panel (uncheck to skip judging and only solve)"
+        required: true
+        default: true
+        type: boolean
 
 concurrency:
   group: benchmark-${{ github.workflow }}-${{ inputs.challenge || 'benchmark' }}
@@ -244,20 +254,40 @@ jobs:
           fi
 
           missing=0
-          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+          needs_anthropic=0
+          needs_openai=0
+          needs_opencode_go=0
+
+          if [[ "${{ inputs.enable_judges }}" == "true" ]]; then
+            needs_anthropic=1
+          fi
+
+          case "${{ matrix.model.name }}" in
+            claude-*)
+              needs_anthropic=1
+              ;;
+            gpt-*)
+              needs_openai=1
+              ;;
+            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*)
+              needs_opencode_go=1
+              ;;
+          esac
+
+          if [[ "${needs_anthropic}" -eq 1 && -z "${ANTHROPIC_API_KEY:-}" ]]; then
             echo "Missing required secret: ANTHROPIC_API_KEY" >&2
             missing=1
           fi
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+          if [[ "${needs_openai}" -eq 1 && -z "${OPENAI_API_KEY:-}" ]]; then
             echo "Missing required secret: OPENAI_API_KEY" >&2
             missing=1
           fi
-          if [[ -z "${OPENCODE_GO_API_KEY:-}" ]]; then
+          if [[ "${needs_opencode_go}" -eq 1 && -z "${OPENCODE_GO_API_KEY:-}" ]]; then
             echo "Missing required secret: OPENCODE_GO_API_KEY" >&2
             missing=1
           fi
           if [[ "${missing}" -ne 0 ]]; then
-            echo "Configure ANTHROPIC_API_KEY, OPENAI_API_KEY, and OPENCODE_GO_API_KEY before running this workflow." >&2
+            echo "Configure the required repository secrets before running this workflow." >&2
             exit 1
           fi
 
@@ -295,13 +325,19 @@ jobs:
           set -euo pipefail
           mkdir -p "${OUTPUT_DIR}"
 
-          # Build one --judge-model flag per non-empty line in BENCHMARK_JUDGE_MODELS.
           judge_args=()
-          while IFS= read -r line; do
-            line="${line//[$'\t\r ']/}"
-            [[ -z "${line}" ]] && continue
-            judge_args+=(--judge-model "${line}")
-          done <<< "${BENCHMARK_JUDGE_MODELS}"
+          if [[ "${{ inputs.enable_judges }}" == "true" ]]; then
+            while IFS= read -r line; do
+              line="${line//[$'\t\r ']/}"
+              [[ -z "${line}" ]] && continue
+              judge_args+=(--judge-model "${line}")
+            done <<< "${BENCHMARK_JUDGE_MODELS}"
+          fi
+
+          screenshot_flag="--no-screenshot"
+          if [[ "${{ inputs.enable_screenshot }}" == "true" ]]; then
+            screenshot_flag="--screenshot"
+          fi
 
           shinygen generate \
             --prompt "${BENCHMARK_PROMPT}" \
@@ -309,7 +345,7 @@ jobs:
             --framework "${{ matrix.framework }}" \
             --output "${OUTPUT_DIR}" \
             --csv-file "${BENCHMARK_DATASET}" \
-            --screenshot \
+            "${screenshot_flag}" \
             "${judge_args[@]}" \
             --max-iterations "${BENCHMARK_MAX_ITERATIONS}" \
             --quality-threshold "${BENCHMARK_QUALITY_THRESHOLD}" \

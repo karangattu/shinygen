@@ -26,7 +26,7 @@ def test_benchmark_workflow_covers_python_and_r_with_visual_checks():
     assert "- shiny_python" in workflow
     assert "- shiny_r" in workflow
     assert '--framework "${{ matrix.framework }}"' in workflow
-    assert "--screenshot \\" in workflow
+    assert '"${screenshot_flag}" \\' in workflow
     assert "SHINYGEN_SANDBOX_PYTHON_IMAGE" in workflow
     assert "SHINYGEN_SANDBOX_R_IMAGE" in workflow
     assert 'docker pull "${image}"' in workflow
@@ -59,6 +59,23 @@ def test_benchmark_workflow_accepts_generic_dispatch_inputs():
     assert "benchmark_prompt:" in workflow
     assert "quality_threshold:" in workflow
     assert "max_iterations:" in workflow
+
+
+def test_benchmark_matrix_can_disable_screenshots_and_judges():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "enable_screenshot:" in workflow
+    assert 'description: "Enable --screenshot (adds visual judging; slower & more expensive)"' in workflow
+    assert "enable_judges:" in workflow
+    assert 'description: "Run the judge panel (uncheck to skip judging and only solve)"' in workflow
+    assert 'if [[ "${{ inputs.enable_judges }}" == "true" ]]; then' in workflow
+    assert "needs_anthropic=1" in workflow
+    assert 'case "${{ matrix.model.name }}" in' in workflow
+    assert '[[ "${needs_anthropic}" -eq 1 && -z "${ANTHROPIC_API_KEY:-}" ]]' in workflow
+    assert 'if [[ "${{ inputs.enable_screenshot }}" == "true" ]]; then' in workflow
+    assert 'screenshot_flag="--no-screenshot"' in workflow
+    assert 'screenshot_flag="--screenshot"' in workflow
+    assert '"${screenshot_flag}" \\' in workflow
 
 
 def test_benchmark_workflow_uses_generic_benchmark_metadata():
