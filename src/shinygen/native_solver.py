@@ -55,14 +55,20 @@ _REACT_INSTRUCTIONS_TEMPLATE = (
     "You have two tools:\n"
     "  - `bash`: run shell commands in the sandbox.\n"
     "  - `text_editor`: view, create, and edit files in the sandbox.\n\n"
+    "IMPORTANT RULES:\n"
+    "- You MUST create the artifact file using `text_editor` before calling "
+    "`submit`. Do NOT call `submit` until the file exists.\n"
+    "- After creating the file, validate it (e.g. `python3 -c 'import app'` "
+    "for Shiny for Python or `Rscript -e \"source('app.R')\"` for Shiny for "
+    "R) and fix any errors before submitting.\n"
+    "- If `submit` is called but no artifact file exists, you will be told "
+    "the submission was incorrect and given another chance.\n\n"
     "Workflow:\n"
     "1. Use `bash` to inspect `{cwd}` (e.g. `ls -la`) and any data files "
     "(e.g. `head -n 5 *.csv`).\n"
     "2. Plan the dashboard structure briefly before editing.\n"
     "3. Create or edit the primary artifact file with `text_editor`.\n"
-    "4. Validate by importing or running the app once (e.g. "
-    "`python3 -c 'import app'` for Shiny for Python or "
-    "`Rscript -e \"source('app.R')\"` for Shiny for R). Fix any errors.\n"
+    "4. Validate by importing or running the app once. Fix any errors.\n"
     "5. When the artifact is complete and valid, call the `submit` tool "
     "with a one-line summary. Do not ask the user for confirmation.\n\n"
     "Always prefer surgical edits over rewriting whole files. The system "
@@ -138,6 +144,6 @@ def native_react_solver(
             text_editor(timeout=_TOOL_TIMEOUT),
         ],
         prompt=AgentPrompt(instructions=instructions),
-        attempts=1,
+        attempts=3,
     )
     return agent
