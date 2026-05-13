@@ -154,12 +154,52 @@ _PRICING: dict[str, tuple[float, float]] = {
     "gpt-5-codex": (1.25, 10.00),
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),
+    # OpenCode Go models — pricing per 1M tokens.
+    # Source: OpenCode Go pricing dashboard (current as of 2026-05).
+    "deepseek-v4-pro": (1.74, 3.48),
+    "mimo-v2-pro": (1.00, 3.00),
+    "mimo-v2-omni": (0.40, 2.00),
+    "glm-5.1": (1.40, 4.40),
+    "glm-5": (1.00, 3.20),
+    "mimo-v2.5-pro": (1.00, 3.00),
+    "kimi-k2.6": (0.95, 4.00),
+    "kimi-k2.5": (0.60, 3.00),
+    "qwen3.6-plus": (0.325, 1.95),
+    "minimax-m2.7": (0.30, 1.20),
+    "qwen3.5-plus": (0.26, 1.56),
+    "minimax-m2.5": (0.15, 1.15),
+    "deepseek-v4-flash": (0.14, 0.28),
+    "mimo-v2.5": (0.10, 0.20),
 }
 
 # Cache multipliers (write, read) relative to base input price per provider
 _CACHE_MULTIPLIERS: dict[str, tuple[float, float]] = {
     "anthropic": (1.25, 0.10),
     "openai": (1.00, 0.10),
+    # OpenCode Go publishes absolute cache-read prices per model (see
+    # _CACHE_READ_PRICE_OVERRIDES). The multiplier here only applies when
+    # an override is missing for a particular model.
+    "opencode-go": (1.00, 0.10),
+}
+
+# Absolute cache-read price per million tokens for models whose cache-read
+# pricing is not a clean multiple of the standard input price. Used by
+# OpenCode Go where each model publishes its own cache-read rate.
+_CACHE_READ_PRICE_OVERRIDES: dict[str, float] = {
+    "deepseek-v4-pro": 0.145,
+    "mimo-v2-pro": 0.20,
+    "mimo-v2-omni": 0.08,
+    "glm-5.1": 0.21,  # upper bound of the published $0.18-$0.21 range
+    "glm-5": 0.15,
+    "mimo-v2.5-pro": 0.25,
+    "kimi-k2.6": 0.24,
+    "kimi-k2.5": 0.15,
+    "qwen3.6-plus": 0.033,
+    "minimax-m2.7": 0.075,
+    "qwen3.5-plus": 0.026,
+    "minimax-m2.5": 0.038,
+    "deepseek-v4-flash": 0.028,
+    "mimo-v2.5": 0.025,
 }
 
 # model_short_name -> (input_token_threshold, input_multiplier, output_multiplier)
@@ -176,7 +216,17 @@ _LONG_CONTEXT_SURCHARGES: dict[str, tuple[int, float, float]] = {
 def _normalize_model_name(model_id: str) -> str:
     """Strip provider prefix and normalise for lookup."""
     name = model_id.lower().strip()
-    for prefix in ("anthropic/", "openai/"):
+    # OpenCode Go models reach this code as `openai-api/opencode-go/<name>`
+    # or `anthropic/opencode-go/<name>`. Strip the routing prefix down to the
+    # short alias so the static pricing table matches.
+    for opencode_prefix in (
+        "openai-api/opencode-go/",
+        "anthropic/opencode-go/",
+        "opencode-go/",
+    ):
+        if name.startswith(opencode_prefix):
+            return name[len(opencode_prefix):]
+    for prefix in ("anthropic/", "openai/", "openai-api/"):
         if name.startswith(prefix):
             name = name[len(prefix):]
             break
@@ -186,9 +236,15 @@ def _normalize_model_name(model_id: str) -> str:
 def _detect_provider(model_id: str) -> str | None:
     """Detect provider from model ID or name."""
     name = model_id.lower().strip()
+    if "opencode-go/" in name:
+        return "opencode-go"
     if name.startswith("anthropic/") or "claude" in name:
         return "anthropic"
-    if name.startswith("openai/") or name.startswith("gpt"):
+    if (
+        name.startswith("openai/")
+        or name.startswith("openai-api/")
+        or name.startswith("gpt")
+    ):
         return "openai"
     return None
 
@@ -222,11 +278,16 @@ def calculate_cost(
     if cache_write_tokens > 0 or cache_read_tokens > 0:
         provider = _detect_provider(model_id)
         write_mult, read_mult = _CACHE_MULTIPLIERS.get(provider or "", (1.0, 1.0))
+        cache_read_override = _CACHE_READ_PRICE_OVERRIDES.get(normalized_name)
         regular_input = max(0, input_tokens - cache_write_tokens - cache_read_tokens)
+        if cache_read_override is not None:
+            cache_read_cost_component = cache_read_tokens * cache_read_override
+        else:
+            cache_read_cost_component = cache_read_tokens * input_price * read_mult
         input_cost = (
             regular_input * input_price
             + cache_write_tokens * input_price * write_mult
-            + cache_read_tokens * input_price * read_mult
+            + cache_read_cost_component
         ) / 1_000_000
     else:
         input_cost = (input_tokens * input_price) / 1_000_000

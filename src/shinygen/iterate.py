@@ -995,6 +995,7 @@ def _run_generation(
         task = build_generation_task(
             user_prompt=prompt,
             agent=agent,
+            model_id=model_id,
             framework_key=framework_key,
             docker_context_dir=docker_dir,
             data_files=data_files,

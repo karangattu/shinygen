@@ -111,6 +111,8 @@ class TestResolveModel:
             "kimi-k2.6",
             "mimo-v2.5",
             "mimo-v2.5-pro",
+            "mimo-v2-pro",
+            "mimo-v2-omni",
             "minimax-m2.5",
             "minimax-m2.7",
             "qwen3.5-plus",

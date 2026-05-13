@@ -109,6 +109,7 @@ env:
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '2' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
   SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"
+  SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "1"
 
 jobs:
   prepare:
@@ -301,14 +302,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -e ".[screenshot]"
-          python -m playwright install --with-deps chromium
-          if [[ "${{ inputs.framework }}" == "shiny_python" ]]; then
-            python -m pip install \
-              shiny shinyswatch plotly faicons pandas matplotlib seaborn \
-              shinywidgets great-tables itables htmltools folium pydeck \
-              lonboard geopandas numpy
-          fi
+          # Benchmark screenshots are captured inside the pre-built sandbox
+          # images. Keep the runner install lean; host-side screenshot fallback
+          # is disabled by SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1.
+          python -m pip install -e "."
 
       - name: Run shinygen benchmark generation
         shell: bash

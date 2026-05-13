@@ -77,6 +77,7 @@ env:
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '3' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
   SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"
+  SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "1"
 
 jobs:
   prepare:
@@ -283,21 +284,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Install with [screenshot] extras so the host-side screenshot
-          # fallback in iterate.py can capture an image when the in-sandbox
-          # screenshot is missing (e.g. agent SIGTERMed mid-run).
-          python -m pip install -e ".[screenshot]"
-          python -m playwright install --with-deps chromium
-          # Runtime deps so the fallback can actually start the generated
-          # app on the runner. Shiny-R apps have R + system Shiny baked
-          # into the sandbox image only, so host-side fallback for R
-          # is best-effort and will gracefully degrade to code-only judging.
-          if [[ "${{ matrix.framework }}" == "shiny_python" ]]; then
-            python -m pip install \
-              shiny shinyswatch plotly faicons pandas matplotlib seaborn \
-              shinywidgets great-tables itables htmltools folium pydeck \
-              lonboard geopandas numpy
-          fi
+          # Benchmark screenshots are captured inside the pre-built sandbox
+          # images. Keep the runner install lean; host-side screenshot fallback
+          # is disabled by SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1.
+          python -m pip install -e "."
 
       - name: Run shinygen benchmark generation
         shell: bash

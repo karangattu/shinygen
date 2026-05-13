@@ -149,6 +149,66 @@ class TestBuildGenerationTask:
 
         assert captured["disallowed_tools"] == ["web_search"]
 
+    def test_opencode_go_openai_model_uses_native_react_solver(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        """OpenCode Go (OpenAI-compatible) routes to native_react_solver
+        instead of mini_swe_agent — bypasses the litellm/openai-bridge
+        shim that strips reasoning_content and breaks cost tracking."""
+        captured = {}
+        sentinel_solver = object()
+
+        def fake_native(**kwargs):
+            captured.update(kwargs)
+            return sentinel_solver
+
+        monkeypatch.setattr(
+            "shinygen.native_solver.native_react_solver", fake_native
+        )
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="mini_swe_agent",
+            model_id="openai-api/opencode-go/deepseek-v4-flash",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+        )
+
+        assert task.solver is sentinel_solver
+        assert captured["model_id"] == "openai-api/opencode-go/deepseek-v4-flash"
+
+    def test_opencode_go_minimax_model_uses_native_react_solver(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        """OpenCode Go MiniMax (Anthropic-compatible) also routes to the
+        native solver, which handles the Anthropic SDK's /v1/messages
+        auto-suffix internally."""
+        captured = {}
+        sentinel_solver = object()
+
+        def fake_native(**kwargs):
+            captured.update(kwargs)
+            return sentinel_solver
+
+        monkeypatch.setattr(
+            "shinygen.native_solver.native_react_solver", fake_native
+        )
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="mini_swe_agent",
+            model_id="anthropic/opencode-go/minimax-m2.7",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+        )
+
+        assert task.solver is sentinel_solver
+        assert captured["model_id"] == "anthropic/opencode-go/minimax-m2.7"
+
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_use_skills_false_runs_vanilla_baseline(
         self,

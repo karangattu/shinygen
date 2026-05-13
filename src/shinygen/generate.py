@@ -6,6 +6,7 @@ Claude Code or Codex CLI in Docker sandboxes.
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 import shutil
 import tempfile
@@ -27,6 +28,7 @@ from .config import (
     FRAMEWORK_COMPOSE,
     FRAMEWORKS,
     SANDBOX_WORK_DIR,
+    is_opencode_go_model,
     sandbox_time_limit_for_framework,
 )
 from .prompts import build_system_prompt, build_user_prompt
@@ -444,6 +446,7 @@ def build_generation_task(
     agent: str,
     framework_key: str,
     docker_context_dir: Path,
+    model_id: str | None = None,
     data_files: dict[str, str] | None = None,
     skills: list[Skill] | None = None,
     web_fetch: bool = True,
@@ -457,6 +460,7 @@ def build_generation_task(
         agent: "claude_code" or "codex_cli".
         framework_key: "shiny_python" or "shiny_r".
         docker_context_dir: Path to staged Docker context.
+        model_id: Resolved Inspect model ID for provider-specific agent wiring.
         data_files: Dict of {filename: content} for data files.
         skills: Agent skills to install inside the sandbox.
         web_fetch: Whether to allow web search tools.
@@ -553,6 +557,40 @@ def build_generation_task(
             disallowed_tools=codex_disallowed_tools,
         )
     elif agent == "mini_swe_agent":
+        # OpenCode Go models go through a native Inspect ReAct solver
+        # instead of mini_swe_agent. The mini bridge strips
+        # provider-specific reasoning fields (which Kimi requires) and
+        # forces litellm cost tracking that doesn't know about OpenCode
+        # Go's synthetic provider names. See ``shinygen.native_solver``.
+        if model_id and is_opencode_go_model(model_id):
+            from .native_solver import native_react_solver
+
+            extra_instructions: str | None = None
+            if use_skills:
+                from .skills import load_skill_context_text
+
+                skill_context = load_skill_context_text(framework_key).strip()
+                if skill_context:
+                    extra_instructions = (
+                        "Use these additional shinygen dashboard "
+                        "generation guidelines when planning and editing "
+                        f"files:\n\n{skill_context}"
+                    )
+            solver = native_react_solver(
+                model_id=model_id,
+                cwd=SANDBOX_WORK_DIR,
+                extra_instructions=extra_instructions,
+            )
+            time_limit = sandbox_time_limit_for_framework(framework_key)
+            return Task(
+                dataset=dataset,
+                solver=solver,
+                scorer=app_created_scorer(screenshot=screenshot),
+                sandbox=("docker", str(docker_context_dir / compose_file)),
+                time_limit=time_limit,
+                working_limit=time_limit,
+            )
+
         mini_system_prompt = None
         if use_skills:
             from .skills import load_skill_context_text

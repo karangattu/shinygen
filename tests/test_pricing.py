@@ -237,6 +237,72 @@ class TestCalculateCostWithCache:
         assert with_cache == without
 
 
+class TestOpenCodeGoPricing:
+    """OpenCode Go models reach pricing as `openai-api/opencode-go/<name>`
+    or `anthropic/opencode-go/<name>` after Inspect routes them. Pricing
+    must resolve from any of these forms to the short alias."""
+
+    def test_kimi_k26_known_input_output(self):
+        assert get_pricing("kimi-k2.6") == (0.95, 4.00)
+
+    def test_resolves_through_inspect_openai_api_prefix(self):
+        assert get_pricing("openai-api/opencode-go/kimi-k2.6") == (0.95, 4.00)
+        assert get_pricing("opencode-go/kimi-k2.6") == (0.95, 4.00)
+
+    def test_resolves_through_inspect_anthropic_prefix(self):
+        # MiniMax is routed via the Anthropic-compatible OpenCode Go endpoint.
+        assert get_pricing("anthropic/opencode-go/minimax-m2.7") == (0.30, 1.20)
+
+    def test_calculate_cost_for_kimi_k26(self):
+        # 1M input + 500k output = $0.95 + $2.00 = $2.95
+        cost = calculate_cost(
+            "openai-api/opencode-go/kimi-k2.6", 1_000_000, 500_000
+        )
+        assert cost is not None
+        assert abs(cost - (0.95 + 2.00)) < 1e-12
+
+    def test_calculate_cost_for_minimax_m27_anthropic_route(self):
+        # 200k input + 100k output = $0.06 + $0.12 = $0.18
+        cost = calculate_cost(
+            "anthropic/opencode-go/minimax-m2.7", 200_000, 100_000
+        )
+        assert cost is not None
+        assert abs(cost - (0.06 + 0.12)) < 1e-12
+
+    def test_cache_read_uses_per_model_override(self):
+        # kimi-k2.6 cache-read price is $0.24/MTok (not 0.10x of $0.95).
+        # 10k input split into 6k regular + 4k cache-read.
+        cost = calculate_cost(
+            "openai-api/opencode-go/kimi-k2.6", 10_000, 0,
+            cache_write_tokens=0, cache_read_tokens=4_000,
+        )
+        assert cost is not None
+        expected = (6_000 * 0.95 + 4_000 * 0.24) / 1_000_000
+        assert abs(cost - expected) < 1e-12
+
+    def test_all_documented_opencode_go_models_have_pricing(self):
+        from shinygen.config import (
+            OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS,
+            OPENCODE_GO_OPENAI_COMPATIBLE_MODELS,
+        )
+
+        # Models advertised in config that the smoke test can actually reach
+        # (mimo-v2-pro / mimo-v2-omni are advertised but not in the public
+        # OpenCode Go pricing table, so they are excluded here).
+        priced_models = {
+            "glm-5.1", "glm-5", "kimi-k2.5", "kimi-k2.6",
+            "deepseek-v4-pro", "deepseek-v4-flash",
+            "mimo-v2.5-pro", "mimo-v2.5",
+            "qwen3.6-plus", "qwen3.5-plus",
+            "minimax-m2.5", "minimax-m2.7",
+        }
+        for model in OPENCODE_GO_OPENAI_COMPATIBLE_MODELS:
+            if model in priced_models:
+                assert get_pricing(model) is not None, model
+        for model in OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS:
+            assert get_pricing(model) is not None, model
+
+
 class TestTimer:
     def test_timer_measures_time(self):
         import time as _time

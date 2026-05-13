@@ -91,29 +91,21 @@ def test_benchmark_workflow_uses_claude_opus_judge():
     assert "judge_args+=(--judge-model" in workflow
 
 
-def test_benchmark_workflow_installs_screenshot_extras_for_host_fallback():
-    """The runner must have Playwright + Shiny runtime so the host-side
-    screenshot fallback in iterate.py can capture an image when the agent
-    fails to produce one in the sandbox.
+def test_benchmark_workflow_uses_sandbox_screenshots_without_runner_browser_install():
+    """Benchmark jobs rely on the prebuilt sandbox images for screenshots.
+
+    The runner should not download Playwright browsers or Shiny app runtime
+    packages on every matrix cell.
     """
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "Install shinygen CLI on runner" in workflow
-    assert 'python -m pip install -e ".[screenshot]"' in workflow
-    assert "python -m playwright install --with-deps chromium" in workflow
+    assert 'python -m pip install -e "."' in workflow
+    assert 'python -m pip install -e ".[screenshot]"' not in workflow
+    assert "python -m playwright install --with-deps chromium" not in workflow
     assert 'SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"' in workflow
-    for package in [
-        "shinyswatch",
-        "great-tables",
-        "folium",
-        "pydeck",
-        "lonboard",
-        "geopandas",
-    ]:
-        assert package in workflow
-    # R packages are NOT reinstalled on the runner — host fallback for R
-    # is best-effort, but the benchmark will no longer accept code-only
-    # judging when screenshot mode is enabled.
+    assert 'SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "1"' in workflow
+    assert "python -m pip install \\" not in workflow
     assert "install.packages(c(" not in workflow
 
 
