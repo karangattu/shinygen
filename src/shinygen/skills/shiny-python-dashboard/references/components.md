@@ -61,6 +61,43 @@ ui.card_header(
 
 Use this for secondary options that do not deserve a full sidebar section.
 
+### Toolbars (Shiny ≥ 1.6)
+
+Use `ui.toolbar()` to embed compact controls inside `ui.card_header()`, `ui.card_footer()`, input labels, or `ui.input_submit_textarea(toolbar=...)`. This is the modern, low-noise way to scope controls to a single card instead of pushing more inputs into the global sidebar.
+
+```python
+from faicons import icon_svg
+from shiny import ui
+
+ui.card(
+    ui.card_header(
+        "Listing map",
+        ui.toolbar(
+            ui.toolbar_input_select(
+                id="map_basemap",
+                label="Basemap",
+                choices=["Positron", "Voyager"],
+                selected="Positron",
+            ),
+            ui.toolbar_divider(),
+            ui.toolbar_input_button(
+                id="map_legend_info",
+                label="Legend",
+                icon=icon_svg("circle-info"),
+                tooltip="H = entire home · P = private · S = shared · L = lodging",
+            ),
+            align="right",
+        ),
+    ),
+    output_widget("density_map"),
+    full_screen=True,
+)
+```
+
+Components: `ui.toolbar()` (container with `align="left"|"right"`), `ui.toolbar_input_button()` (small action button with optional `tooltip=`), `ui.toolbar_input_select()` (compact dropdown), `ui.toolbar_divider()` (separator), `ui.toolbar_spacer()` (push items to opposite sides). Each input has a matching `ui.update_toolbar_input_*()`. Read inputs in the server with `input.<id>()` like any other input.
+
+Use toolbars for: per-card filters (date range, basemap, palette toggle), info/help tooltips next to inputs (`label=ui.toolbar(ui.toolbar_input_button(..., icon=icon_svg("circle-info"), tooltip="..."), "Threshold", align="left")`), and message-composer actions inside `ui.input_submit_textarea(toolbar=...)`. Do **not** use them as a substitute for the global sidebar — keep cross-cutting filters there.
+
 ## Value Boxes
 
 Use `ui.value_box()` for KPIs and headline metrics.
