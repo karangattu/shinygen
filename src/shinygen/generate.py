@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 from .config import (
     FRAMEWORK_COMPOSE,
     FRAMEWORKS,
+    SANDBOX_IMAGE_ENV_DEFAULTS,
     SANDBOX_WORK_DIR,
     is_opencode_go_model,
     sandbox_time_limit_for_framework,
@@ -58,19 +59,6 @@ ARTIFACT_SEARCH_ROOTS = (
 # ---------------------------------------------------------------------------
 
 DOCKERFILES_DIR = Path(__file__).parent / "dockerfiles"
-
-# Image name env vars and defaults (must match compose.yaml / compose-python.yaml)
-_SANDBOX_IMAGE_DEFAULTS: dict[str, tuple[str, str]] = {
-    "shiny_r": (
-        "SHINYGEN_SANDBOX_R_IMAGE",
-        "ghcr.io/karangattu/shinygen-sandbox-r:latest",
-    ),
-    "shiny_python": (
-        "SHINYGEN_SANDBOX_PYTHON_IMAGE",
-        "ghcr.io/karangattu/shinygen-sandbox-python:latest",
-    ),
-}
-
 
 def _docker_image_exists_locally(image: str) -> bool:
     """Return True when *image* is already available in the local Docker daemon."""
@@ -108,7 +96,7 @@ def stage_docker_context(
     compose_file = FRAMEWORK_COMPOSE.get(framework_key, "compose-python.yaml")
 
     # Resolve the sandbox image name from environment / defaults.
-    env_var, default_image = _SANDBOX_IMAGE_DEFAULTS.get(framework_key, ("", ""))
+    env_var, default_image = SANDBOX_IMAGE_ENV_DEFAULTS.get(framework_key, ("", ""))
     image_name = os.environ.get(env_var, default_image) if env_var else default_image
 
     if image_name and _docker_image_exists_locally(image_name):

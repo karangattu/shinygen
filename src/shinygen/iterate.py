@@ -7,7 +7,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shlex
 import shutil
+import subprocess
+import sys
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
@@ -19,6 +22,7 @@ from .config import (
     DEFAULT_QUALITY_THRESHOLD,
     FRAMEWORKS,
     OPENCODE_GO_BASE_URL,
+    SANDBOX_IMAGE_ENV_DEFAULTS,
     find_free_port,
     is_opencode_go_anthropic_model,
     opencode_go_anthropic_model_name,
@@ -36,6 +40,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 AGENT_LAST_SCREENSHOT_NAME = "agent_last_screenshot.png"
+RUNTIME_VALIDATION_STARTUP_WAIT = 6
+RUNTIME_VALIDATION_TIMEOUT = 45
 
 
 def _env_truthy(name: str) -> bool:
@@ -138,6 +144,136 @@ def _extract_generation_usage_rows(log: "EvalLog") -> list[dict[str, object]]:
         )
 
     return rows
+
+
+def _runtime_validation_command(
+    *,
+    framework_key: str,
+    artifact_name: str,
+    port: int,
+    wait_seconds: int = RUNTIME_VALIDATION_STARTUP_WAIT,
+    python_executable: str = "python3",
+) -> str:
+    """Return a shell command that starts an app and prints startup logs."""
+    quoted_artifact = shlex.quote(artifact_name)
+    log_path = "/tmp/shinygen_runtime_validation.log"
+
+    if framework_key == "shiny_r":
+        start_cmd = (
+            f"Rscript -e \"shiny::runApp('{artifact_name}', port={port}, "
+            "launch.browser=FALSE)\""
+        )
+        process_pattern = f"Rscript.*{artifact_name}.*{port}"
+    else:
+        start_cmd = (
+            f"{shlex.quote(python_executable)} -m shiny run {quoted_artifact} "
+            f"--port {port}"
+        )
+        process_pattern = f"shiny run {artifact_name} --port {port}"
+
+    return f"""
+set +e
+rm -f {log_path}
+app_pid=""
+cleanup() {{
+  if [ -n "${{app_pid:-}}" ]; then
+    kill "$app_pid" 2>/dev/null || true
+  fi
+  pkill -f {shlex.quote(process_pattern)} 2>/dev/null || true
+}}
+trap cleanup EXIT
+({start_cmd}) > {log_path} 2>&1 &
+app_pid=$!
+sleep {wait_seconds}
+if kill -0 "$app_pid" 2>/dev/null; then
+  echo "Startup validation: process is still running after {wait_seconds}s."
+  tail -n 160 {log_path} || true
+  exit 0
+fi
+wait "$app_pid"
+status=$?
+echo "Startup validation: process exited with status $status."
+tail -n 160 {log_path} || true
+exit "$status"
+""".strip()
+
+
+def _validate_generated_app_runtime(
+    app_dir: Path,
+    framework_key: str,
+    artifact_name: str,
+    port: int,
+) -> tuple[bool, str]:
+    """Start a generated app in the sandbox image and return (startup_ok, logs)."""
+    command = _runtime_validation_command(
+        framework_key=framework_key,
+        artifact_name=artifact_name,
+        port=port,
+    )
+
+    env_var, default_image = SANDBOX_IMAGE_ENV_DEFAULTS.get(framework_key, ("", ""))
+    image = os.environ.get(env_var, default_image) if env_var else ""
+    if image:
+        docker_cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{app_dir.resolve()}:/home/user/project",
+            "-w",
+            "/home/user/project",
+            image,
+            "sh",
+            "-lc",
+            command,
+        ]
+        try:
+            completed = subprocess.run(
+                docker_cmd,
+                text=True,
+                capture_output=True,
+                timeout=RUNTIME_VALIDATION_TIMEOUT,
+            )
+            output = "\n".join(
+                part for part in (completed.stdout, completed.stderr) if part
+            ).strip()
+            return completed.returncode == 0, output
+        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            logger.warning(
+                "Docker runtime validation failed (%s); falling back to host",
+                exc,
+            )
+
+    try:
+        host_command = _runtime_validation_command(
+            framework_key=framework_key,
+            artifact_name=artifact_name,
+            port=port,
+            python_executable=sys.executable,
+        )
+        completed = subprocess.run(
+            ["sh", "-lc", host_command],
+            cwd=app_dir,
+            text=True,
+            capture_output=True,
+            timeout=RUNTIME_VALIDATION_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = "\n".join(
+            part
+            for part in (
+                "Startup validation timed out.",
+                exc.stdout or "",
+                exc.stderr or "",
+            )
+            if part
+        )
+        return False, output
+
+    output = "\n".join(
+        part for part in (completed.stdout, completed.stderr) if part
+    ).strip()
+    return completed.returncode == 0, output
 
 
 def _generation_extra_config(agent: str) -> dict[str, object]:
@@ -627,6 +763,7 @@ def generate_and_refine(
     best_quality_score: float = 0.0
     best_feedback: dict | None = None
     best_score_breakdown: dict | None = None
+    best_runtime_valid: bool | None = None
 
     for iteration in range(1, max_iterations + 1):
         logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
@@ -637,9 +774,11 @@ def generate_and_refine(
 
         code: str | None = None
         generation_usage_rows: list[dict[str, object]] = []
-        # 3 attempts: original prompt, direct-write retry on truncation,
-        # and one more direct-write attempt if the second still fails.
-        max_retries = 3
+        # 3 attempts before any artifact exists: original prompt, direct-write
+        # retry on truncation, and one more direct-write attempt if needed.
+        # Once we already have a fallback app from an earlier iteration, avoid
+        # spending another full benchmark window on repeated no-code retries.
+        max_retries = 1 if best_code is not None else 3
         prompt_for_attempt = current_prompt
         hit_output_token_limit = False
         for attempt in range(1, max_retries + 1):
@@ -905,15 +1044,49 @@ def generate_and_refine(
                 best_score = 0.0
                 best_quality_score = 0.0
         else:
-            # No judge — accept first successful generation
+            # No judge — use local startup logs as the refinement signal.
+            runtime_valid, runtime_logs = _validate_generated_app_runtime(
+                eval_dir,
+                framework_key,
+                artifact_name,
+                effective_port,
+            )
+            if runtime_valid:
+                logger.info(
+                    "Iteration %d: Runtime validation passed; captured startup logs",
+                    iteration,
+                )
+            else:
+                logger.warning(
+                    "Iteration %d: Runtime validation failed; captured startup logs",
+                    iteration,
+                )
+
             best_code = code
-            best_score = 10.0
-            best_quality_score = 10.0
-            result.passed = True
-            result.score = 10.0
-            result.quality_score = 10.0
-            result.value_score = 10.0
+            best_runtime_valid = runtime_valid
+            best_score = 10.0 if runtime_valid else 0.0
+            best_quality_score = best_score
             result.screenshot_paths = screenshot_paths
+
+            if iteration < max_iterations:
+                from .prompts import build_runtime_refinement_prompt
+
+                current_prompt = build_runtime_refinement_prompt(
+                    prompt,
+                    previous_code=code,
+                    runtime_logs=runtime_logs,
+                    validation_passed=runtime_valid,
+                    iteration=iteration,
+                )
+                logger.info(
+                    "Preparing runtime-log refinement prompt for next iteration"
+                )
+                continue
+
+            result.passed = runtime_valid
+            result.score = best_score
+            result.quality_score = best_quality_score
+            result.value_score = best_score
             break
 
     # --- Step 5: Copy final app to output ---
@@ -934,7 +1107,12 @@ def generate_and_refine(
 
         result.app_dir = output_path
         result.source_code = best_code
-        if not result.passed:
+        if not judge_models and best_runtime_valid is not None:
+            result.passed = best_runtime_valid
+            result.score = best_score
+            result.quality_score = best_quality_score
+            result.value_score = best_score
+        elif not result.passed:
             result.score = best_score
             result.quality_score = best_quality_score
             result.value_score = best_score

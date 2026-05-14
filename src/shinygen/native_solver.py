@@ -54,7 +54,7 @@ from .validation import validate_framework_artifact
 # OpenCode Go models like to run package installs / linters between edits.
 _TOOL_TIMEOUT = 180
 _DATA_CONTEXT_CHAR_LIMIT = 12_000
-_DIRECT_ARTIFACT_ATTEMPTS = 2
+_DIRECT_ARTIFACT_ATTEMPTS = 3
 _SERVER_VALIDATION_TIMEOUT = 45
 
 
@@ -188,6 +188,24 @@ def _build_direct_repair_prompt(*, artifact: str, validation_output: str) -> str
     )
 
 
+def _build_invalid_code_retry_prompt(*, artifact: str, previous_output: str) -> str:
+    """Build a no-tool retry prompt when model output was not extractable."""
+    trimmed = previous_output.strip()
+    if len(trimmed) > 6_000:
+        trimmed = trimmed[-6_000:]
+
+    return (
+        f"No valid `{artifact}` code block was found in your previous answer. "
+        "The benchmark cannot use plans, explanations, diffs, shell commands, "
+        "or partial snippets.\n\n"
+        "Previous answer excerpt:\n\n"
+        f"```\n{trimmed or '(empty response)'}\n```\n\n"
+        f"Return the complete contents of `{artifact}` as exactly one fenced "
+        "code block. Do not call tools and do not include prose outside the "
+        "code block."
+    )
+
+
 async def _validate_artifact_server(
     *,
     cwd: str,
@@ -309,10 +327,9 @@ def native_direct_artifact_solver(
                 if attempt < _DIRECT_ARTIFACT_ATTEMPTS:
                     state.messages.append(
                         ChatMessageUser(
-                            content=(
-                                f"No valid `{artifact}` code block was found. "
-                                f"Return exactly one fenced code block with the "
-                                f"complete `{artifact}` contents."
+                            content=_build_invalid_code_retry_prompt(
+                                artifact=artifact,
+                                previous_output=state.output.completion,
                             )
                         )
                     )

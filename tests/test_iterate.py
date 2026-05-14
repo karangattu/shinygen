@@ -15,6 +15,7 @@ from shinygen.iterate import (
     _generation_extra_config,
     _recover_code_from_eval_logs,
     _resolve_judge_screenshot_paths,
+    generate_and_refine,
     _write_run_summary,
 )
 
@@ -87,6 +88,87 @@ class TestGenerationExtraConfig:
 
     def test_codex_generation_uses_default_config(self):
         assert _generation_extra_config("codex_cli") == {}
+
+
+class TestNoJudgeRuntimeRefinement:
+    def test_no_judge_run_uses_server_logs_for_one_refinement_pass(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        prompts_seen: list[str] = []
+        generated = [
+            "from shiny import App, ui\napp = App(ui.page_fluid('first'), lambda input, output, session: None)",
+            "from shiny import App, ui\napp = App(ui.page_fluid('second'), lambda input, output, session: None)",
+        ]
+
+        def fake_run_generation(prompt, *args, **kwargs):
+            prompts_seen.append(prompt)
+            return generated[len(prompts_seen) - 1], [], False
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_generation)
+        monkeypatch.setattr(
+            "shinygen.iterate._validate_generated_app_runtime",
+            lambda *a, **k: (True, "Listening on http://127.0.0.1:8000"),
+        )
+
+        result = generate_and_refine(
+            prompt="Build an ED operations dashboard",
+            model="gpt-5.4",
+            framework="shiny_python",
+            output_dir=tmp_path,
+            judge_model=None,
+            screenshot=False,
+            max_iterations=2,
+        )
+
+        assert result.source_code == generated[1]
+        assert result.iterations == 2
+        assert result.passed is True
+        assert len(prompts_seen) == 2
+        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
+        assert "Listening on http://127.0.0.1:8000" in prompts_seen[1]
+        assert "first" in prompts_seen[1]
+
+    def test_refinement_no_code_falls_back_without_inner_retries(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        calls = 0
+        first_code = (
+            "from shiny import App, ui\n"
+            "app = App(ui.page_fluid('first'), lambda input, output, session: None)"
+        )
+
+        def fake_run_generation(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return first_code, [], False
+            return None, [], False
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_generation)
+        monkeypatch.setattr(
+            "shinygen.iterate._validate_generated_app_runtime",
+            lambda *a, **k: (True, "Listening on http://127.0.0.1:8000"),
+        )
+
+        result = generate_and_refine(
+            prompt="Build an ED operations dashboard",
+            model="gpt-5.4",
+            framework="shiny_python",
+            output_dir=tmp_path,
+            judge_model=None,
+            screenshot=False,
+            max_iterations=2,
+        )
+
+        assert calls == 2
+        assert result.source_code == first_code
+        assert result.passed is True
 
 
 class TestWriteRunSummary:

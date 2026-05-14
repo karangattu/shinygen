@@ -155,6 +155,19 @@ FRAMEWORK_COMPOSE: dict[str, str] = {
     "shiny_python": "compose-python.yaml",
 }
 
+# Image name env vars and defaults used for both Inspect sandboxes and
+# post-generation runtime validation.
+SANDBOX_IMAGE_ENV_DEFAULTS: dict[str, tuple[str, str]] = {
+    "shiny_r": (
+        "SHINYGEN_SANDBOX_R_IMAGE",
+        "ghcr.io/karangattu/shinygen-sandbox-r:latest",
+    ),
+    "shiny_python": (
+        "SHINYGEN_SANDBOX_PYTHON_IMAGE",
+        "ghcr.io/karangattu/shinygen-sandbox-python:latest",
+    ),
+}
+
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------

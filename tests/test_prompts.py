@@ -2,6 +2,7 @@
 
 from shinygen.prompts import (
     build_refinement_prompt,
+    build_runtime_refinement_prompt,
     build_system_prompt,
     build_truncation_retry_prompt,
     build_user_prompt,
@@ -117,3 +118,20 @@ class TestBuildRefinementPrompt:
         prompt_none = build_refinement_prompt("Build a dashboard", feedback, 1, previous_code=None)
         prompt_omit = build_refinement_prompt("Build a dashboard", feedback, 1)
         assert prompt_none == prompt_omit
+
+
+class TestBuildRuntimeRefinementPrompt:
+    def test_includes_previous_code_and_server_logs(self):
+        prompt = build_runtime_refinement_prompt(
+            "Build an ED operations dashboard",
+            previous_code="from shiny import App\napp = App(None, None)",
+            runtime_logs="Listening on http://127.0.0.1:8000\nTraceback: bad column",
+            validation_passed=False,
+            iteration=1,
+        )
+
+        assert "RUNTIME LOG REVIEW" in prompt
+        assert "previous version" in prompt.lower()
+        assert "Traceback: bad column" in prompt
+        assert "from shiny import App" in prompt
+        assert "Return a complete replacement" in prompt

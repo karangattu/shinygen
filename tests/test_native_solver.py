@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from shinygen.native_solver import (
     _build_direct_artifact_instructions,
+    _build_invalid_code_retry_prompt,
     _build_direct_repair_prompt,
     _extract_direct_artifact_code,
     _server_validation_command,
@@ -72,4 +73,15 @@ def test_direct_repair_prompt_includes_server_logs():
 
     assert "server validation failed" in prompt
     assert "Traceback: missing column" in prompt
+    assert "exactly one fenced code block" in prompt
+
+
+def test_invalid_code_retry_prompt_shows_previous_model_output():
+    prompt = _build_invalid_code_retry_prompt(
+        artifact="app.py",
+        previous_output="I cannot create files, but here is a plan...",
+    )
+
+    assert "No valid `app.py` code block was found" in prompt
+    assert "I cannot create files" in prompt
     assert "exactly one fenced code block" in prompt
