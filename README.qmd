@@ -52,56 +52,44 @@ The current loop is **generate inside a fresh sandbox → optionally self-evalua
 
 ```{mermaid}
 %%| fig-width: 9
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, Arial, sans-serif'}}}%%
 flowchart TD
-  A[User Prompt + flags] --> B[shinygen CLI / API]
-    B --> C["Pre-flight checks<br/>Docker + API key"]
-    C --> D["Load framework defaults,<br/>data files, and skills"]
-  D --> E[Iteration loop]
+    %% Color Palette Definitions
+    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,rx:8
+    classDef core fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a,rx:8
+    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87,rx:8
+    classDef validation fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,rx:8
+    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,rx:8
+    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,rx:8
 
-  subgraph F[Fresh Docker sandbox per iteration]
-    direction TB
-        G["Stage Docker context<br/>+ Inspect AI task"]
-    H[LLM Agent]
-    I[Generate app.py / app.R]
-    J{--screenshot?}
-        K["Run app on :8000<br/>inside sandbox"]
-        L["screenshot_helper.py<br/>waits 7s and captures screenshot.png"]
-        M["Agent reviews screenshot<br/>and refines in sandbox"]
-        N["Scorer copies project files<br/>to results volume"]
-    O[Eval log + usage rows]
-
-    E --> G --> H --> I --> J
-    J -- Yes --> K --> L --> M --> N
-    J -- No --> N
-    N --> O
-  end
-
-    O --> P["Extract code from results volume<br/>or eval log"]
-    O --> Q["Copy agent_last_screenshot.png<br/>from results or eval attachment"]
-  P --> R{--judge-model?}
-  R -- Yes --> S[Run extracted app on host temp dir]
-  S --> T[Host Playwright screenshot]
-  T --> U["Judge panel<br/>(1+ external LLM judges)"]
-  U --> Y["Average per-criterion scores<br/>+ concatenate rationales"]
-  Y --> V{Score ≥ threshold?}
-    V -- No --> W["Refinement prompt includes<br/>panel feedback + previous code"]
-  W --> E
-  V -- Yes --> X[Output directory]
-  R -- No --> X
-
-  Q --> X
-
-  style A fill:#6c5ce7,color:#fff,stroke:none
-  style B fill:#0984e3,color:#fff,stroke:none
-  style C fill:#74b9ff,color:#fff,stroke:none
-  style D fill:#636e72,color:#fff,stroke:none
-  style F fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px
-  style H fill:#00b894,color:#fff,stroke:none
-  style I fill:#fdcb6e,color:#2d3436,stroke:none
-  style Q fill:#00cec9,color:#fff,stroke:none
-  style U fill:#e17055,color:#fff,stroke:none
-  style Y fill:#d63031,color:#fff,stroke:none
-  style X fill:#00b894,color:#fff,stroke:none
+    A["👤 User Request<br/>(Prompt + Dataset + Flags)"]:::input --> B["shinygen API / CLI"]:::core
+    
+    B --> C["Start Iteration Loop"]:::core
+    
+    subgraph Sandbox["Docker Sandbox Execution"]
+        direction TB
+        C --> D["Inject Framework Skills & Context"]:::agent
+        D --> E["LLM Agent Writes Code<br/>(Claude Code / Codex / OpenCode Go)"]:::agent
+    end
+    
+    E --> F["Host-side Runtime Validation<br/>(Unconditionally Starts App & Captures Logs)"]:::validation
+    
+    F --> G{"Screenshots<br/>Enabled?"}:::validation
+    G -- Yes --> H["Host Playwright Captures UI"]:::validation
+    G -- No --> I{"Judge Model<br/>Enabled?"}:::judge
+    H --> I
+    
+    I -- Yes --> J["LLM Judge Panel Evaluates<br/>(Scores Code + Visuals 1-10)"]:::judge
+    J --> K{"Meets Quality<br/>Threshold?"}:::judge
+    
+    I -- No --> L{"App Started<br/>Successfully?"}:::validation
+    
+    K -- No --> M["Construct Refinement Feedback<br/>(Judge Critiques + Server Error Logs)"]:::core
+    L -- No --> M
+    M --> C
+    
+    K -- Yes --> N["✅ Save Artifacts<br/>(Code, Logs, Screenshots, Summary)"]:::output
+    L -- Yes --> N
 ```
 
 ### How it works

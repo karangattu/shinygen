@@ -15,33 +15,33 @@ flowchart TD
     classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,rx:8
     classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,rx:8
 
-    A["👤 User Request<br/><small>Prompt + Dataset + Flags</small>"]:::input --> B["shinygen API / CLI"]:::core
+    A["👤 User Request<br/>(Prompt + Dataset + Flags)"]:::input --> B["shinygen API / CLI"]:::core
     
     B --> C["Start Iteration Loop"]:::core
     
     subgraph Sandbox["Docker Sandbox Execution"]
         direction TB
         C --> D["Inject Framework Skills & Context"]:::agent
-        D --> E["LLM Agent Writes Code<br/><small>Claude Code / Codex CLI / OpenCode Go</small>"]:::agent
+        D --> E["LLM Agent Writes Code<br/>(Claude Code / Codex / OpenCode Go)"]:::agent
     end
     
-    E --> F["Host-side Runtime Validation<br/><small>Unconditionally Starts App & Captures Logs</small>"]:::validation
+    E --> F["Host-side Runtime Validation<br/>(Unconditionally Starts App & Captures Logs)"]:::validation
     
     F --> G{"Screenshots<br/>Enabled?"}:::validation
     G -- Yes --> H["Host Playwright Captures UI"]:::validation
     G -- No --> I{"Judge Model<br/>Enabled?"}:::judge
     H --> I
     
-    I -- Yes --> J["LLM Judge Panel Evaluates<br/><small>Scores Code + Visuals (1-10)</small>"]:::judge
+    I -- Yes --> J["LLM Judge Panel Evaluates<br/>(Scores Code + Visuals 1-10)"]:::judge
     J --> K{"Meets Quality<br/>Threshold?"}:::judge
     
     I -- No --> L{"App Started<br/>Successfully?"}:::validation
     
-    K -- No --> M["Construct Refinement Feedback<br/><small>Judge Critiques + Server Error Logs</small>"]:::core
+    K -- No --> M["Construct Refinement Feedback<br/>(Judge Critiques + Server Error Logs)"]:::core
     L -- No --> M
     M --> C
     
-    K -- Yes --> N["✅ Save Artifacts<br/><small>Code, Logs, Screenshots, Summary</small>"]:::output
+    K -- Yes --> N["✅ Save Artifacts<br/>(Code, Logs, Screenshots, Summary)"]:::output
     L -- Yes --> N
 ```
 
