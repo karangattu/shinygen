@@ -12,7 +12,6 @@ my-dashboard/
 ├── app-express.py
 ├── shared.py
 ├── plots.py
-├── styles.css
 ├── data.csv
 └── requirements.txt
 ```
@@ -129,70 +128,52 @@ Guidelines:
 
 ## CSS and Theming
 
-Use a small stylesheet for layout polish and component-specific tuning.
+Prefer inline `ui.tags.style()` over a separate `styles.css` file. A missing
+external stylesheet crashes the app at startup and is the most common agent
+failure mode.
 
 ```python
-from pathlib import Path
 from shiny import ui
 
-app_dir = Path(__file__).parent
-
 app_ui = ui.page_sidebar(
-    ui.include_css(app_dir / "styles.css"),
+    ui.tags.style("""
+        .bslib-grid {
+          gap: 1rem !important;
+          row-gap: 1rem !important;
+          column-gap: 1rem !important;
+        }
+        .bslib-page-fill > .card + .card,
+        .bslib-page-fill > .bslib-grid + .bslib-grid,
+        .bslib-page-fill > .card + .bslib-grid,
+        .bslib-page-fill > .bslib-grid + .card,
+        .bslib-page-sidebar__main > .card + .card,
+        .bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
+        .bslib-page-sidebar__main > .card + .bslib-grid,
+        .bslib-page-sidebar__main > .bslib-grid + .card {
+          margin-top: 1rem;
+        }
+    """),
     ...,
 )
 ```
 
-Use CSS for:
+### Card-spacing safety net
+
+The CSS above is the mandatory card-spacing safety net. Unlike R bslib,
+Python Shiny's `ui.layout_columns()` and `ui.layout_column_wrap()` render
+`<div class="bslib-grid">` with `gap: 0` by default unless `gap=` is passed
+explicitly. This inline style block catches the most common visual defect:
+cards rendered edge-to-edge with no spacing.
+
+Use CSS only for:
 
 - spacing and alignment helpers
 - custom card or hero section styling
 - subtle borders, backgrounds, and typography rules
 - responsive tweaks that do not belong inside Python layout logic
 
-### Mandatory card-spacing safety net
-
-Always include this rule in `styles.css` so cards never appear glued together,
-even when a `gap` argument is forgotten on a layout container. Unlike R bslib,
-Python Shiny's `ui.layout_columns()` and `ui.layout_column_wrap()` render
-`<div class="bslib-grid">` with `gap: 0` by default unless `gap=` is passed
-explicitly, so this CSS is the most reliable defense:
-
-```css
-/* Force a sensible default gap on every bslib grid container.
-   Inline style="gap: ..." from layout_columns(gap=...) still wins. */
-.bslib-grid {
-  gap: 1rem !important;
-  row-gap: 1rem !important;
-  column-gap: 1rem !important;
-}
-
-/* Vertical spacing between bare cards or between a card and the next
-   layout row when they are placed as direct page children. */
-.bslib-page-fill > .card + .card,
-.bslib-page-fill > .bslib-grid + .bslib-grid,
-.bslib-page-fill > .card + .bslib-grid,
-.bslib-page-fill > .bslib-grid + .card,
-.bslib-page-sidebar__main > .card + .card,
-.bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
-.bslib-page-sidebar__main > .card + .bslib-grid,
-.bslib-page-sidebar__main > .bslib-grid + .card {
-  margin-top: 1rem;
-}
-
-/* Value boxes inside a bslib grid never touch */
-.bslib-grid > .bslib-value-box + .bslib-value-box {
-  margin-left: 0;  /* gap on parent already handles spacing */
-}
-```
-
-This safety net is **mandatory** for every Python Shiny dashboard. It catches
-the most common visual defect: cards rendered edge-to-edge with no spacing
-because `gap=` was omitted on a layout container or because cards were placed
-as bare page children. It does not replace passing `gap="1rem"` explicitly —
-it ensures the dashboard looks correct even if you forget.
-
 Avoid using CSS to rebuild the layout system from scratch when Shiny layout primitives already solve the problem.
+
 
 ### Theme direction
 
@@ -228,5 +209,5 @@ Add mapping or table packages only when the app needs them.
 1. Load data once and reuse it through reactive calcs.
 2. Clean numeric and coordinate columns before they hit inputs or plots.
 3. Keep formatting helpers near the data layer, not scattered across render functions.
-4. Use `ui.include_css(...)` for small style layers instead of large inline `<style>` blocks.
+4. Use `ui.tags.style(...)` for small style layers to avoid missing-file startup crashes.
 5. Treat dark mode as an explicit product choice, not a side effect of random CSS overrides.

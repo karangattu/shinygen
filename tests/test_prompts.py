@@ -16,27 +16,23 @@ class TestBuildSystemPrompt:
         assert "app.py" in prompt
         assert "R" in prompt  # "DO NOT use R" should be in there
 
-    def test_python_prompt_includes_dashboard_spacing_rules(self):
+    def test_python_prompt_does_not_leak_skills_layout_rules(self):
         prompt = build_system_prompt("shiny_python")
-        assert "fillable=False" in prompt
-        assert 'min_height="320px"' in prompt
-        assert "ui.layout_columns() or ui.layout_column_wrap()" in prompt
-        assert "ui.page_navbar()" in prompt
+        assert "fillable=False" not in prompt
+        assert 'min_height="320px"' not in prompt
+        assert "ui.page_navbar()" not in prompt
+        assert "output_widget" not in prompt
 
     def test_python_prompt_prioritizes_writing_over_recon(self):
         prompt = build_system_prompt("shiny_python")
         assert "package version checks" in prompt
         assert "write the best complete working app.py immediately" in prompt
 
-    def test_python_prompt_explains_plotly_widget_rendering(self):
+    def test_python_prompt_mentions_shiny_framework_basics(self):
         prompt = build_system_prompt("shiny_python")
         assert "shinywidgets" in prompt
-        assert "output_widget" in prompt
-        assert "render_plotly" in prompt or "render_widget" in prompt
-        assert (
-            "Do NOT use ui.output_plot() or @render.plot for Plotly figures"
-            in prompt
-        )
+        assert "page_sidebar" in prompt
+        assert "value_box" in prompt
 
     def test_r_prompt(self):
         prompt = build_system_prompt("shiny_r")

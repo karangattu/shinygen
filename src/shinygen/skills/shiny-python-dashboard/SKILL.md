@@ -43,7 +43,7 @@ These rules are global and should be applied on almost every dashboard task.
 1. Never use emoji characters as icons. Use `faicons.icon_svg()` or Bootstrap Icons SVG instead.
 2. Always pass an explicit light `theme=` to your `ui.page_*()` call. Default bslib styling reads as stock Shiny and caps the dashboard visually. Prefer `shinyswatch.theme.zephyr`, `flatly`, `minty`, `cosmo`, `lumen`, or `yeti`.
 3. Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
-4. Only call `ui.include_css(app_dir / "styles.css")` if you create `styles.css` in the same change. Missing referenced stylesheets break app startup.
+4. Prefer `ui.tags.style(...)` for CSS. Only use `ui.include_css(app_dir / "styles.css")` if you also create `styles.css` in the same change. Missing referenced stylesheets break app startup.
 5. For dense dashboards, use `fillable=False`. Reserve `fillable=True` for sparse pages with one or two large fillable panels.
 6. Keep KPI rows in `ui.layout_column_wrap(..., width="240px", fill=False)` and limit them to 3 to 4 value boxes per row.
 7. Always pass `gap="1rem"` (or larger) to every `ui.layout_columns()` and `ui.layout_column_wrap()` call. The bslib default in Shiny for Python is a 0 gutter, so adjacent cards visually collide unless you set `gap=`.
@@ -95,7 +95,7 @@ Use these shortcuts to stay consistent:
 ## Avoid common failure modes
 
 1. Do not ship the default theme.
-2. Do not reference a stylesheet file that does not exist.
+2. Do not reference a stylesheet file that does not exist. Prefer `ui.tags.style(...)` instead.
 3. Do not let KPI rows stretch edge to edge or exceed 4 cards before wrapping.
 4. Do not cram 3 or more serious charts into one row.
 5. Do not put multiple Matplotlib charts into one render function.

@@ -37,18 +37,6 @@ language syntax. Use Shiny Express or Core API with modern layout functions \
 (page_sidebar, card, value_box, etc.). Import from `shiny` or \
 `shiny.express`, and construct a real Shiny app in `app.py`. Remember: Use \
 Python, not R, and Shiny, not Streamlit or Dash. The file must be app.py.
-
-Dashboard layout rules for Python Shiny:
-- Put KPI and value-box rows in ui.layout_column_wrap(..., width="240px", fill=False).
-- For dense dashboards with a KPI row plus multiple chart, map, or table rows, set fillable=False on the page.
-- Wrap cards in ui.layout_columns() or ui.layout_column_wrap() rather than dropping them as bare sequential page children.
-- Give chart and table cards min_height="320px" or larger so they do not collapse into shallow strips.
-- For multi-section dashboards (Performance / Patient Flow / Outcomes etc.), prefer ui.page_navbar() with a ui.nav_panel() per section over cramming everything onto one scrolling page.
-- If you use Plotly, import output_widget plus render_plotly or
-    render_widget from shinywidgets.
-- Do NOT use ui.output_plot() or @render.plot for Plotly figures.
-    @render.plot is for Matplotlib or Seaborn only.
-- If you reference a stylesheet (e.g. ui.include_css(app_dir / "styles.css")), you MUST also create that file. Otherwise omit the include — a missing file raises at startup and the app will not run.
 """
 
 SYSTEM_PROMPT_VISUAL_QA = """\
