@@ -25,8 +25,8 @@ the task FAILS.
 IMPORTANT WORKFLOW:
 1. cd to /home/user/project (this is your working directory)
 2. Install any additional Python packages you need: {install_command}
-   NOTE: shiny, plotly, faicons, pandas, matplotlib, seaborn are \
-already installed.
+    NOTE: shiny, shinywidgets, plotly, faicons, pandas, matplotlib,
+    seaborn are already installed.
 3. Create the file /home/user/project/app.py with the dashboard code.
    CRITICAL: The file MUST be app.py (NOT app.R). Use Python language syntax.
 4. Verify Python syntax: python -c "import ast; \
@@ -44,6 +44,10 @@ Dashboard layout rules for Python Shiny:
 - Wrap cards in ui.layout_columns() or ui.layout_column_wrap() rather than dropping them as bare sequential page children.
 - Give chart and table cards min_height="320px" or larger so they do not collapse into shallow strips.
 - For multi-section dashboards (Performance / Patient Flow / Outcomes etc.), prefer ui.page_navbar() with a ui.nav_panel() per section over cramming everything onto one scrolling page.
+- If you use Plotly, import output_widget plus render_plotly or
+    render_widget from shinywidgets.
+- Do NOT use ui.output_plot() or @render.plot for Plotly figures.
+    @render.plot is for Matplotlib or Seaborn only.
 - If you reference a stylesheet (e.g. ui.include_css(app_dir / "styles.css")), you MUST also create that file. Otherwise omit the include — a missing file raises at startup and the app will not run.
 """
 

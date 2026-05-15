@@ -95,6 +95,19 @@ class TestLoadDefaultSkills:
         assert "the input value must be an actual dataframe column name" in instructions
         assert "do not invert that mapping" in instructions
 
+    def test_shiny_python_skill_forbids_plotly_in_render_plot(self):
+        instructions = load_skill_context_text("shiny_python")
+
+        assert (
+            "Never return a Plotly figure from `@render.plot`"
+            in instructions
+        )
+        assert "output_widget" in instructions
+        assert (
+            "render_plotly" in instructions
+            or "render_widget" in instructions
+        )
+
 
 class TestBuildGenerationTask:
     def test_codex_solver_uses_auto_cli_with_live_web_search(

@@ -54,16 +54,17 @@ These rules are global and should be applied on almost every dashboard task.
 12. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta such as `down 4.1% vs prior period`.
 13. Never use Bootstrap `text-success` or `text-danger` directly for delta text inside dark or gradient value boxes. Use a high-contrast pill or badge treatment instead.
 14. For Plotly charts, always use `template="plotly_white"` and an explicit 3 to 4 color palette. Default Plotly rainbow colors instantly look auto-generated.
-15. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
-16. Format every displayed number for readability, including `render.DataGrid` outputs. Never show raw 6-decimal floats in UI.
-17. Prefer `great_tables.GT(...)` for short summary tables and `render.DataGrid(...)` for long filterable drill-down tables.
-18. Default to `lonboard` for maps and use a light basemap. Avoid dark basemaps.
-19. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
-20. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot`.
-21. Use the dataset the user provided. Do not substitute built-in examples such as `tips`, `diamonds`, `iris`, or `mtcars` unless the prompt explicitly asks for them.
-22. Add at least one `ui.toolbar()` in every non-trivial dashboard that targets Shiny >= 1.6. Put local controls in card headers or footers: metric selectors, grouping selectors, basemap/palette toggles, display-mode buttons, reset actions, or info buttons. Keep cross-cutting filters in the sidebar.
-23. Do not ship red output errors, blank panels, spinner-only panels, or zero/N/A KPI cards as if they are finished. Add empty states and `req()` guards, then verify screenshots.
-24. Every chart card should have a working output on initial load using the default filters. If a filter can legitimately remove all data, show a clear empty-state message in the card instead of an exception.
+15. Never return a Plotly figure from `@render.plot`. Use `from shinywidgets import output_widget, render_plotly` for Plotly cards in Core apps, or `@render_widget` for other HTML widgets. `@render.plot` is for Matplotlib and Seaborn only and will surface red render errors for Plotly figures.
+16. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
+17. Format every displayed number for readability, including `render.DataGrid` outputs. Never show raw 6-decimal floats in UI.
+18. Prefer `great_tables.GT(...)` for short summary tables and `render.DataGrid(...)` for long filterable drill-down tables.
+19. Default to `lonboard` for maps and use a light basemap. Avoid dark basemaps.
+20. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
+21. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot`.
+22. Use the dataset the user provided. Do not substitute built-in examples such as `tips`, `diamonds`, `iris`, or `mtcars` unless the prompt explicitly asks for them.
+23. Add at least one `ui.toolbar()` in every non-trivial dashboard that targets Shiny >= 1.6. Put local controls in card headers or footers: metric selectors, grouping selectors, basemap/palette toggles, display-mode buttons, reset actions, or info buttons. Keep cross-cutting filters in the sidebar.
+24. Do not ship red output errors, blank panels, spinner-only panels, or zero/N/A KPI cards as if they are finished. Add empty states and `req()` guards, then verify screenshots.
+25. Every chart card should have a working output on initial load using the default filters. If a filter can legitimately remove all data, show a clear empty-state message in the card instead of an exception.
 
 ## Sensible dashboard defaults
 

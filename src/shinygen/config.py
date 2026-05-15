@@ -97,7 +97,8 @@ FRAMEWORKS: dict[str, dict[str, str]] = {
         "primary_artifact": "app.py",
         "run_command": "shiny run app.py --port {port}",
         "install_command": (
-            "pip install shiny plotly faicons pandas matplotlib seaborn"
+            "pip install shiny shinywidgets plotly faicons pandas "
+            "matplotlib seaborn"
         ),
         "skill_dir": "shiny-python-dashboard",
     },

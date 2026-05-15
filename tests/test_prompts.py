@@ -28,6 +28,16 @@ class TestBuildSystemPrompt:
         assert "package version checks" in prompt
         assert "write the best complete working app.py immediately" in prompt
 
+    def test_python_prompt_explains_plotly_widget_rendering(self):
+        prompt = build_system_prompt("shiny_python")
+        assert "shinywidgets" in prompt
+        assert "output_widget" in prompt
+        assert "render_plotly" in prompt or "render_widget" in prompt
+        assert (
+            "Do NOT use ui.output_plot() or @render.plot for Plotly figures"
+            in prompt
+        )
+
     def test_r_prompt(self):
         prompt = build_system_prompt("shiny_r")
         assert "app.R" in prompt

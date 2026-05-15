@@ -88,6 +88,9 @@ Rules:
 ### Plotly with `shinywidgets`
 
 Use `output_widget()` in Core apps and `@render_plotly` in the server or Express block.
+Do not return Plotly figures from `@render.plot` or wire them to
+`ui.output_plot()`; Shiny for Python will raise a red render error because
+that renderer only knows how to handle Matplotlib or Seaborn outputs.
 
 ```python
 from shinywidgets import output_widget, render_plotly

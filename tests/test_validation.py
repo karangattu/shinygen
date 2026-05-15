@@ -20,7 +20,9 @@ def server(input, output, session):
 
 app = App(app_ui, server)
 """
-        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
+        valid, reason = validate_framework_artifact(
+            "shiny_python", "app.py", code
+        )
         assert valid, f"Expected valid, got: {reason}"
 
     def test_invalid_syntax(self):
@@ -56,7 +58,78 @@ ui.page_opts(title="My App")
 def txt():
     return f"n = {input.n()}"
 """
-        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
+        valid, reason = validate_framework_artifact(
+            "shiny_python", "app.py", code
+        )
+        assert valid, f"Expected valid, got: {reason}"
+
+    def test_rejects_plotly_figure_in_render_plot(self):
+        code = """
+import plotly.express as px
+from shiny import App, render, ui
+
+app_ui = ui.page_sidebar(ui.output_plot("chart"))
+
+
+def server(input, output, session):
+    @output
+    @render.plot
+    def chart():
+        return px.scatter(x=[1, 2, 3], y=[3, 1, 2])
+
+
+app = App(app_ui, server)
+"""
+        valid, reason = validate_framework_artifact(
+            "shiny_python", "app.py", code
+        )
+        assert not valid
+        assert "plotly" in reason.lower()
+        assert "render.plot" in reason.lower()
+
+    def test_rejects_output_plot_with_render_plotly(self):
+        code = """
+import plotly.express as px
+from shiny import App, ui
+from shinywidgets import render_plotly
+
+app_ui = ui.page_sidebar(ui.output_plot("chart"))
+
+
+def server(input, output, session):
+    @render_plotly
+    def chart():
+        return px.scatter(x=[1, 2, 3], y=[3, 1, 2])
+
+
+app = App(app_ui, server)
+"""
+        valid, reason = validate_framework_artifact(
+            "shiny_python", "app.py", code
+        )
+        assert not valid
+        assert "output_widget" in reason
+
+    def test_allows_plotly_with_shinywidgets_renderers(self):
+        code = """
+import plotly.express as px
+from shiny import App, ui
+from shinywidgets import output_widget, render_plotly
+
+app_ui = ui.page_sidebar(output_widget("chart"))
+
+
+def server(input, output, session):
+    @render_plotly
+    def chart():
+        return px.scatter(x=[1, 2, 3], y=[3, 1, 2])
+
+
+app = App(app_ui, server)
+"""
+        valid, reason = validate_framework_artifact(
+            "shiny_python", "app.py", code
+        )
         assert valid, f"Expected valid, got: {reason}"
 
 
