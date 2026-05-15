@@ -22,8 +22,6 @@ def test_build_sandbox_images_workflow_uses_node24_compatible_docker_actions():
 def test_run_workflows_use_node24_compatible_docker_login_action():
     workflow_names = [
         "run-benchmark-matrix.yml",
-        "run-shinygen.yml",
-        "run-shinygen-multi.yml",
     ]
 
     for workflow_name in workflow_names:
@@ -35,8 +33,6 @@ def test_workflows_do_not_force_node24_runtime_override():
     workflow_names = [
         "build-sandbox-images.yml",
         "run-benchmark-matrix.yml",
-        "run-shinygen.yml",
-        "run-shinygen-multi.yml",
     ]
 
     for workflow_name in workflow_names:
