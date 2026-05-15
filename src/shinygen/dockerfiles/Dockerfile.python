@@ -37,8 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Pre-install Python packages used by generated Shiny apps
-RUN pip install --no-cache-dir \
-    uv \
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache \
     shiny \
     shinyswatch \
     plotly \
@@ -56,7 +56,6 @@ RUN pip install --no-cache-dir \
     geopandas \
     numpy \
     playwright
-
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
 RUN playwright install chromium
 
