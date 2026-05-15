@@ -85,3 +85,31 @@ def test_invalid_code_retry_prompt_shows_previous_model_output():
     assert "No valid `app.py` code block was found" in prompt
     assert "I cannot create files" in prompt
     assert "exactly one fenced code block" in prompt
+
+
+def test_web_browser_tools_are_flattened_into_tools_list():
+    from unittest.mock import patch, MagicMock
+
+    fake_tool_a = MagicMock(name="tool_a")
+    fake_tool_b = MagicMock(name="tool_b")
+
+    with patch("shinygen.native_solver.react") as mock_react, \
+         patch("shinygen.native_solver.get_model") as mock_get_model, \
+         patch("inspect_ai.tool.web_browser", return_value=[fake_tool_a, fake_tool_b]):
+        mock_get_model.return_value = MagicMock()
+        mock_react.return_value = MagicMock()
+
+        from shinygen.native_solver import native_react_solver
+        native_react_solver(
+            model_id="openai-api/opencode-go/kimi-k2.6",
+            cwd="/home/user/project",
+            framework="shiny_python",
+            artifact="app.py",
+            web_fetch=True,
+        )
+
+        called_tools = mock_react.call_args.kwargs["tools"]
+        assert fake_tool_a in called_tools
+        assert fake_tool_b in called_tools
+        for t in called_tools:
+            assert not isinstance(t, list), "web_browser tools should be flattened, not nested"

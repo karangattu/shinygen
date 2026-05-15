@@ -454,7 +454,7 @@ def native_react_solver(
     if web_fetch:
         try:
             from inspect_ai.tool import web_browser
-            tools.append(web_browser())
+            tools.extend(web_browser())
         except ImportError:
             pass
 
