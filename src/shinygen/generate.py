@@ -553,8 +553,6 @@ def build_generation_task(
         # crash, the Anthropic-SDK ``/v1`` double-prefix bug, and Kimi's
         # rejection of dropped ``reasoning_content`` fields.
         if model_id and is_opencode_go_model(model_id):
-            from inspect_ai.agent import as_solver
-
             from .native_solver import native_react_solver
 
             extra_instructions: str | None = None
@@ -568,12 +566,14 @@ def build_generation_task(
                         "generation guidelines when planning and editing "
                         f"files:\n\n{skill_context}"
                     )
-            agent_obj = native_react_solver(
+            solver = native_react_solver(
                 model_id=model_id,
                 cwd=SANDBOX_WORK_DIR,
+                framework=framework_key,
+                artifact=artifact,
+                web_fetch=web_fetch,
                 extra_instructions=extra_instructions,
             )
-            solver = as_solver(agent_obj)
             # Fail fast for the open-weights tier: the prior 25-min ceiling
             # burned wall-clock on stalled providers without producing
             # better apps. 10 minutes is plenty for a single dashboard

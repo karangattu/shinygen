@@ -38,7 +38,7 @@ import shlex
 from inspect_ai.agent import Agent, AgentPrompt, react
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser, Model, get_model
 from inspect_ai.solver import Generate, Solver, TaskState, solver
-from inspect_ai.tool import bash, text_editor
+from inspect_ai.tool import bash, text_editor, python, tool, Tool
 from inspect_ai.util import sandbox
 
 from .config import (
@@ -61,15 +61,16 @@ _SERVER_VALIDATION_TIMEOUT = 45
 _REACT_INSTRUCTIONS_TEMPLATE = (
     "You are a coding agent that builds Shiny dashboards inside a Linux "
     "sandbox. Your working directory is `{cwd}`.\n\n"
-    "You have two tools:\n"
+    "You have the following tools:\n"
     "  - `bash`: run shell commands in the sandbox.\n"
-    "  - `text_editor`: view, create, and edit files in the sandbox.\n\n"
+    "  - `python`: execute Python code snippets to explore data or test logic.\n"
+    "  - `text_editor`: view, create, and edit files in the sandbox.\n"
+    "  - `validate_app_tool`: starts the generated app and returns server logs.\n"
+    "  - `web_browser`: (if available) fetch web pages to check documentation.\n\n"
     "IMPORTANT RULES:\n"
     "- You MUST create the artifact file using `text_editor` before calling "
     "`submit`. Do NOT call `submit` until the file exists.\n"
-    "- After creating the file, validate it (e.g. `python3 -c 'import app'` "
-    "for Shiny for Python or `Rscript -e \"source('app.R')\"` for Shiny for "
-    "R) and fix any errors before submitting.\n"
+    "- After creating the file, validate it using the `validate_app_tool` tool. Fix any errors in the logs before submitting.\n"
     "- If `submit` is called but no artifact file exists, you will be told "
     "the submission was incorrect and given another chance.\n"
     "- Do NOT print the full app source as a code block in chat. Write it "
@@ -78,11 +79,10 @@ _REACT_INSTRUCTIONS_TEMPLATE = (
     "- Keep your prose between tool calls to one short sentence. No plans, "
     "no recaps, no explanations of what you are about to do.\n\n"
     "Workflow:\n"
-    "1. Use `bash` to inspect `{cwd}` (e.g. `ls -la`) and any data files "
-    "(e.g. `head -n 5 *.csv`).\n"
+    "1. Review the dataset context provided in the chat.\n"
     "2. Plan the dashboard structure briefly before editing.\n"
     "3. Create or edit the primary artifact file with `text_editor`.\n"
-    "4. Validate by importing or running the app once. Fix any errors.\n"
+    "4. Validate by using `validate_app_tool`. Fix any errors.\n"
     "5. When the artifact is complete and valid, call the `submit` tool "
     "with a one-line summary. Do not ask the user for confirmation.\n\n"
     "Always prefer surgical edits over rewriting whole files. The system "
@@ -240,6 +240,25 @@ async def _validate_artifact_server(
     stderr = getattr(result, "stderr", "") or ""
     output = "\n".join(part for part in (stdout, stderr) if part).strip()
     return getattr(result, "returncode", 1) == 0, output
+
+
+@tool
+def validate_app_tool(cwd: str, framework: str, artifact: str) -> Tool:
+    """A tool that starts the generated app and captures server logs."""
+    async def execute() -> str:
+        """
+        Start the generated app and capture server logs. Use this to verify that the app
+        starts correctly without errors. It will return the startup logs.
+        """
+        valid, output = await _validate_artifact_server(
+            cwd=cwd, framework=framework, artifact=artifact
+        )
+        if valid:
+            return f"Success. App started without errors.\n\nLogs:\n{output}"
+        else:
+            return f"Error. App failed to start.\n\nLogs:\n{output}"
+    return execute
+
 
 
 async def _collect_sandbox_data_context(cwd: str) -> str:
@@ -407,19 +426,12 @@ def native_react_solver(
     *,
     model_id: str,
     cwd: str,
+    framework: str,
+    artifact: str,
+    web_fetch: bool = True,
     extra_instructions: str | None = None,
-) -> Agent:
-    """Return an Inspect ``Agent`` driven by the native ``react()`` agent.
-
-    Args:
-        model_id: Resolved Inspect model ID (e.g.
-            ``"openai-api/opencode-go/mimo-v2.5"`` or
-            ``"anthropic/opencode-go/minimax-m2.5"``).
-        cwd: Working directory inside the sandbox.
-        extra_instructions: Optional text appended to the react agent's
-            system instructions (used to inject the framework skill
-            guidance when ``use_skills=True``).
-    """
+) -> Solver:
+    """Return an Inspect ``Solver`` driven by the native ``react()`` agent."""
     if is_opencode_go_model(model_id):
         model = _build_opencode_go_model(model_id)
     else:
@@ -432,13 +444,42 @@ def native_react_solver(
     if extra_instructions and extra_instructions.strip():
         instructions = f"{instructions}\n\n{extra_instructions.strip()}"
 
+    tools = [
+        bash(timeout=_TOOL_TIMEOUT),
+        python(timeout=_TOOL_TIMEOUT),
+        text_editor(timeout=_TOOL_TIMEOUT),
+        validate_app_tool(cwd=cwd, framework=framework, artifact=artifact),
+    ]
+
+    if web_fetch:
+        try:
+            from inspect_ai.tool import web_browser
+            tools.append(web_browser())
+        except ImportError:
+            pass
+
     agent = react(
         model=model,
-        tools=[
-            bash(timeout=_TOOL_TIMEOUT),
-            text_editor(timeout=_TOOL_TIMEOUT),
-        ],
+        tools=tools,
         prompt=AgentPrompt(instructions=instructions),
-        attempts=3,
+        attempts=5,
     )
-    return agent
+
+    @solver
+    def react_with_init() -> Solver:
+        async def solve(state: TaskState, generate: Generate) -> TaskState:
+            data_context = await _collect_sandbox_data_context(cwd)
+            if data_context:
+                state.messages.append(
+                    ChatMessageUser(
+                        content=(
+                            "Dataset context gathered from the sandbox. Use these "
+                            "columns and preview rows when writing the app:\n\n"
+                            f"{data_context}"
+                        )
+                    )
+                )
+            return await agent(state, generate)
+        return solve
+
+    return react_with_init()

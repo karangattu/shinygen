@@ -20,7 +20,7 @@ FROM rocker/r-ver:4.4.2
 
 ARG TARGETARCH
 ARG CLAUDE_VERSION=2.1.142
-ARG CODEX_VERSION=0.131.0-alpha.19
+ARG CODEX_VERSION=rust-v0.129.0
 
 # System deps for R packages, Python, and Chromium (Playwright)
 # Includes build tooling (cmake, pkg-config) required by recent CRAN packages
