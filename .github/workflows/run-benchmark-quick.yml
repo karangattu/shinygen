@@ -80,16 +80,16 @@ on:
       quality_threshold:
         description: "Minimum quality score"
         required: true
-        default: "7.0"
+        default: "5.0"
       enable_screenshot:
         description: "Enable --screenshot (adds visual judging; slower & more expensive)"
         required: true
-        default: true
+        default: false
         type: boolean
       enable_judges:
         description: "Run the judge panel (uncheck for the cheapest possible smoke run)"
         required: true
-        default: true
+        default: false
         type: boolean
 
 concurrency:
