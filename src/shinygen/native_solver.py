@@ -479,7 +479,7 @@ def native_react_solver(
                         )
                     )
                 )
-            return await agent(state, generate)
+            return await agent(state)
         return solve
 
     return react_with_init()
