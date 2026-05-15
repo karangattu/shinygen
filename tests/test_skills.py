@@ -172,21 +172,13 @@ class TestBuildGenerationTask:
         solver instead of mini_swe_agent."""
         captured = {}
         sentinel_agent = object()
-        sentinel_solver = object()
 
         def fake_native_react(**kwargs):
             captured.update(kwargs)
             return sentinel_agent
 
-        def fake_as_solver(agent, *args, **kwargs):
-            captured["_wrapped_agent"] = agent
-            return sentinel_solver
-
         monkeypatch.setattr(
             "shinygen.native_solver.native_react_solver", fake_native_react
-        )
-        monkeypatch.setattr(
-            "inspect_ai.agent.as_solver", fake_as_solver
         )
 
         task = build_generation_task(
@@ -197,8 +189,7 @@ class TestBuildGenerationTask:
             docker_context_dir=tmp_path,
         )
 
-        assert task.solver is sentinel_solver
-        assert captured["_wrapped_agent"] is sentinel_agent
+        assert task.solver is sentinel_agent
         assert captured["model_id"] == (
             "openai-api/opencode-go/deepseek-v4-flash"
         )
@@ -215,21 +206,13 @@ class TestBuildGenerationTask:
         native ReAct solver."""
         captured = {}
         sentinel_agent = object()
-        sentinel_solver = object()
 
         def fake_native_react(**kwargs):
             captured.update(kwargs)
             return sentinel_agent
 
-        def fake_as_solver(agent, *args, **kwargs):
-            captured["_wrapped_agent"] = agent
-            return sentinel_solver
-
         monkeypatch.setattr(
             "shinygen.native_solver.native_react_solver", fake_native_react
-        )
-        monkeypatch.setattr(
-            "inspect_ai.agent.as_solver", fake_as_solver
         )
 
         task = build_generation_task(
@@ -240,8 +223,7 @@ class TestBuildGenerationTask:
             docker_context_dir=tmp_path,
         )
 
-        assert task.solver is sentinel_solver
-        assert captured["_wrapped_agent"] is sentinel_agent
+        assert task.solver is sentinel_agent
         assert captured["model_id"] == (
             "anthropic/opencode-go/minimax-m2.7"
         )
