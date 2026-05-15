@@ -65,6 +65,8 @@ Use this for secondary options that do not deserve a full sidebar section.
 
 Use `ui.toolbar()` to embed compact controls inside `ui.card_header()`, `ui.card_footer()`, input labels, or `ui.input_submit_textarea(toolbar=...)`. This is the modern, low-noise way to scope controls to a single card instead of pushing more inputs into the global sidebar.
 
+For professional dashboards, use toolbars by default when Shiny >= 1.6 is available. A dashboard with several chart/table cards should normally include at least one or two toolbars: one for local chart display options and one for table/map actions. This makes the UI feel deliberate and keeps the global sidebar focused on filters that affect the whole page.
+
 ```python
 from faicons import icon_svg
 from shiny import ui
@@ -96,7 +98,14 @@ ui.card(
 
 Components: `ui.toolbar()` (container with `align="left"|"right"`), `ui.toolbar_input_button()` (small action button with optional `tooltip=`), `ui.toolbar_input_select()` (compact dropdown), `ui.toolbar_divider()` (separator), `ui.toolbar_spacer()` (push items to opposite sides). Each input has a matching `ui.update_toolbar_input_*()`. Read inputs in the server with `input.<id>()` like any other input.
 
-Use toolbars for: per-card filters (date range, basemap, palette toggle), info/help tooltips next to inputs (`label=ui.toolbar(ui.toolbar_input_button(..., icon=icon_svg("circle-info"), tooltip="..."), "Threshold", align="left")`), and message-composer actions inside `ui.input_submit_textarea(toolbar=...)`. Do **not** use them as a substitute for the global sidebar — keep cross-cutting filters there.
+Use toolbars for: per-card filters (date range, metric selector, grouping selector, basemap, palette toggle), display modes (absolute vs percent, top 10 vs all, bars vs line), info/help tooltips next to inputs (`label=ui.toolbar(ui.toolbar_input_button(..., icon=icon_svg("circle-info"), tooltip="..."), "Threshold", align="left")`), reset/export/details actions, and message-composer actions inside `ui.input_submit_textarea(toolbar=...)`. Do **not** use them as a substitute for the global sidebar — keep cross-cutting filters there.
+
+Toolbar decision rule:
+
+- If a control changes the entire dashboard, put it in the sidebar.
+- If a control changes one card's encoding, sorting, aggregation, annotation, or display mode, put it in that card's toolbar.
+- If a button explains, resets, expands, exports, or toggles details for one card, put it in that card's toolbar.
+- If no local control is obvious, add a small info toolbar button to a complex chart explaining denominator, filter scope, or caveats.
 
 ## Value Boxes
 
