@@ -72,7 +72,7 @@ def _register_opencode_go_aliases() -> None:
             f"opencode-go/{model_name}",
             f"opencode-go-{model_name}",
         ):
-            MODEL_ALIASES.setdefault(alias, ("mini_swe_agent", inspect_model_id))
+            MODEL_ALIASES.setdefault(alias, ("native_react_solver", inspect_model_id))
 
     for model_name in OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS:
         inspect_model_id = f"anthropic/opencode-go/{model_name}"
@@ -81,7 +81,7 @@ def _register_opencode_go_aliases() -> None:
             f"opencode-go/{model_name}",
             f"opencode-go-{model_name}",
         ):
-            MODEL_ALIASES.setdefault(alias, ("mini_swe_agent", inspect_model_id))
+            MODEL_ALIASES.setdefault(alias, ("native_react_solver", inspect_model_id))
 
 
 _register_opencode_go_aliases()
@@ -226,7 +226,7 @@ def resolve_model(alias: str) -> tuple[str, str]:
     if key.startswith("openai/"):
         return ("codex_cli", alias)
     if key.startswith("openai-api/"):
-        return ("mini_swe_agent", alias)
+        return ("native_react_solver", alias)
     raise ValueError(
         f"Unknown model '{alias}'. Choose from: "
         f"{', '.join(sorted(MODEL_ALIASES.keys()))}"
@@ -346,10 +346,10 @@ def check_api_key(agent: str, model_id: str | None = None) -> None:
                 "Get your API key from https://platform.openai.com/api-keys and run:\n"
                 "  export OPENAI_API_KEY='sk-...'"
             )
-    elif agent == "mini_swe_agent":
+    elif agent == "native_react_solver":
         if not model_id:
             raise APIKeyMissingError(
-                "mini_swe_agent requires a resolved Inspect model ID so shinygen "
+                "native_react_solver requires a resolved Inspect model ID so shinygen "
                 "can determine which provider API key is needed."
             )
 

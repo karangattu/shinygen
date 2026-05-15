@@ -489,7 +489,7 @@ Judge cost is still recorded in `usage`, but it does not penalize the generating
 
 ## {{< fa globe >}} OpenCode Go Models
 
-shinygen can route OpenCode Go's OpenAI-compatible models through Inspect's `openai-api` provider and the `mini_swe_agent` Inspect SWE solver. This is the recommended path for value benchmarking because model calls are still proxied through Inspect, so eval logs, token usage, model usage, and the skills-vs-vanilla arm comparison remain intact.
+shinygen can route OpenCode Go's OpenAI-compatible models through Inspect's `openai-api` provider and the `native_react_solver` Inspect solver. This is the recommended path for value benchmarking because model calls are still proxied through Inspect, so eval logs, token usage, model usage, and the skills-vs-vanilla arm comparison remain intact.
 
 Set your subscription key after signing up for OpenCode Go:
 
@@ -529,7 +529,7 @@ import polars as pl
 
 models = pl.DataFrame({
     "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`", "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`"],
-    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Mini SWE Agent", "Mini SWE Agent", "Mini SWE Agent"],
+    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Native ReAct", "Native ReAct", "Native ReAct"],
     "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`", "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`"],
     "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenCode Go", "OpenCode Go", "OpenCode Go"],
 })

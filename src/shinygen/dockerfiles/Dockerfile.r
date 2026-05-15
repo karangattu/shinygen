@@ -12,7 +12,7 @@
 #   - Python + visualization packages (so the same image works for both
 #     framework variants when needed)
 #   - Playwright + Chromium browser
-#   - uv (used by inspect_swe mini_swe_agent)
+#   - uv (used by native_react_solver)
 #   - `claude` (Anthropic Claude Code) standalone binary on PATH
 #   - `codex` (OpenAI Codex CLI) standalone binary on PATH
 
