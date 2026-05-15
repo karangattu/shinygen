@@ -46,22 +46,24 @@ These rules are global and should be applied on almost every dashboard task.
 4. Only call `ui.include_css(app_dir / "styles.css")` if you create `styles.css` in the same change. Missing referenced stylesheets break app startup.
 5. For dense dashboards, use `fillable=False`. Reserve `fillable=True` for sparse pages with one or two large fillable panels.
 6. Keep KPI rows in `ui.layout_column_wrap(..., width="240px", fill=False)` and limit them to 3 to 4 value boxes per row.
-7. Give every chart, map, and table card a title via `ui.card_header(...)` and a readable floor such as `min_height="320px"`.
-8. Do not place more than 2 medium or large visualization cards in a row.
-9. For multi-section dashboards, use `ui.page_navbar()` with one `ui.nav_panel()` per section, add an icon to each tab, and use a branded title block.
-10. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta such as `down 4.1% vs prior period`.
-11. Never use Bootstrap `text-success` or `text-danger` directly for delta text inside dark or gradient value boxes. Use a high-contrast pill or badge treatment instead.
-12. For Plotly charts, always use `template="plotly_white"` and an explicit 3 to 4 color palette. Default Plotly rainbow colors instantly look auto-generated.
-13. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
-14. Format every displayed number for readability, including `render.DataGrid` outputs. Never show raw 6-decimal floats in UI.
-15. Prefer `great_tables.GT(...)` for short summary tables and `render.DataGrid(...)` for long filterable drill-down tables.
-16. Default to `lonboard` for maps and use a light basemap. Avoid dark basemaps.
-17. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
-18. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot`.
-19. Use the dataset the user provided. Do not substitute built-in examples such as `tips`, `diamonds`, `iris`, or `mtcars` unless the prompt explicitly asks for them.
-20. Add at least one `ui.toolbar()` in every non-trivial dashboard that targets Shiny >= 1.6. Put local controls in card headers or footers: metric selectors, grouping selectors, basemap/palette toggles, display-mode buttons, reset actions, or info buttons. Keep cross-cutting filters in the sidebar.
-21. Do not ship red output errors, blank panels, spinner-only panels, or zero/N/A KPI cards as if they are finished. Add empty states and `req()` guards, then verify screenshots.
-22. Every chart card should have a working output on initial load using the default filters. If a filter can legitimately remove all data, show a clear empty-state message in the card instead of an exception.
+7. Always pass `gap="1rem"` (or larger) to every `ui.layout_columns()` and `ui.layout_column_wrap()` call. The bslib default in Shiny for Python is a 0 gutter, so adjacent cards visually collide unless you set `gap=`.
+8. Render every KPI tile with `ui.value_box(title, value, showcase=..., theme="primary")`. Do NOT hand-roll metric cards from `ui.div(...)` or raw `ui.card(...)` — `value_box()` ships the spacing, typography, and showcase slot the dashboard needs.
+9. Give every chart, map, and table card a title via `ui.card_header(...)` and a readable floor such as `min_height="320px"`.
+10. Do not place more than 2 medium or large visualization cards in a row.
+11. For multi-section dashboards, use `ui.page_navbar()` with one `ui.nav_panel()` per section, add an icon to each tab, and use a branded title block.
+12. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta such as `down 4.1% vs prior period`.
+13. Never use Bootstrap `text-success` or `text-danger` directly for delta text inside dark or gradient value boxes. Use a high-contrast pill or badge treatment instead.
+14. For Plotly charts, always use `template="plotly_white"` and an explicit 3 to 4 color palette. Default Plotly rainbow colors instantly look auto-generated.
+15. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
+16. Format every displayed number for readability, including `render.DataGrid` outputs. Never show raw 6-decimal floats in UI.
+17. Prefer `great_tables.GT(...)` for short summary tables and `render.DataGrid(...)` for long filterable drill-down tables.
+18. Default to `lonboard` for maps and use a light basemap. Avoid dark basemaps.
+19. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
+20. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot`.
+21. Use the dataset the user provided. Do not substitute built-in examples such as `tips`, `diamonds`, `iris`, or `mtcars` unless the prompt explicitly asks for them.
+22. Add at least one `ui.toolbar()` in every non-trivial dashboard that targets Shiny >= 1.6. Put local controls in card headers or footers: metric selectors, grouping selectors, basemap/palette toggles, display-mode buttons, reset actions, or info buttons. Keep cross-cutting filters in the sidebar.
+23. Do not ship red output errors, blank panels, spinner-only panels, or zero/N/A KPI cards as if they are finished. Add empty states and `req()` guards, then verify screenshots.
+24. Every chart card should have a working output on initial load using the default filters. If a filter can legitimately remove all data, show a clear empty-state message in the card instead of an exception.
 
 ## Sensible dashboard defaults
 

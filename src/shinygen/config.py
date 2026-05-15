@@ -185,6 +185,11 @@ SANDBOX_TIME_LIMIT_BY_FRAMEWORK: dict[str, int] = {
     "shiny_python": SANDBOX_TIME_LIMIT,
     "shiny_r": 25 * 60,
 }
+# Hard ceiling for the OpenCode Go (open-weights) tier. Empirical evidence
+# from May-13 showed runs hitting the 25-min framework ceiling without
+# producing better apps because the upstream proxy was stalling. Failing
+# fast at 10 minutes preserves benchmark budget.
+OPENCODE_GO_TIME_LIMIT = 10 * 60
 BASE_PORT = 18801
 STARTUP_TIMEOUT = 25
 PAGE_LOAD_WAIT = 7

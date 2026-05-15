@@ -48,7 +48,7 @@ def test_direct_artifact_instructions_disable_tool_use():
     )
 
     assert "Do not call tools" in instructions
-    assert "exactly one fenced code block" in instructions
+    assert "EXACTLY ONE fenced code block" in instructions
     assert "app.py" in instructions
     assert "Prefer ui.card layouts." in instructions
 

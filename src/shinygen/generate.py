@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 from .config import (
     FRAMEWORK_COMPOSE,
     FRAMEWORKS,
+    OPENCODE_GO_TIME_LIMIT,
     SANDBOX_IMAGE_ENV_DEFAULTS,
     SANDBOX_WORK_DIR,
     is_opencode_go_model,
@@ -545,17 +546,16 @@ def build_generation_task(
             disallowed_tools=codex_disallowed_tools,
         )
     elif agent == "mini_swe_agent":
-        # OpenCode Go models bypass mini_swe_agent. The mini bridge strips
-        # provider-specific reasoning fields and forces litellm cost tracking
-        # that does not know OpenCode Go's synthetic provider names.
-        #
-        # They also bypass Inspect's multi-turn ReAct tool loop: Kimi returns
-        # repeated provider 500s on the second tool-turn in CI, which burns the
-        # full time limit and leaves no artifact. The direct solver gathers a
-        # compact data preview host-side, asks for one complete app file, and
-        # writes it into the sandbox for the existing scorer.
+        # OpenCode Go (open-weights) models bypass mini_swe_agent entirely.
+        # We drive them with our own native ReAct solver — same shape as
+        # claude_code / codex_cli but talking directly to the OpenCode Go
+        # endpoint. This avoids the mini bridge's litellm cost-tracking
+        # crash, the Anthropic-SDK ``/v1`` double-prefix bug, and Kimi's
+        # rejection of dropped ``reasoning_content`` fields.
         if model_id and is_opencode_go_model(model_id):
-            from .native_solver import native_direct_artifact_solver
+            from inspect_ai.agent import as_solver
+
+            from .native_solver import native_react_solver
 
             extra_instructions: str | None = None
             if use_skills:
@@ -568,13 +568,20 @@ def build_generation_task(
                         "generation guidelines when planning and editing "
                         f"files:\n\n{skill_context}"
                     )
-            solver = native_direct_artifact_solver(
+            agent_obj = native_react_solver(
+                model_id=model_id,
                 cwd=SANDBOX_WORK_DIR,
-                framework=framework_key,
-                artifact=artifact,
                 extra_instructions=extra_instructions,
             )
-            time_limit = sandbox_time_limit_for_framework(framework_key)
+            solver = as_solver(agent_obj)
+            # Fail fast for the open-weights tier: the prior 25-min ceiling
+            # burned wall-clock on stalled providers without producing
+            # better apps. 10 minutes is plenty for a single dashboard
+            # when the harness isn't sleeping on a slow proxy.
+            time_limit = min(
+                sandbox_time_limit_for_framework(framework_key),
+                OPENCODE_GO_TIME_LIMIT,
+            )
             return Task(
                 dataset=dataset,
                 solver=solver,

@@ -150,22 +150,30 @@ class TestBuildGenerationTask:
 
         assert captured["disallowed_tools"] == ["web_search"]
 
-    def test_opencode_go_openai_model_uses_native_direct_solver(
+    def test_opencode_go_openai_model_uses_native_react_solver(
         self,
         tmp_path,
         monkeypatch,
     ):
-        """OpenCode Go (OpenAI-compatible) routes to the direct native solver
-        instead of mini_swe_agent or a multi-turn tool loop."""
+        """OpenCode Go (OpenAI-compatible) routes to the native ReAct
+        solver instead of mini_swe_agent."""
         captured = {}
+        sentinel_agent = object()
         sentinel_solver = object()
 
-        def fake_native(**kwargs):
+        def fake_native_react(**kwargs):
             captured.update(kwargs)
+            return sentinel_agent
+
+        def fake_as_solver(agent, *args, **kwargs):
+            captured["_wrapped_agent"] = agent
             return sentinel_solver
 
         monkeypatch.setattr(
-            "shinygen.native_solver.native_direct_artifact_solver", fake_native
+            "shinygen.native_solver.native_react_solver", fake_native_react
+        )
+        monkeypatch.setattr(
+            "inspect_ai.agent.as_solver", fake_as_solver
         )
 
         task = build_generation_task(
@@ -177,25 +185,38 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_solver
-        assert captured["framework"] == "shiny_python"
-        assert captured["artifact"] == "app.py"
+        assert captured["_wrapped_agent"] is sentinel_agent
+        assert captured["model_id"] == (
+            "openai-api/opencode-go/deepseek-v4-flash"
+        )
+        # Fail-fast 10-min ceiling for the open-weights tier.
+        assert task.time_limit == 600
+        assert task.working_limit == 600
 
-    def test_opencode_go_minimax_model_uses_native_direct_solver(
+    def test_opencode_go_minimax_model_uses_native_react_solver(
         self,
         tmp_path,
         monkeypatch,
     ):
         """OpenCode Go MiniMax (Anthropic-compatible) also routes to the
-        direct native solver."""
+        native ReAct solver."""
         captured = {}
+        sentinel_agent = object()
         sentinel_solver = object()
 
-        def fake_native(**kwargs):
+        def fake_native_react(**kwargs):
             captured.update(kwargs)
+            return sentinel_agent
+
+        def fake_as_solver(agent, *args, **kwargs):
+            captured["_wrapped_agent"] = agent
             return sentinel_solver
 
         monkeypatch.setattr(
-            "shinygen.native_solver.native_direct_artifact_solver", fake_native
+            "shinygen.native_solver.native_react_solver", fake_native_react
+        )
+        monkeypatch.setattr(
+            "inspect_ai.agent.as_solver", fake_as_solver
         )
 
         task = build_generation_task(
@@ -207,8 +228,10 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_solver
-        assert captured["framework"] == "shiny_python"
-        assert captured["artifact"] == "app.py"
+        assert captured["_wrapped_agent"] is sentinel_agent
+        assert captured["model_id"] == (
+            "anthropic/opencode-go/minimax-m2.7"
+        )
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_use_skills_false_runs_vanilla_baseline(
