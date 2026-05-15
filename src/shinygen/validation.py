@@ -298,11 +298,18 @@ def validate_framework_artifact(
 
         # Check for banned frameworks
         banned_frameworks = {
-            "Streamlit": "import streamlit" in lower or "streamlit run app.py" in lower,
+            "Streamlit": (
+                "import streamlit" in lower
+                or "streamlit run app.py" in lower
+            ),
             "Dash": "import dash" in lower or "from dash" in lower,
-            "Gradio": "import gradio" in lower or "import gradio as gr" in lower,
+            "Gradio": (
+                "import gradio" in lower or "import gradio as gr" in lower
+            ),
             "Flask": "from flask import" in lower or "import flask" in lower,
-            "FastAPI": "from fastapi import" in lower or "import fastapi" in lower,
+            "FastAPI": (
+                "from fastapi import" in lower or "import fastapi" in lower
+            ),
         }
         for name, present in banned_frameworks.items():
             if present:
