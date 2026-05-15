@@ -5,44 +5,44 @@ Generate, evaluate, and refine Shiny apps using LLM agents (Claude Code, Codex C
 ## Architecture
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, Arial, sans-serif'}}}%%
 flowchart TD
-    A["👤 User Prompt + flags"] --> B["shinygen CLI / API"]
-    B --> C["Pre-flight checks<br/>Docker + API key"]
-    C --> D["Load framework defaults,<br/>data files, and skills"]
-    D --> E["Iteration loop"]
+    %% Color Palette Definitions
+    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,rx:8
+    classDef core fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a,rx:8
+    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87,rx:8
+    classDef validation fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,rx:8
+    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,rx:8
+    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,rx:8
 
-    subgraph F["Fresh Docker sandbox per iteration"]
-        G["Stage Docker context<br/>+ Inspect AI task"]
-        H["LLM Agent<br/>(Claude Code / Codex CLI)"]
-        I["Generate app.py / app.R"]
-        J{"--screenshot?"}
-        K["Run app on :8000<br/>inside sandbox"]
-        L["screenshot_helper.py<br/>waits 7s and captures screenshot.png"]
-        M["Agent reviews screenshot<br/>and refines in sandbox"]
-        N["Scorer copies project files<br/>to results volume"]
-        O["Eval log + usage rows"]
-
-        E --> G --> H --> I --> J
-        J -- Yes --> K --> L --> M --> N
-        J -- No --> N
-        N --> O
+    A["👤 User Request<br/><small>Prompt + Dataset + Flags</small>"]:::input --> B["shinygen API / CLI"]:::core
+    
+    B --> C["Start Iteration Loop"]:::core
+    
+    subgraph Sandbox["Docker Sandbox Execution"]
+        direction TB
+        C --> D["Inject Framework Skills & Context"]:::agent
+        D --> E["LLM Agent Writes Code<br/><small>Claude Code / Codex CLI / OpenCode Go</small>"]:::agent
     end
-
-    O --> P["Extract code from results volume<br/>or eval log"]
-    O --> Q["Copy agent_last_screenshot.png<br/>from results or eval attachment"]
-    P --> R{"--judge-model?"}
-    R -- Yes --> S["Run extracted app on host temp dir"]
-    S --> T["Host Playwright screenshot"]
-    T --> U["Judge panel<br/>(1+ external LLM judges)"]
-    U --> Y["Average per-criterion scores<br/>+ concatenate rationales"]
-    Y --> V{"Score ≥ threshold?"}
-    V -- No --> W["Refinement prompt includes<br/>panel feedback + previous code"]
-    W --> E
-    V -- Yes --> X["✅ Output directory"]
-    R -- No --> X
-
-    Q --> X
-    X --> Z["Artifacts:<br/>• app.py / app.R<br/>• data files<br/>• screenshot.png<br/>• agent_last_screenshot.png<br/>• eval_logs/*.eval<br/>• run_summary.json"]
+    
+    E --> F["Host-side Runtime Validation<br/><small>Unconditionally Starts App & Captures Logs</small>"]:::validation
+    
+    F --> G{"Screenshots<br/>Enabled?"}:::validation
+    G -- Yes --> H["Host Playwright Captures UI"]:::validation
+    G -- No --> I{"Judge Model<br/>Enabled?"}:::judge
+    H --> I
+    
+    I -- Yes --> J["LLM Judge Panel Evaluates<br/><small>Scores Code + Visuals (1-10)</small>"]:::judge
+    J --> K{"Meets Quality<br/>Threshold?"}:::judge
+    
+    I -- No --> L{"App Started<br/>Successfully?"}:::validation
+    
+    K -- No --> M["Construct Refinement Feedback<br/><small>Judge Critiques + Server Error Logs</small>"]:::core
+    L -- No --> M
+    M --> C
+    
+    K -- Yes --> N["✅ Save Artifacts<br/><small>Code, Logs, Screenshots, Summary</small>"]:::output
+    L -- Yes --> N
 ```
 
 For full documentation — installation, CLI, Python API, batch mode, GitHub Actions, model aliases, skills, and data inputs — see the published docs:
