@@ -232,6 +232,8 @@ def build_refinement_prompt(
     judge_feedback: dict[str, dict[str, str | float]],
     iteration: int,
     previous_code: str | None = None,
+    runtime_logs: str | None = None,
+    validation_passed: bool | None = None,
 ) -> str:
     """Build a refinement prompt incorporating judge feedback.
 
@@ -242,6 +244,8 @@ def build_refinement_prompt(
         previous_code: The source code from the previous iteration.
             When provided, the agent can see and incrementally improve it
             rather than regenerating from scratch.
+        runtime_logs: Optional startup/server logs.
+        validation_passed: Optional boolean indicating if startup passed.
     """
     feedback_lines = []
     for criterion, entry in judge_feedback.items():
@@ -261,6 +265,16 @@ def build_refinement_prompt(
         parts.append(
             f"\nHere is the previous version of the app that was evaluated:\n\n"
             f"```\n{previous_code}\n```\n"
+        )
+
+    if runtime_logs and validation_passed is False:
+        trimmed_logs = runtime_logs.strip() or "(no server output captured)"
+        if len(trimmed_logs) > 8_000:
+            trimmed_logs = trimmed_logs[-8_000:]
+        parts.append(
+            f"\nAdditionally, the app failed to start locally. "
+            f"Please fix the following startup/server errors before addressing the judge feedback:\n\n"
+            f"```\n{trimmed_logs}\n```\n"
         )
 
     parts.append(

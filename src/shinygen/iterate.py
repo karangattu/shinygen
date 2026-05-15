@@ -933,6 +933,25 @@ def generate_and_refine(
                     )
                     continue
 
+        # --- Step 3.5: Runtime Validation ---
+        runtime_valid, runtime_logs = _validate_generated_app_runtime(
+            eval_dir,
+            framework_key,
+            artifact_name,
+            effective_port,
+        )
+        if runtime_valid:
+            logger.info(
+                "Iteration %d: Runtime validation passed; captured startup logs",
+                iteration,
+            )
+        else:
+            logger.warning(
+                "Iteration %d: Runtime validation failed; captured startup logs:\n%s",
+                iteration,
+                runtime_logs,
+            )
+
         # --- Step 4: Judge ---
         if judge_models:
             try:
@@ -1035,6 +1054,8 @@ def generate_and_refine(
                         judge_result.feedback_dict(),
                         iteration,
                         previous_code=code,
+                        runtime_logs=runtime_logs,
+                        validation_passed=runtime_valid,
                     )
                     logger.info("Preparing refinement prompt for next iteration")
 
@@ -1045,22 +1066,6 @@ def generate_and_refine(
                 best_quality_score = 0.0
         else:
             # No judge — use local startup logs as the refinement signal.
-            runtime_valid, runtime_logs = _validate_generated_app_runtime(
-                eval_dir,
-                framework_key,
-                artifact_name,
-                effective_port,
-            )
-            if runtime_valid:
-                logger.info(
-                    "Iteration %d: Runtime validation passed; captured startup logs",
-                    iteration,
-                )
-            else:
-                logger.warning(
-                    "Iteration %d: Runtime validation failed; captured startup logs",
-                    iteration,
-                )
 
             best_code = code
             best_runtime_valid = runtime_valid
