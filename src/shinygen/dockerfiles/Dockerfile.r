@@ -61,12 +61,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Pre-install R packages
 RUN Rscript -e ' \
-    install.packages(c( \
+    pkgs <- c( \
         "shiny", "bslib", "bsicons", \
         "ggplot2", "dplyr", "readr", "tidyr", "stringr", "lubridate", \
         "plotly", "DT", "leaflet", \
         "scales", "thematic", "htmltools", "htmlwidgets" \
-    ), repos = "https://cloud.r-project.org") \
+    ); \
+    install.packages(pkgs); \
+    missing <- pkgs[!(pkgs %in% installed.packages()[,"Package"])]; \
+    if (length(missing) > 0) { \
+        stop("Failed to install packages: ", paste(missing, collapse = ", ")); \
+    } \
 '
 
 # Python packages (so the image can also exercise Python helpers when
