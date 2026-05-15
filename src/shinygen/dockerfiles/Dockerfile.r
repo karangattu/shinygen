@@ -93,6 +93,12 @@ RUN pip3 install --break-system-packages --no-cache-dir uv && \
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
 RUN playwright install chromium
 
+# Install inspect-tool-support for web_browser() tool sandbox service
+ENV PATH="$PATH:/opt/inspect_tool_support/bin"
+RUN python3 -m venv /opt/inspect_tool_support && \
+    /opt/inspect_tool_support/bin/pip install inspect-tool-support && \
+    /opt/inspect_tool_support/bin/inspect-tool-support post-install
+
 # Pre-install Claude Code and Codex CLI standalone binaries.
 # inspect_swe uses `which claude` / `which codex` when version="auto"
 # (the default) and skips downloading when these are already on PATH.
