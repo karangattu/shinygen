@@ -16,7 +16,7 @@ After reading this file, load only the references you need:
 | Task surface | Read this file |
 | --- | --- |
 | Page structure, sidebar vs navbar, responsive grids, fill behavior, branded navbar with per-tab icons | [references/layout-and-navigation.md](references/layout-and-navigation.md) |
-| Cards, value boxes, accordions, toolbars, tooltips, KPI value box with period-over-period delta, summary tables with `great_tables` | [references/components.md](references/components.md) |
+| Cards, value boxes, accordions, toolbars, tooltips, summary tables with `great_tables` | [references/components.md](references/components.md) |
 | Reactive graph design, `@render.plot`, Plotly brand template, `DataGrid` number formatting, empty-state handling | [references/reactivity-and-rendering.md](references/reactivity-and-rendering.md) |
 | Themes and brand palette, CSS spacing safety net, number formatting, data loading, project structure | [references/styling-and-data.md](references/styling-and-data.md) |
 | Icons, geographic outputs, map-library picker, lonboard / pydeck / Plotly map tiers | [references/icons-and-maps.md](references/icons-and-maps.md) |
@@ -51,11 +51,9 @@ These rules are global and should be applied on almost every dashboard task.
 9. Give every chart, map, and table card a title via `ui.card_header(...)` and a readable floor such as `min_height="320px"`.
 10. Do not place more than 2 medium or large visualization cards in a row.
 11. For multi-section dashboards, use `ui.page_navbar()` with one `ui.nav_panel()` per section, add an icon to each tab, and use a branded title block.
-12. Make value boxes carry context, not just a number. Pair the headline metric with a small period-over-period delta such as `down 4.1% vs prior period`.
-13. Never use Bootstrap `text-success` or `text-danger` directly for delta text inside dark or gradient value boxes. Use a high-contrast pill or badge treatment instead.
-14. For Plotly charts, always use `template="plotly_white"` and an explicit 3 to 4 color palette. Default Plotly rainbow colors instantly look auto-generated.
-15. Never return a Plotly figure from `@render.plot`. Use `from shinywidgets import output_widget, render_plotly` for Plotly cards in Core apps, or `@render_widget` for other HTML widgets. `@render.plot` is for Matplotlib and Seaborn only and will surface red render errors for Plotly figures.
-16. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
+12. For Plotly charts, always use `template="plotly_white"` and an explicit 3 to 4 color palette. Default Plotly rainbow colors instantly look auto-generated.
+13. Never return a Plotly figure from `@render.plot`. Use `from shinywidgets import output_widget, render_plotly` for Plotly cards in Core apps, or `@render_widget` for other HTML widgets. `@render.plot` is for Matplotlib and Seaborn only and will surface red render errors for Plotly figures.
+14. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
 17. Format every displayed number for readability, including `render.DataGrid` outputs. Never show raw 6-decimal floats in UI.
 18. Prefer `great_tables.GT(...)` for short summary tables and `render.DataGrid(...)` for long filterable drill-down tables.
 19. Default to `lonboard` for maps and use a light basemap. Avoid dark basemaps.
@@ -87,7 +85,7 @@ Use these component defaults unless the prompt conflicts:
 
 Use these shortcuts to stay consistent:
 
-1. Need the fastest path to a production-feeling app: navbar layout, light theme, tab icons, KPI deltas, Plotly white template, one card per chart.
+1. Need the fastest path to a production-feeling app: navbar layout, light theme, tab icons, Plotly white template, one card per chart.
 2. Need a geographic view: read [references/icons-and-maps.md](references/icons-and-maps.md) and default to `lonboard`.
 3. Need a polished summary table: read [references/components.md](references/components.md) and prefer `great_tables`.
 4. Need maintainable server logic: read [references/reactivity-and-rendering.md](references/reactivity-and-rendering.md) and centralize filtering in `@reactive.calc`.
