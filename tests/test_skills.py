@@ -169,7 +169,7 @@ class TestBuildGenerationTask:
         monkeypatch,
     ):
         """OpenCode Go (OpenAI-compatible) routes to the native ReAct
-        solver instead of mini_swe_agent."""
+        solver."""
         captured = {}
         sentinel_agent = object()
 
@@ -183,7 +183,7 @@ class TestBuildGenerationTask:
 
         task = build_generation_task(
             user_prompt="Build a dashboard",
-            agent="mini_swe_agent",
+            agent="native_react_solver",
             model_id="openai-api/opencode-go/deepseek-v4-flash",
             framework_key="shiny_python",
             docker_context_dir=tmp_path,
@@ -217,7 +217,7 @@ class TestBuildGenerationTask:
 
         task = build_generation_task(
             user_prompt="Build a dashboard",
-            agent="mini_swe_agent",
+            agent="native_react_solver",
             model_id="anthropic/opencode-go/minimax-m2.7",
             framework_key="shiny_python",
             docker_context_dir=tmp_path,

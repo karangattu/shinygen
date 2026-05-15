@@ -85,19 +85,19 @@ class TestResolveModel:
         assert agent == "codex_cli"
         assert model_id == "openai/gpt-5.3-codex"
 
-    def test_opencode_go_alias_resolves_to_mini_swe_agent(self):
+    def test_opencode_go_alias_resolves_to_native_react_solver(self):
         agent, model_id = resolve_model("opencode-go/kimi-k2.6")
-        assert agent == "mini_swe_agent"
+        assert agent == "native_react_solver"
         assert model_id == "openai-api/opencode-go/kimi-k2.6"
 
     def test_opencode_go_short_alias_resolves_to_openai_api_provider(self):
         agent, model_id = resolve_model("deepseek-v4-flash")
-        assert agent == "mini_swe_agent"
+        assert agent == "native_react_solver"
         assert model_id == "openai-api/opencode-go/deepseek-v4-flash"
 
     def test_opencode_go_minimax_alias_resolves_to_anthropic_provider_marker(self):
         agent, model_id = resolve_model("minimax-m2.7")
-        assert agent == "mini_swe_agent"
+        assert agent == "native_react_solver"
         assert model_id == "anthropic/opencode-go/minimax-m2.7"
         assert is_opencode_go_anthropic_model(model_id)
         assert opencode_go_anthropic_model_name(model_id) == "minimax-m2.7"
@@ -123,12 +123,12 @@ class TestResolveModel:
     )
     def test_all_documented_opencode_go_aliases_resolve(self, alias):
         agent, model_id = resolve_model(alias)
-        assert agent == "mini_swe_agent"
+        assert agent == "native_react_solver"
         assert model_id.endswith(alias)
 
-    def test_full_openai_api_id_uses_mini_swe_agent(self):
+    def test_full_openai_api_id_uses_native_react_solver(self):
         agent, model_id = resolve_model("openai-api/opencode-go/qwen3.6-plus")
-        assert agent == "mini_swe_agent"
+        assert agent == "native_react_solver"
         assert model_id == "openai-api/opencode-go/qwen3.6-plus"
 
     def test_unknown_raises(self):
@@ -248,11 +248,11 @@ class TestCheckAPIKey:
     def test_opencode_go_key_missing(self):
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(APIKeyMissingError, match="OPENCODE_GO_API_KEY"):
-                check_api_key("mini_swe_agent", "openai-api/opencode-go/kimi-k2.6")
+                check_api_key("native_react_solver", "openai-api/opencode-go/kimi-k2.6")
 
     def test_opencode_go_key_present(self):
         with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
-            check_api_key("mini_swe_agent", "openai-api/opencode-go/kimi-k2.6")
+            check_api_key("native_react_solver", "openai-api/opencode-go/kimi-k2.6")
 
     def test_prepare_model_environment_sets_opencode_go_base_url(self):
         with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
