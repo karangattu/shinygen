@@ -56,7 +56,7 @@ These rules are global and should be applied on almost every dashboard task.
 14. Never put more than one chart inside a single `@render.plot`. Do not stack Matplotlib subplots in one card.
 17. Format every displayed number for readability, including `render.DataGrid` outputs. Never show raw 6-decimal floats in UI.
 18. Prefer `great_tables.GT(...)` for short summary tables and `render.DataGrid(...)` for long filterable drill-down tables.
-19. Default to `lonboard` for maps and use a light basemap. Avoid dark basemaps.
+19. Default to Plotly `px.scatter_map` for point maps in generated dashboards unless the project explicitly declares and installs `lonboard` or another map dependency. Use a light Carto/Positron basemap and avoid dark basemaps.
 20. Handle missing data explicitly with `dropna()`, `pd.to_numeric(..., errors="coerce")`, and `req()`.
 21. Keep imports at module scope except `matplotlib.pyplot`, which should be imported inside `@render.plot`.
 22. Use the dataset the user provided. Do not substitute built-in examples such as `tips`, `diamonds`, `iris`, or `mtcars` unless the prompt explicitly asks for them.
@@ -86,7 +86,7 @@ Use these component defaults unless the prompt conflicts:
 Use these shortcuts to stay consistent:
 
 1. Need the fastest path to a production-feeling app: navbar layout, light theme, tab icons, Plotly white template, one card per chart.
-2. Need a geographic view: read [references/icons-and-maps.md](references/icons-and-maps.md) and default to `lonboard`.
+2. Need a geographic view: read [references/icons-and-maps.md](references/icons-and-maps.md) and use the dependency-safe Plotly map pattern unless the app already has a declared richer map stack.
 3. Need a polished summary table: read [references/components.md](references/components.md) and prefer `great_tables`.
 4. Need maintainable server logic: read [references/reactivity-and-rendering.md](references/reactivity-and-rendering.md) and centralize filtering in `@reactive.calc`.
 5. Need translation guidance: read [references/core-vs-express.md](references/core-vs-express.md).

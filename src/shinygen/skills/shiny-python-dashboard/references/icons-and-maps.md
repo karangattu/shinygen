@@ -90,17 +90,85 @@ If the geography is incidental, use a ranked table or bar chart instead.
 
 ### Picking a map library
 
-Default to `lonboard` for point, hex, and text layers. Reach for the next tier only when `lonboard` cannot express the encoding you need.
+Generated benchmark apps must render with the dependencies available in the target environment. Do not import `lonboard`, `pydeck`, `folium`, or `keplergl` unless that dependency is declared and installed for the app. For ordinary point maps, default to Plotly `px.scatter_map` because it is already used by the dashboard chart stack and does not need an extra map widget package.
 
 | Library | Use when | Notes |
 | --- | --- | --- |
-| `lonboard` | Point, text, hex, or path layers up to ~1M rows | Tier 1 default. GPU-accelerated, returns an `anywidget`. |
-| `pydeck` | You need a deck.gl layer that lonboard does not expose (e.g. `IconLayer` with custom sprites) | Tier 2 fallback. Returns a `pydeck.Deck`; render via `output_widget`. |
-| `plotly.express` | Density heatmaps, choropleths, or quick prototypes | Tier 3 fallback. Use `density_mapbox` or `choropleth_mapbox` with a light style. |
+| `plotly.express` | Standard dashboard point maps, density maps, choropleths, and dependency-safe generated apps | Tier 1 default. Use `scatter_map`, `density_mapbox`, or `choropleth_mapbox` with a light style. |
+| `lonboard` | Point, text, hex, or path layers up to ~1M rows when the dependency is declared | Tier 2 for large/GPU maps. Returns an `anywidget`. |
+| `pydeck` | You need a deck.gl layer that lonboard does not expose (e.g. `IconLayer` with custom sprites) and the dependency is declared | Tier 3 fallback. Returns a `pydeck.Deck`; render via `output_widget`. |
 | `folium` | Static-feeling tile maps with markers and popups | Use only for simple click-through maps; not great for >1k points. |
 | `keplergl` | Heavily exploratory analyst tooling | Rarely the right pick for a polished dashboard. |
 
-### Tier 1 — `lonboard` ScatterplotLayer with popup
+### Tier 1 — Plotly `scatter_map`
+
+This is the default for generated Shiny for Python dashboards. It avoids blank maps caused by missing optional widget libraries, works with `output_widget()`, and keeps the chart stack consistent.
+
+```python
+import pandas as pd
+import plotly.express as px
+from shinywidgets import output_widget, render_plotly
+
+ROOM_COLORS = {
+    "Entire home/apt": "#0d6efd",
+    "Private room": "#198754",
+    "Shared room": "#ffc107",
+    "Hotel room": "#dc3545",
+}
+
+ui.card(
+    ui.card_header("Listing locations"),
+    output_widget("listings_map", height="540px"),
+    full_screen=True,
+    min_height="540px",
+)
+
+@render_plotly
+def listings_map():
+    frame = filtered_listings().copy()
+    frame["latitude"] = pd.to_numeric(frame["latitude"], errors="coerce")
+    frame["longitude"] = pd.to_numeric(frame["longitude"], errors="coerce")
+    frame = frame.dropna(subset=["latitude", "longitude"])
+    if frame.empty:
+        return empty_fig("No listings with valid coordinates")
+
+    fig = px.scatter_map(
+        frame,
+        lat="latitude",
+        lon="longitude",
+        color="room_type",
+        color_discrete_map=ROOM_COLORS,
+        hover_name="name",
+        hover_data={
+            "neighborhood": True,
+            "price": ":$,.0f",
+            "score_rating": ":.2f",
+            "latitude": False,
+            "longitude": False,
+        },
+        zoom=10,
+        height=540,
+    )
+    fig.update_layout(
+        template="plotly_white",
+        map_style="carto-positron",
+        map_center={
+            "lat": float(frame["latitude"].mean()),
+            "lon": float(frame["longitude"].mean()),
+        },
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
+    return fig
+```
+
+Guidelines:
+
+- Use `@render_plotly`, not `@render_widget`, for Plotly maps.
+- Keep the map output as `output_widget(...)`; Plotly widgets still render through `shinywidgets`.
+- Always set `height`, `map_style`, `map_center`, and zero margins.
+- Build `hover_data` only from columns that exist in the dataset when the schema is uncertain.
+
+### Tier 2 — `lonboard` ScatterplotLayer with popup
 
 ```python
 import lonboard
@@ -161,6 +229,8 @@ def listings_map():
     return Map(layer, basemap_style=lonboard.basemap.CartoBasemap.Positron)
 ```
 
+Use this only when `lonboard` is installed or declared in the generated app dependencies.
+
 Guidelines:
 
 - Build the `numpy.uint8` color array once per render and pass it as `get_fill_color`.
@@ -169,7 +239,7 @@ Guidelines:
 - Keep popup column names short — lonboard renders the dict keys verbatim.
 - Use a Positron / light Carto basemap.
 
-### Tier 1b — `lonboard` TextLayer with emoji glyphs
+### Tier 2b — `lonboard` TextLayer with emoji glyphs
 
 Good for category icons that should be readable at any zoom.
 
@@ -194,7 +264,7 @@ text_layer = TextLayer.from_geopandas(
 )
 ```
 
-### Tier 1c — `lonboard` H3HexagonLayer for density
+### Tier 2c — `lonboard` H3HexagonLayer for density
 
 ```python
 import h3
@@ -216,7 +286,7 @@ hex_layer = H3HexagonLayer(
 )
 ```
 
-### Tier 2 — `pydeck` IconLayer
+### Tier 3 — `pydeck` IconLayer
 
 Use when you need genuine sprite icons that are not glyphs.
 
@@ -245,9 +315,9 @@ deck = pdk.Deck(layers=[layer], initial_view_state=view,
 
 Render with `@render_widget` from `shinywidgets`.
 
-### Tier 3 — Plotly density fallback
+### Plotly density fallback
 
-Use only when neither lonboard nor pydeck fit (e.g. quick density heatmap with no extra deps).
+Use this when a point map overplots heavily and you need a quick heatmap without adding dependencies.
 
 ```python
 import plotly.express as px
@@ -266,6 +336,7 @@ fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=540)
 - Always use a light basemap (Positron / Carto Light). Dark basemaps look gimmicky and reduce contrast on points.
 - Recompute the map center from the filtered dataset instead of hard-coding coordinates.
 - Give the map card `min_height="420px"` to `"560px"` and `full_screen=True`.
+- For Plotly point maps, prefer `px.scatter_map` over deprecated `px.scatter_mapbox` in new code.
 - For `lonboard`, build color and size arrays as `numpy.uint8` / `numpy.float32` once per render — do not iterate per-row in the render function.
 - Push live filter changes via `@reactive.effect` updating `layer.data` / `layer.get_fill_color` instead of re-rendering the whole `Map` when possible.
 - Never plot more than ~5,000 markers without aggregating to hexes or clusters first.
