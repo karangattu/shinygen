@@ -188,6 +188,32 @@ Shiny for Python does not use the same `bs_theme()` object as bslib in R, so kee
 ui.input_dark_mode(id="mode")
 ```
 
+## Visual Design & Spacing Quality
+
+### Cohesive Color Palette
+Establish a strict, professional color harmony. Limit layouts to **2-3 primary/brand colors + neutrals** (whites, light grays, dark slate/charcoal text). 
+* **Semantic Colors**: Use standard colors only to convey actual meaning (e.g., green for positive trends, red for outages/danger, amber/yellow for warnings). Do not assign random colored background swatches to value boxes or card components (e.g., mixing dark green, yellow, blue, and purple in one row without meaning).
+* **WCAG Contrast Compliance**: Ensure high contrast for all text layers. Never render yellow, lime-green, or light gray text on light/white card backgrounds. Use dark charcoal (`#1f2937`) or dark slate for headings.
+
+### Spacing, Grid, and Breathing Room
+To eliminate cluttered and cramped layouts, adhere to the following layout constraints:
+* **Generous Grid Gutters**: Always pass `gap="1rem"` or `gap="1.5rem"` on `ui.layout_columns` and `ui.layout_column_wrap`.
+* **Chart Height Floor**: Never let visualization cards collapse. Set explicit heights and floors (`min_height="320px"` to `"400px"`) for plots and maps so labels and ticks remain fully readable.
+* **White Space**: Separate different functional sections (KPIs, main chart rows, and detail directories) with clear vertical spacing.
+
+### Responsive Design & Widths
+Always design dashboards with responsiveness in mind to support varying viewport sizes:
+* **Responsive Column Widths**: Use breakpoint dictionaries for grid rows to stack components vertically on small screens:
+  ```python
+  ui.layout_columns(
+      card_chart,
+      card_map,
+      col_widths={"sm": 12, "lg": [7, 5]},
+      gap="1rem",
+  )
+  ```
+* **Compact Sidebar Overlay**: Keep filters neat. For mobile viewports, the default sidebar collapses into an overlay canvas automatically when configuring `open="desktop"`.
+
 ## Requirements
 
 Include the packages your dashboard actually uses. Common dashboard requirements are:

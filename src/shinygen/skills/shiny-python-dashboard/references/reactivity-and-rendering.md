@@ -178,8 +178,34 @@ Guidelines:
 - Always start from `template="plotly_white"` (or the registered `"brand"` template).
 - Pass an explicit 3–4 color palette via `color_discrete_sequence`. Never accept default rainbow.
 - Strip chart junk: hide the top/right spines, drop the y-axis line, soften gridlines.
-- Place the legend horizontally above the plot.
+- Place the legend horizontally above the plot. If the legend is redundant (e.g., when the categories are already clearly labeled on the axis or bars, or there is only a single series), completely hide it using `showlegend=False` in `update_layout`.
 - Set `margin` explicitly so titles do not collide with the card header.
+- **Categorical Simplification (<5% Rule)**: For bar, column, or pie charts (e.g., Property Types, Connector Types), always combine sparse categories representing **less than 5% of the total dataset** into a single `"Other"` bucket up front. This prevents unreadable, crammed labels:
+  ```python
+  pcts = df["property_type"].value_counts(normalize=True)
+  df["property_type_grouped"] = df["property_type"].apply(
+      lambda x: x if pcts.get(x, 0) >= 0.05 else "Other"
+  )
+  ```
+- **Direct Data Labels**: Display raw metrics directly next to or on top of chart bars or columns rather than forcing users to trace grids or hover. Set `texttemplate` and `textposition`:
+  ```python
+  fig.update_traces(texttemplate="%{y:,.0f}", textposition="outside")
+  ```
+- **Histogram Widths & Overlays**: Prevent thin, unreadable histogram bars. Define a generous, explicit bin spacing, add solid white borders (`line=dict(color="white", width=1)`), and add a marginal box-plot overlay to provide a rich distribution breakdown:
+  ```python
+  fig = px.histogram(df, x="price", nbins=25, marginal="box")
+  fig.update_traces(marker=dict(line=dict(color="white", width=1.5)))
+  ```
+- **Scatter Plot Legibility & Tooltips**: Ensure scatter plots are easy to interpret. Increase marker dots to an explicit readable scale (`size=8` or `size=9`), add soft opacity to handle overlaps, add white borders, completely disable trendlines unless statistically significant, and build highly informative hover cards using `hover_name` and `hover_data`:
+  ```python
+  fig = px.scatter(
+      df, x="price", y="rating",
+      hover_name="listing_name",
+      hover_data={"neighborhood": True, "price": ":$,.0f", "rating": ":.2f"}
+  )
+  fig.update_traces(marker=dict(size=9, opacity=0.75, line=dict(color="white", width=1)))
+  ```
+- **Sorted & Labeled Category Charts**: Always sort categorical comparison bars in descending or ascending order of values. Place the data label at the end of the bars so differences are immediately clear.
 
 ### Tables with `@render.data_frame`
 

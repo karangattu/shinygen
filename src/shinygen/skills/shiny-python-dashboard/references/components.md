@@ -148,9 +148,35 @@ Guidelines:
 
 - Keep the row to 3 or 4 boxes.
 - Prefer `ui.layout_column_wrap(..., width="240px", fill=False)` so KPI cards wrap before becoming cramped.
-- Use named themes like `"primary"`, `"success"`, `"info"`, `"warning"`, and `"danger"`.
-- Use icons that reinforce the metric; do not use emojis.
+- Use named themes like `"primary"`, `"success"`, `"info"`, `"warning"`, and `"danger"` matching the swatches. Do not assign random colored background swatches to adjacent value boxes without semantic meaning.
+- Use icons that reinforce the metric; do not use emojis or generic/unrelated icons.
 - Format the displayed value instead of passing a raw float or integer.
+- **Mandatory Metric Context & Trends**: Headline metrics must never stand alone. Always provide a clear comparison trend or period label (e.g., `↑ 12% vs prior month`, `↓ 5% outage rate`) under the primary value inside the card.
+  * **Core API Trend Pattern**:
+    ```python
+    ui.value_box(
+        "Revenue",
+        ui.output_text("kpi_rev"),
+        ui.p(
+            ui.tags.span("↑ 12.4%", class_="text-success fw-bold"),
+            " vs last month",
+            class_="fs-6 text-muted mb-0"
+        ),
+        showcase=icon_svg("dollar-sign"),
+        theme="primary"
+    )
+    ```
+  * **Express API Trend Pattern**:
+    ```python
+    with ui.value_box(showcase=icon_svg("plug"), theme="success"):
+        "Active Ports"
+        f"{active_ports:,}"
+        ui.p(
+            ui.tags.span("↓ 3%", class_="text-danger fw-bold"),
+            " vs previous period",
+            class_="fs-6 text-muted mb-0"
+        )
+    ```
 
 ### Dynamic showcase icons
 
@@ -282,6 +308,21 @@ Guidelines:
 - Use notifications for completion, failure, or "export started" states.
 - Keep them specific instead of saying only "Done".
 - Reserve persistent on-page status areas for information users need to keep reading.
+
+## Table Improvements & Cognitive Load Reduction
+
+To prevent tables from looking like raw, overwhelming spreadsheets, apply these strict design practices:
+* **Subset Columns**: Never display all columns from the raw dataset. Subset your dataframe to show only 4–6 essential attributes (e.g., name, price, rating, neighborhood, and status) so the user is not overwhelmed.
+* **Row Hover Highlighting**: Always enable row hover highlighting for readability by injecting simple CSS in your app UI:
+  ```python
+  ui.tags.style("""
+      .rt-tbody tr:hover {
+          background-color: #f8f9fa !important;
+          transition: background-color 0.15s ease-in-out;
+      }
+  """)
+  ```
+* **Virtualization and Sorting**: Always configure `render.DataGrid` with `filters=True` (so users can query columns directly), and ensure it has an explicit height floor (at least `height="420px"`) to prevent the grid from collapsing or showing tiny pagination buttons.
 
 ## Best Practices
 
