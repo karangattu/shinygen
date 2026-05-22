@@ -245,11 +245,88 @@ Do not wrap `ui.nav_panel()` content in another `ui.card()` when the container i
 
 Use page-level sidebars when the controls affect the whole page or the whole app section.
 
+#### Premium Sidebar Design Guidelines
+
+A standard flat vertical list of controls looks dry and textbook. To make a dashboard's filter panel visually appealing, legible, and premium:
+1. **Never use low-contrast text**: Do not use light gray/muted utility classes (like `text-secondary` or `text-muted`) for main sidebar headings on a standard light-gray sidebar background. Always use bold high-contrast text (`class_="text-dark fw-bold"` or `#1f2937`) to guarantee WCAG compliance.
+2. **Structure with Grouping Cards**: Group flat stacks of input controls logically inside styled panels or cards (using `class_="bg-white p-3 rounded shadow-sm border mb-3"`). This breaks the vertical monotony and groups related parameters (e.g., date selection, geographic bounds, ticker filters).
+3. **Enhance with Icons**: Bring group headers and labels to life with inline SVG icons from `faicons` (e.g., `ui.span(icon_svg("calendar-days", margin_right="0.5em"), " Time Horizon")`).
+4. **Actionable Resets**: Style clear reset/action buttons clearly (e.g., `class_="btn-outline-danger w-100"`).
+
+Here is a premium page sidebar layout template:
+
 ```python
 ui.page_sidebar(
     ui.sidebar(
-        ui.input_checkbox_group("region", "Region", regions),
-        ui.input_action_button("reset", "Reset"),
+        ui.div(
+            # High-Contrast Title block
+            ui.div(
+                ui.h4("Global Controls", class_="mb-1 text-dark fw-bold"),
+                ui.output_ui("filter_count_ui"),
+                class_="pb-3 border-bottom mb-3"
+            ),
+            # Group 1: Time Horizon card
+            ui.div(
+                ui.div(
+                    ui.span(
+                        icon_svg("calendar-days", margin_right="0.5em"), 
+                        "Time Horizon", 
+                        class_="fw-bold text-dark"
+                    ),
+                    class_="mb-2"
+                ),
+                ui.input_date_range(
+                    "date_range", "", start=min_date, end=max_date
+                ),
+                class_="bg-white p-3 rounded shadow-sm border mb-3",
+            ),
+            # Group 2: Scope & Portfolio card
+            ui.div(
+                ui.div(
+                    ui.span(
+                        icon_svg("tags", margin_right="0.5em"), 
+                        "Scope & Portfolio", 
+                        class_="fw-bold text-dark"
+                    ),
+                    class_="mb-2"
+                ),
+                ui.input_selectize(
+                    "sku_filter",
+                    "Select SKU Products",
+                    choices=sku_choices,
+                    multiple=True,
+                    options={"placeholder": "All SKUs Selected"},
+                ),
+                ui.div(class_="my-2"),
+                ui.input_selectize(
+                    "retailer_filter",
+                    "Select Retailers",
+                    choices=retailer_choices,
+                    multiple=True,
+                    options={"placeholder": "All Retailers Selected"},
+                ),
+                class_="bg-white p-3 rounded shadow-sm border mb-3",
+            ),
+            # Group 3: Distribution Network card
+            ui.div(
+                ui.div(
+                    ui.span(
+                        icon_svg("warehouse", margin_right="0.5em"), 
+                        "Distribution Network", 
+                        class_="fw-bold text-dark"
+                    ),
+                    class_="mb-2"
+                ),
+                ui.input_checkbox_group(
+                    "dc_filter", "", choices=dc_choices, selected=dc_choices
+                ),
+                class_="bg-white p-3 rounded shadow-sm border mb-3",
+            ),
+            # Clear Reset Button
+            ui.input_action_button(
+                "reset_btn", "Reset Filters", class_="btn-outline-danger w-100"
+            ),
+        ),
         open="desktop",
     ),
     ...,

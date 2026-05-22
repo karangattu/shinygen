@@ -122,8 +122,8 @@ Guidelines:
 
 - Always pass an explicit `theme=` to your `ui.page_*()` call. Prefer `shinyswatch.theme.zephyr`, `flatly`, `minty`, `cosmo`, `lumen`, or `yeti`.
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
-- Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, value-box themes, and `great_tables.data_color()` ramps.
-- Use named Bootstrap themes (`"primary"`, `"success"`, `"info"`, `"warning"`, `"danger"`) on value boxes so they line up with the active swatch.
+- Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, and `great_tables.data_color()` ramps.
+- Forbid using standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes, as they cause legibility/contrast issues with comparison dynamic helper texts. Use the clean left-border accent style on light/white card themes instead.
 - Avoid mixing rainbow palettes with the brand sequence — pick one and stick to it.
 
 ## CSS and Theming

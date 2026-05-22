@@ -33,15 +33,6 @@ Guidelines:
 - Use `ui.card_footer()` for provenance, notes, or small actions.
 - Keep static text cards shorter than plot cards; large paragraphs belong in scrolling pages, not dashboard grids.
 
-### Preventing squished dashboards
-
-When a dashboard has a KPI row plus multiple rows of charts, maps, or tables, prefer a scrolling page over a fully fillable one.
-
-- Use `fillable=False` for dense dashboards.
-- Keep KPI rows in `ui.layout_column_wrap(..., width="240px", fill=False)`.
-- Give each chart or map card `min_height="320px"` or more.
-- Split crowded content across tabs or pages instead of forcing many shallow cards into one viewport.
-
 ### Card headers with inline controls
 
 Card headers can hold small secondary controls.
@@ -111,21 +102,36 @@ Toolbar decision rule:
 
 Use `ui.value_box()` for KPIs and headline metrics.
 
+> [!WARNING]
+> **WCAG Contrast & Readability Warning**: Never use standard saturated colored background themes (`theme="primary"`, `"success"`, `"danger"`, `"info"`) for value boxes. Pairings of dynamic trends (like green `text-success` or gray `text-muted`) on saturated backgrounds fail contrast standards. Always use neutral light/white themes with thick semantic left borders and colored showcase icons instead.
+
 **Core API:**
 
 ```python
 ui.layout_column_wrap(
     ui.value_box(
-        "Total users",
-        ui.output_ui("total_users"),
-        showcase=icon_svg("users"),
-        theme="primary",
+        "Total Users",
+        ui.output_text("kpi_users"),
+        ui.p(
+            ui.tags.span("↑ 4.2%", class_="text-success fw-bold"),
+            " vs last month",
+            class_="fs-6 text-muted mb-0",
+        ),
+        showcase=ui.div(icon_svg("users"), class_="text-primary fs-3"),
+        theme="light",
+        class_="border-start border-primary border-4 shadow-sm bg-white",
     ),
     ui.value_box(
-        "Average order",
-        ui.output_ui("avg_order"),
-        showcase=icon_svg("wallet"),
-        theme="success",
+        "Average Order",
+        ui.output_text("kpi_order"),
+        ui.p(
+            ui.tags.span("↑ 0.8%", class_="text-success fw-bold"),
+            " vs target",
+            class_="fs-6 text-muted mb-0",
+        ),
+        showcase=ui.div(icon_svg("wallet"), class_="text-success fs-3"),
+        theme="light",
+        class_="border-start border-success border-4 shadow-sm bg-white",
     ),
     width="240px",
     fill=False,
@@ -136,47 +142,29 @@ ui.layout_column_wrap(
 
 ```python
 with ui.layout_columns(fill=False):
-    with ui.value_box(showcase=icon_svg("users"), theme="primary"):
-        "Total users"
-
-        @render.express
-        def total_users():
-            f"{len(df):,}"
+    with ui.value_box(
+        showcase=ui.div(icon_svg("users"), class_="text-primary fs-3"),
+        theme="light",
+        class_="border-start border-primary border-4 shadow-sm bg-white",
+    ):
+        "Total Users"
+        f"{len(df):,}"
+        ui.p(
+            ui.tags.span("↑ 12.4%", class_="text-success fw-bold"),
+            " vs last month",
+            class_="fs-6 text-muted mb-0",
+        )
 ```
 
 Guidelines:
 
 - Keep the row to 3 or 4 boxes.
 - Prefer `ui.layout_column_wrap(..., width="240px", fill=False)` so KPI cards wrap before becoming cramped.
-- Use named themes like `"primary"`, `"success"`, `"info"`, `"warning"`, and `"danger"` matching the swatches. Do not assign random colored background swatches to adjacent value boxes without semantic meaning.
+- Discourage solid background fills. Instead, designate semantic metric categories using thick, 4px-thick left borders (`border-start border-{theme} border-4 shadow-sm bg-white`).
 - Use icons that reinforce the metric; do not use emojis or generic/unrelated icons.
+- Wrap showcase icons in colored divs (e.g., `class_="text-primary fs-3"`) to bring in semantic color contexts cleanly.
 - Format the displayed value instead of passing a raw float or integer.
-- **Mandatory Metric Context & Trends**: Headline metrics must never stand alone. Always provide a clear comparison trend or period label (e.g., `↑ 12% vs prior month`, `↓ 5% outage rate`) under the primary value inside the card.
-  * **Core API Trend Pattern**:
-    ```python
-    ui.value_box(
-        "Revenue",
-        ui.output_text("kpi_rev"),
-        ui.p(
-            ui.tags.span("↑ 12.4%", class_="text-success fw-bold"),
-            " vs last month",
-            class_="fs-6 text-muted mb-0"
-        ),
-        showcase=icon_svg("dollar-sign"),
-        theme="primary"
-    )
-    ```
-  * **Express API Trend Pattern**:
-    ```python
-    with ui.value_box(showcase=icon_svg("plug"), theme="success"):
-        "Active Ports"
-        f"{active_ports:,}"
-        ui.p(
-            ui.tags.span("↓ 3%", class_="text-danger fw-bold"),
-            " vs previous period",
-            class_="fs-6 text-muted mb-0"
-        )
-    ```
+- **Mandatory Metric Context & Trends**: Headline metrics must never stand alone. Always provide a clear comparison trend or period label styled with high-contrast Bootstrap tags.
 
 ### Dynamic showcase icons
 
