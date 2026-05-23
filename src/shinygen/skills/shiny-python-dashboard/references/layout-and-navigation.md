@@ -390,6 +390,17 @@ ui.page_sidebar(
 )
 ```
 
+## Structural Storytelling
+
+dashboards should function as interactive stories rather than a cluttered dumping ground for charts. Structure layouts around these principles:
+
+- **The Inverted Pyramid**: Lay out content vertically based on granularity:
+  1. **High-level Key Performance Indicators (KPIs)** at the top.
+  2. **Trend lines, maps, and exploratory charts** in the middle.
+  3. **Dense data tables or granular details** at the bottom.
+- **The "Sweet Spot"**: Always place your most critical, high-impact metric in the upper left-hand corner where the human eye lands first.
+- **Functional Grouping**: Enclose interconnected metrics or charts inside designated cards or panel boundaries to establish clear visual context and visual association.
+
 ## Best Practices
 
 1. Start with `ui.page_sidebar()` unless the app clearly needs multiple pages.

@@ -176,6 +176,10 @@ def styled_bar(frame, *, x, y, color=None, title=None):
 Guidelines:
 
 - Always start from `template="plotly_white"` (or the registered `"brand"` template).
+- **Chart Choice by Purpose**:
+  * **Trends over time**: Use thin line charts or continuous area charts.
+  * **Category comparisons**: Use standard horizontal bar charts or vertical column charts.
+  * **Parts-of-a-whole**: Use donut charts or stacked bars, but limit them to fewer than 5–8 categories.
 - Pass an explicit 3–4 color palette via `color_discrete_sequence`. Never accept default rainbow.
 - Strip chart junk: hide the top/right spines, drop the y-axis line, soften gridlines.
 - Place the legend horizontally above the plot. If the legend is redundant (e.g., when the categories are already clearly labeled on the axis or bars, or there is only a single series), completely hide it using `showlegend=False` in `update_layout`.

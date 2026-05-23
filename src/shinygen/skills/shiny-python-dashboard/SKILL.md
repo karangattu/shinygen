@@ -69,6 +69,9 @@ These rules are global and should be applied on almost every dashboard task.
 29. Simplify Plotly charts. Combine sparse categories (representing <5% of data) into an 'Other' bucket, and add direct value data labels (`texttemplate`) on bars or slices while removing redundant legends.
 30. Compact all filter panels. Include active filter count badges and a clear 'Reset / Clear All' action button for usability.
 31. Build premium, high-contrast, visually structured sidebars. Never use low-contrast gray text utilities (like class_="text-secondary" or "text-muted") for headers or labels on the standard light gray sidebar background; always use high-contrast dark slate (class_="text-dark fw-bold" or charcoal "#1f2937"). Group flat stacks of input controls logically inside styled panels or cards (class_="bg-white p-3 rounded shadow-sm border mb-3") to break textbook monotony. Enhance group headers and input labels with semantic icons from faicons (e.g., ui.span(icon_svg("calendar-days", margin_right="0.5em"), " Time Horizon")).
+32. Embrace white space: Avoid cramming cards tightly together; double your padding margins so the visual layout feels clean.
+33. Select chart types based on purpose: Use thin line or continuous area charts for trends over time; standard horizontal bar or vertical column charts for category comparisons; and donut charts or stacked bars (limited to fewer than 5–8 categories) for parts-of-a-whole.
+34. Structure storytelling with the Inverted Pyramid and the Sweet Spot: Stack layouts vertically from high-level KPIs at the top to trend lines in the middle and dense tables at the bottom. Always place the most critical metric in the upper left-hand "Sweet Spot" where the eye lands first, and enclose interconnected elements inside designated cards or panel boundaries (Functional Grouping).
 
 ## Sensible dashboard defaults
 
