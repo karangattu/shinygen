@@ -199,7 +199,7 @@ Establish a strict, professional color harmony. Limit layouts to **2-3 primary/b
 To eliminate cluttered and cramped layouts, adhere to the following layout constraints:
 * **Generous Grid Gutters**: Always pass `gap="1rem"` or `gap="1.5rem"` on `ui.layout_columns` and `ui.layout_column_wrap`.
 * **Chart Height Floor**: Never let visualization cards collapse. Set explicit heights and floors (`min_height="320px"` to `"400px"`) for plots and maps so labels and ticks remain fully readable.
-* **Embrace White Space**: Avoid cramming cards tightly together; double your padding margins so the visual layout feels clean. Separate different functional sections (KPIs, main chart rows, and detail directories) with clear vertical spacing.
+* **Embrace white space**: Avoid cramming cards tightly together; double your padding margins so the visual layout feels clean. Separate different functional sections (KPIs, main chart rows, and detail directories) with clear vertical spacing.
 
 ### Responsive Design & Widths
 Always design dashboards with responsiveness in mind to support varying viewport sizes:

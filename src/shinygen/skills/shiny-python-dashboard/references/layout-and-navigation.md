@@ -247,11 +247,11 @@ Use page-level sidebars when the controls affect the whole page or the whole app
 
 #### Premium Sidebar Design Guidelines
 
-A standard flat vertical list of controls looks dry and textbook. To make a dashboard's filter panel visually appealing, legible, and premium:
+A standard flat vertical list of controls looks dry and textbook. To build visually structured sidebars that are visually appealing, legible, and premium:
 1. **Never use low-contrast text**: Do not use light gray/muted utility classes (like `text-secondary` or `text-muted`) for main sidebar headings on a standard light-gray sidebar background. Always use bold high-contrast text (`class_="text-dark fw-bold"` or `#1f2937`) to guarantee WCAG compliance.
 2. **Structure with Grouping Cards**: Group flat stacks of input controls logically inside styled panels or cards (using `class_="bg-white p-3 rounded shadow-sm border mb-3"`). This breaks the vertical monotony and groups related parameters (e.g., date selection, geographic bounds, ticker filters).
 3. **Enhance with Icons**: Bring group headers and labels to life with inline SVG icons from `faicons` (e.g., `ui.span(icon_svg("calendar-days", margin_right="0.5em"), " Time Horizon")`).
-4. **Actionable Resets**: Style clear reset/action buttons clearly (e.g., `class_="btn-outline-danger w-100"`).
+4. **Actionable Resets**: Style clear reset/action buttons clearly to reset or "Clear All" active filters (e.g., `class_="btn-outline-danger w-100"`).
 
 Here is a premium page sidebar layout template:
 
