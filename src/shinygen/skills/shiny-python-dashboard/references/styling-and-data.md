@@ -142,6 +142,10 @@ app_ui = ui.page_sidebar(
           row-gap: 1rem !important;
           column-gap: 1rem !important;
         }
+        .bslib-page-main > .card + .card,
+        .bslib-page-main > .bslib-grid + .bslib-grid,
+        .bslib-page-main > .card + .bslib-grid,
+        .bslib-page-main > .bslib-grid + .card,
         .bslib-page-fill > .card + .card,
         .bslib-page-fill > .bslib-grid + .bslib-grid,
         .bslib-page-fill > .card + .bslib-grid,
@@ -150,7 +154,7 @@ app_ui = ui.page_sidebar(
         .bslib-page-sidebar__main > .bslib-grid + .bslib-grid,
         .bslib-page-sidebar__main > .card + .bslib-grid,
         .bslib-page-sidebar__main > .bslib-grid + .card {
-          margin-top: 1rem;
+          margin-top: 1.5rem !important;
         }
     """),
     ...,
