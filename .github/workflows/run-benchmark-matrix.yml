@@ -64,6 +64,7 @@ env:
   BENCHMARK_EXPECTED_MODELS: |
     claude-opus-4-6
     claude-opus-4-7
+    claude-opus-4-8
     claude-sonnet-4-6
     gpt-5.4
     gpt-5.4-mini
@@ -181,6 +182,8 @@ jobs:
             name: claude-opus-4-7
           - idx: "03"
             name: claude-sonnet-4-6
+          - idx: "20"
+            name: claude-opus-4-8
           - idx: "04"
             name: gpt-5.4
           - idx: "05"
@@ -465,6 +468,7 @@ jobs:
       BENCHMARK_EXPECTED_MODELS: |
         claude-opus-4-6
         claude-opus-4-7
+        claude-opus-4-8
         claude-sonnet-4-6
         gpt-5.4
         gpt-5.4-mini

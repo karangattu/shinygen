@@ -20,6 +20,10 @@ class TestGetPricing:
         result = get_pricing("anthropic/claude-opus-4-7")
         assert result == (5.00, 25.00)
 
+    def test_claude_opus_4_8_release_returns_expected_price(self):
+        result = get_pricing("anthropic/claude-opus-4-8")
+        assert result == (5.00, 25.00)
+
     def test_gpt55_release_returns_expected_price(self):
         assert get_pricing("openai/gpt-5.5") == (5.00, 30.00)
         assert get_pricing("openai/gpt-5.5-2026-04-23") == (5.00, 30.00)

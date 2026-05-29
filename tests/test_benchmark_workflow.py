@@ -126,11 +126,12 @@ def test_benchmark_workflow_uses_sandbox_screenshots_without_runner_browser_inst
     assert "install.packages(c(" not in workflow
 
 
-def test_benchmark_workflow_runs_both_opus_generations_for_comparison():
+def test_benchmark_workflow_runs_all_opus_generations_for_comparison():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "name: claude-opus-4-6" in workflow
     assert "name: claude-opus-4-7" in workflow
+    assert "name: claude-opus-4-8" in workflow
 
 
 def test_benchmark_workflow_includes_gpt55_in_generation_matrix():
