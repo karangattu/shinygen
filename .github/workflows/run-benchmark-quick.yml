@@ -52,8 +52,11 @@ on:
         options:
           - airbnb-asheville-short.csv
           - air_quality.csv
+          - e_commerce_sales.csv
           - ed_operations.csv
+          - employee_retention.csv
           - ev_charging_stations.csv
+          - marketing_campaigns.csv
           - supply_chain.csv
           - trials_short_50.csv
       arms:

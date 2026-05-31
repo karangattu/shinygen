@@ -1,0 +1,31 @@
+employee_id,hire_date,department,job_role,salary_usd,gender,performance_rating,satisfaction_score,years_at_company,monthly_hours,promotion_last_3years,work_life_balance_score,office_latitude,office_longitude,status
+EMP-001,2020-03-12,Engineering,Senior Associate,98000,Female,4,8,4.2,168,No,3,37.7749,-122.4194,Active
+EMP-002,2021-06-15,Sales,Manager,115000,Male,3,7,3.0,172,No,4,40.7128,-74.0060,Active
+EMP-003,2023-01-10,Marketing,Junior Associate,55000,Non-binary,3,5,1.4,160,No,2,30.2672,-97.7431,Active
+EMP-004,2018-09-05,HR,Manager,85000,Female,5,9,5.7,156,Yes,4,41.8781,-87.6298,Active
+EMP-005,2019-11-20,Finance,Director,155000,Male,4,8,4.5,180,No,3,42.3601,-71.0589,Active
+EMP-006,2022-04-02,Engineering,Junior Associate,72000,Male,2,4,2.2,192,No,1,37.7749,-122.4194,Terminated
+EMP-007,2020-08-14,Customer Success,Senior Associate,68000,Female,3,7,3.8,164,No,4,47.6062,-122.3321,Active
+EMP-008,2021-10-05,Sales,Junior Associate,62000,Female,4,6,2.7,178,No,3,40.7128,-74.0060,Active
+EMP-009,2017-02-18,Engineering,Director,175000,Male,5,9,7.3,168,Yes,5,37.7749,-122.4194,Active
+EMP-010,2023-05-12,Marketing,Senior Associate,75000,Non-binary,3,8,1.1,152,No,4,30.2672,-97.7431,Active
+EMP-011,2019-07-25,HR,Junior Associate,50000,Female,3,6,4.8,160,No,3,41.8781,-87.6298,Active
+EMP-012,2022-01-15,Finance,Senior Associate,92000,Male,4,7,2.4,170,No,3,42.3601,-71.0589,Active
+EMP-013,2020-11-08,Customer Success,Manager,90000,Female,4,5,3.6,188,No,2,47.6062,-122.3321,Terminated
+EMP-014,2021-03-30,Sales,Senior Associate,82000,Male,3,8,3.2,165,No,4,40.7128,-74.0060,Active
+EMP-015,2022-09-22,Engineering,Senior Associate,105000,Female,4,9,1.7,162,No,3,37.7749,-122.4194,Active
+EMP-016,2018-12-04,Marketing,Manager,110000,Male,5,8,5.5,176,Yes,4,30.2672,-97.7431,Active
+EMP-017,2023-02-28,Customer Success,Junior Associate,48000,Female,2,3,1.3,195,No,1,47.6062,-122.3321,Terminated
+EMP-018,2020-05-18,Engineering,Manager,130000,Male,3,7,4.0,166,No,4,37.7749,-122.4194,Active
+EMP-019,2021-07-12,Finance,Junior Associate,58000,Female,4,8,2.9,158,No,4,42.3601,-71.0589,Active
+EMP-020,2022-11-05,Sales,Director,145000,Non-binary,4,6,1.5,185,No,3,40.7128,-74.0060,Active
+EMP-021,2019-04-18,Engineering,Senior Associate,102000,Male,5,9,5.1,164,No,4,37.7749,-122.4194,Active
+EMP-022,2020-10-12,HR,Senior Associate,78000,Female,3,7,3.6,155,No,3,41.8781,-87.6298,Active
+EMP-023,2021-09-02,Customer Success,Junior Associate,49000,Male,3,4,2.7,180,No,2,47.6062,-122.3321,Terminated
+EMP-024,2017-11-15,Sales,Manager,112000,Female,4,8,6.5,172,Yes,4,40.7128,-74.0060,Active
+EMP-025,2022-08-20,Finance,Manager,120000,Male,3,7,1.8,175,No,3,42.3601,-71.0589,Active
+EMP-026,2020-01-28,Engineering,Junior Associate,75000,Female,4,8,4.3,160,No,3,37.7749,-122.4194,Active
+EMP-027,2021-12-10,Marketing,Director,140000,Male,4,8,2.5,170,No,3,30.2672,-97.7431,Active
+EMP-028,2023-06-20,HR,Junior Associate,52000,Female,3,7,0.9,162,No,4,41.8781,-87.6298,Active
+EMP-029,2019-03-24,Sales,Junior Associate,60000,Non-binary,2,5,5.2,190,No,2,40.7128,-74.0060,Terminated
+EMP-030,2020-12-02,Engineering,Senior Associate,100000,Male,4,8,3.4,168,No,3,37.7749,-122.4194,Active
