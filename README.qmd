@@ -608,10 +608,10 @@ from great_tables import GT, md
 import polars as pl
 
 models = pl.DataFrame({
-    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`", "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`", "`gemma-4-26b-a4b`", "`qwen3.6-27b`"],
-    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Native ReAct", "Native ReAct", "Native ReAct", "Native ReAct", "Native ReAct"],
-    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`", "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`", "`openai/gemma-4-26b-a4b`", "`openai/qwen3.6-27b`"],
-    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenCode Go", "OpenCode Go", "OpenCode Go", "Local (LM Studio)", "Local (LM Studio)"],
+    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`", "`gemma-4-26b-a4b`", "`qwen3.6-27b`"],
+    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Native ReAct", "Native ReAct", "Native ReAct", "Native ReAct", "Native ReAct"],
+    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`", "`openai/gemma-4-26b-a4b`", "`openai/qwen3.6-27b`"],
+    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenCode Go", "OpenCode Go", "OpenCode Go", "Local (LM Studio)", "Local (LM Studio)"],
 })
 
 (
@@ -635,9 +635,9 @@ from great_tables import GT, md
 import polars as pl
 
 costs = pl.DataFrame({
-    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`"],
-    "Input": [5.00, 3.00, 5.00, 2.50, 0.75, 1.75],
-    "Output": [25.00, 15.00, 30.00, 15.00, 4.50, 14.00],
+    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`"],
+    "Input": [5.00, 3.00, 5.00, 2.50, 0.75],
+    "Output": [25.00, 15.00, 30.00, 15.00, 4.50],
 })
 
 (

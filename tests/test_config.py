@@ -85,11 +85,6 @@ class TestResolveModel:
         assert agent == "codex_cli"
         assert model_id == expected_model_id
 
-    def test_exact_openai_codex_model_name_without_provider(self):
-        agent, model_id = resolve_model("gpt-5.3-codex")
-        assert agent == "codex_cli"
-        assert model_id == "openai/gpt-5.3-codex"
-
     def test_opencode_go_alias_resolves_to_native_react_solver(self):
         agent, model_id = resolve_model("opencode-go/kimi-k2.6")
         assert agent == "native_react_solver"

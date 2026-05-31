@@ -151,7 +151,6 @@ _PRICING: dict[str, tuple[float, float]] = {
     "gpt-5.4-mini": (0.75, 4.50),
     "gpt-5.4-mini-2026-03-17": (0.75, 4.50),
     "gpt-5.4-nano": (0.20, 1.25),
-    "gpt-5.3-codex": (1.75, 14.00),
     "gpt-5-codex": (1.25, 10.00),
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),

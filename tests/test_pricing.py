@@ -187,7 +187,7 @@ class TestUsageStats:
         usage = UsageStats()
         usage.add(
             "generate",
-            "openai/gpt-5.3-codex",
+            "openai/gpt-5.4",
             1000,
             100,
             0.0,

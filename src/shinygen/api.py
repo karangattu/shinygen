@@ -39,7 +39,7 @@ def generate(
         prompt: Description of the desired Shiny app.
         model: Model alias or full model ID.
             Aliases: "claude-opus", "claude-opus-4-8", "claude-sonnet", "gpt55",
-            "gpt54", "gpt54-mini", "codex-gpt53".
+            "gpt54", "gpt54-mini".
             Or pass a full model ID like "anthropic/claude-sonnet-4-6".
         framework: Target framework.
             Options: "shiny_python" (default), "shiny_r", "python", "r".

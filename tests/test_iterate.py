@@ -197,7 +197,7 @@ class TestWriteRunSummary:
         )
         result.usage.add(
             stage="generate",
-            model="openai/gpt-5.3-codex",
+            model="openai/gpt-5.4",
             input_tokens=2_000,
             output_tokens=500,
             elapsed=1.2,
@@ -216,8 +216,8 @@ class TestWriteRunSummary:
             output_path=tmp_path,
             result=result,
             prompt="Build an Asheville Airbnb dashboard",
-            requested_model="gpt-5.3-codex",
-            resolved_model_id="openai/gpt-5.3-codex",
+            requested_model="gpt-5.4",
+            resolved_model_id="openai/gpt-5.4",
             agent="codex_cli",
             framework_key="shiny_python",
             artifact_name="app.py",
@@ -229,8 +229,8 @@ class TestWriteRunSummary:
 
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         assert summary["prompt"] == "Build an Asheville Airbnb dashboard"
-        assert summary["model"]["requested"] == "gpt-5.3-codex"
-        assert summary["model"]["resolved_id"] == "openai/gpt-5.3-codex"
+        assert summary["model"]["requested"] == "gpt-5.4"
+        assert summary["model"]["resolved_id"] == "openai/gpt-5.4"
         assert summary["model"]["agent"] == "codex_cli"
         assert summary["framework"] == "shiny_python"
         assert summary["artifact_name"] == "app.py"

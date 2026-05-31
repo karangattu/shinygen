@@ -33,8 +33,6 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "gpt54-mini": ("codex_cli", "openai/gpt-5.4-mini-2026-03-17"),
     "gpt-5.4-mini": ("codex_cli", "openai/gpt-5.4-mini-2026-03-17"),
     "gpt-5.4-nano": ("codex_cli", "openai/gpt-5.4-nano"),
-    "codex-gpt53": ("codex_cli", "openai/gpt-5.3-codex"),
-    "gpt-5.3-codex": ("codex_cli", "openai/gpt-5.3-codex"),
     "gemma-4-26b-a4b": ("native_react_solver", "openai/gemma-4-26b-a4b"),
     "openai/gemma-4-26b-a4b": ("native_react_solver", "openai/gemma-4-26b-a4b"),
     "qwen3.6-27b": ("native_react_solver", "openai/qwen3.6-27b"),
