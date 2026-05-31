@@ -35,6 +35,10 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "gpt-5.4-nano": ("codex_cli", "openai/gpt-5.4-nano"),
     "codex-gpt53": ("codex_cli", "openai/gpt-5.3-codex"),
     "gpt-5.3-codex": ("codex_cli", "openai/gpt-5.3-codex"),
+    "gemma-4-26b-a4b": ("native_react_solver", "openai/gemma-4-26b-a4b"),
+    "openai/gemma-4-26b-a4b": ("native_react_solver", "openai/gemma-4-26b-a4b"),
+    "qwen3.6-27b": ("native_react_solver", "openai/qwen3.6-27b"),
+    "openai/qwen3.6-27b": ("native_react_solver", "openai/qwen3.6-27b"),
 }
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
@@ -242,6 +246,26 @@ def is_opencode_go_model(model_id: str) -> bool:
     )
 
 
+def is_lmstudio_model(model_id: str) -> bool:
+    """Return True when a resolved Inspect model points to LM Studio."""
+    model = model_id.lower().strip()
+    return "gemma-4-26b-a4b" in model or "qwen3.6-27b" in model
+
+
+def _build_lmstudio_model(model_id: str):
+    """Construct an Inspect ``Model`` for a local LM Studio model."""
+    from inspect_ai.model import get_model
+
+    base_url = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+    api_key = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
+    return get_model(
+        model_id,
+        base_url=base_url,
+        api_key=api_key,
+        memoize=False,
+    )
+
+
 def is_opencode_go_anthropic_model(model_id: str) -> bool:
     """Return True for OpenCode Go models served via Anthropic messages."""
     return model_id.lower().strip().startswith("anthropic/opencode-go/")
@@ -323,6 +347,9 @@ def check_api_key(agent: str, model_id: str | None = None) -> None:
 
     Raises APIKeyMissingError with a descriptive message.
     """
+    if model_id and is_lmstudio_model(model_id):
+        return
+
     if model_id and is_opencode_go_model(model_id):
         if not os.environ.get("OPENCODE_GO_API_KEY"):
             raise APIKeyMissingError(

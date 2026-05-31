@@ -1,7 +1,7 @@
 ---
 title: "shinygen"
 subtitle: "Generate, evaluate, and refine Shiny apps using LLM agents in Docker sandboxes"
-jupyter: shinygen
+jupyter: python3
 format:
   html:
     theme:
@@ -520,6 +520,86 @@ OpenCode's TypeScript SDK controls an OpenCode server/session, which is useful f
 
 ---
 
+## {{< fa microchip >}} Local Models via LM Studio
+
+shinygen supports running evaluations locally with **gemma-4-26b-a4b** and **qwen3.6-27b** through a local [LM Studio](https://lmstudio.ai/) server. This is extremely useful for running unmetered/free local evaluations in both `skills` (treatment) and `vanilla` (control) configurations.
+
+### 1. Start the LM Studio Server
+- Open LM Studio, search for and download your desired model (`gemma-4-26b-a4b` or `qwen3.6-27b`).
+- Load the model and start the local server. By default, LM Studio runs on port `1234` (making the endpoint `http://localhost:1234/v1`).
+- If you use a custom port or address, set the `LMSTUDIO_BASE_URL` environment variable:
+  ```bash
+  export LMSTUDIO_BASE_URL="http://localhost:1234/v1"
+  ```
+
+### 2. Resolution & Zero Pricing
+- The aliases `gemma-4-26b-a4b` and `qwen3.6-27b` resolve automatically to standard `openai/` identifiers driven by the modern `native_react_solver` agent.
+- API key verification is bypassed since these models run locally.
+- Pricing is hardcoded to `$0.00` per million tokens inside `pricing.py` to ensure local evaluations are not penalized in the final value-adjusted score.
+
+### 3. Running a Local Comparison
+Run the treatment (Skills) and control (Vanilla) arms locally using the CLI:
+
+```bash
+# Skills-equipped run (treatment)
+shinygen generate \
+    --prompt "Build a clinical trials dashboard with filters by phase and therapeutic area" \
+    --model gemma-4-26b-a4b \
+    --framework shiny_python \
+    --output ./local-bench/skills \
+    --csv-file ./test_data_csv_files/trials_short_50.csv \
+    --no-screenshot \
+    --max-iterations 2 \
+    --quality-threshold 5.0 \
+    --skills
+
+# Vanilla run (control)
+shinygen generate \
+    --prompt "Build a clinical trials dashboard with filters by phase and therapeutic area" \
+    --model gemma-4-26b-a4b \
+    --framework shiny_python \
+    --output ./local-bench/vanilla \
+    --csv-file ./test_data_csv_files/trials_short_50.csv \
+    --no-screenshot \
+    --max-iterations 2 \
+    --quality-threshold 5.0 \
+    --no-skills
+```
+
+Or run them sequentially using a local batch config (`batch_local.json`):
+
+```json
+[
+  {
+    "prompt": "Build a professional Shiny dashboard for this dataset with clear visualizations.",
+    "model": "gemma-4-26b-a4b",
+    "framework": "shiny_python",
+    "output_dir": "./local_runs/skills",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "max_iterations": 2,
+    "quality_threshold": 5.0,
+    "use_skills": true
+  },
+  {
+    "prompt": "Build a professional Shiny dashboard for this dataset with clear visualizations.",
+    "model": "gemma-4-26b-a4b",
+    "framework": "shiny_python",
+    "output_dir": "./local_runs/vanilla",
+    "csv_file": "./test_data_csv_files/airbnb-asheville-short.csv",
+    "max_iterations": 2,
+    "quality_threshold": 5.0,
+    "use_skills": false
+  }
+]
+```
+
+Then run the batch:
+```bash
+shinygen batch --config batch_local.json
+```
+
+---
+
 ## {{< fa microchip >}} Supported Models
 
 ```{python}
@@ -528,10 +608,10 @@ from great_tables import GT, md
 import polars as pl
 
 models = pl.DataFrame({
-    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`", "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`"],
-    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Native ReAct", "Native ReAct", "Native ReAct"],
-    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`", "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`"],
-    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenCode Go", "OpenCode Go", "OpenCode Go"],
+    "Alias": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`codex-gpt53`", "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`", "`gemma-4-26b-a4b`", "`qwen3.6-27b`"],
+    "Agent": ["Claude Code", "Claude Code", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Native ReAct", "Native ReAct", "Native ReAct", "Native ReAct", "Native ReAct"],
+    "Model ID": ["`claude-opus-4-7`", "`claude-sonnet-4-6`", "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.3-codex`", "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`", "`openai/gemma-4-26b-a4b`", "`openai/qwen3.6-27b`"],
+    "Provider": ["Anthropic", "Anthropic", "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenCode Go", "OpenCode Go", "OpenCode Go", "Local (LM Studio)", "Local (LM Studio)"],
 })
 
 (

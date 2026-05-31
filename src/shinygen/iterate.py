@@ -24,6 +24,8 @@ from .config import (
     OPENCODE_GO_BASE_URL,
     SANDBOX_IMAGE_ENV_DEFAULTS,
     find_free_port,
+    is_lmstudio_model,
+    _build_lmstudio_model,
     is_opencode_go_anthropic_model,
     opencode_go_anthropic_model_name,
     prepare_model_environment,
@@ -1199,7 +1201,9 @@ def _run_generation(
         extra_config = _generation_extra_config(agent)
 
         eval_model = model_id
-        if is_opencode_go_anthropic_model(model_id):
+        if is_lmstudio_model(model_id):
+            eval_model = _build_lmstudio_model(model_id)
+        elif is_opencode_go_anthropic_model(model_id):
             from inspect_ai.model import get_model
 
             base_url = os.environ.get("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL)

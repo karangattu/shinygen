@@ -43,6 +43,8 @@ from inspect_ai.util import sandbox
 
 from .config import (
     OPENCODE_GO_BASE_URL,
+    is_lmstudio_model,
+    _build_lmstudio_model,
     is_opencode_go_anthropic_model,
     is_opencode_go_model,
     opencode_go_anthropic_model_name,
@@ -432,7 +434,9 @@ def native_react_solver(
     extra_instructions: str | None = None,
 ) -> Solver:
     """Return an Inspect ``Solver`` driven by the native ``react()`` agent."""
-    if is_opencode_go_model(model_id):
+    if is_lmstudio_model(model_id):
+        model = _build_lmstudio_model(model_id)
+    elif is_opencode_go_model(model_id):
         model = _build_opencode_go_model(model_id)
     else:
         # Allow the native solver to be used for non-OpenCode-Go models too;

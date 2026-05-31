@@ -171,6 +171,8 @@ _PRICING: dict[str, tuple[float, float]] = {
     "minimax-m2.5": (0.15, 1.15),
     "deepseek-v4-flash": (0.14, 0.28),
     "mimo-v2.5": (0.10, 0.20),
+    "gemma-4-26b-a4b": (0.0, 0.0),
+    "qwen3.6-27b": (0.0, 0.0),
 }
 
 # Cache multipliers (write, read) relative to base input price per provider

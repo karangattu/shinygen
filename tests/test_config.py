@@ -140,6 +140,20 @@ class TestResolveModel:
         with pytest.raises(ValueError, match="Unknown model"):
             resolve_model("nonexistent-model")
 
+    def test_lmstudio_model_resolution(self):
+        from shinygen.config import is_lmstudio_model
+        agent, model_id = resolve_model("gemma-4-26b-a4b")
+        assert agent == "native_react_solver"
+        assert model_id == "openai/gemma-4-26b-a4b"
+        assert is_lmstudio_model(model_id)
+
+        agent2, model_id2 = resolve_model("qwen3.6-27b")
+        assert agent2 == "native_react_solver"
+        assert model_id2 == "openai/qwen3.6-27b"
+        assert is_lmstudio_model(model_id2)
+
+        assert not is_lmstudio_model("openai/gpt-5.4")
+
 
 class TestResolveFramework:
     def test_canonical(self):
@@ -263,6 +277,22 @@ class TestCheckAPIKey:
         with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
             prepare_model_environment("openai-api/opencode-go/kimi-k2.6")
             assert os.environ["OPENCODE_GO_BASE_URL"] == "https://opencode.ai/zen/go/v1"
+
+    def test_lmstudio_key_not_required(self):
+        with patch.dict("os.environ", {}, clear=True):
+            check_api_key("native_react_solver", "openai/gemma-4-26b-a4b")
+            check_api_key("native_react_solver", "openai/qwen3.6-27b")
+
+    def test_build_lmstudio_model(self):
+        from shinygen.config import _build_lmstudio_model
+        with patch("inspect_ai.model.get_model") as mock_get_model:
+            _build_lmstudio_model("openai/gemma-4-26b-a4b")
+            mock_get_model.assert_called_once_with(
+                "openai/gemma-4-26b-a4b",
+                base_url="http://localhost:1234/v1",
+                api_key="lm-studio",
+                memoize=False,
+            )
 
 
 class TestPreflightChecks:

@@ -38,6 +38,11 @@ class TestGetPricing:
         assert result is not None
         assert result == (5.00, 25.00)
 
+    def test_lmstudio_pricing(self):
+        assert get_pricing("openai/gemma-4-26b-a4b") == (0.0, 0.0)
+        assert get_pricing("openai/qwen3.6-27b") == (0.0, 0.0)
+        assert calculate_cost("openai/gemma-4-26b-a4b", 1_000_000, 1_000_000) == 0.0
+
 
 class TestCalculateCost:
     def test_known_anthropic_model(self):
