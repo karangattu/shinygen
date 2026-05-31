@@ -8,12 +8,12 @@ Generate, evaluate, and refine Shiny apps using LLM agents (Claude Code, Codex C
 %%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, Arial, sans-serif'}}}%%
 flowchart TD
     %% Color Palette Definitions
-    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,rx:8
-    classDef core fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a,rx:8
-    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87,rx:8
-    classDef validation fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,rx:8
-    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,rx:8
-    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,rx:8
+    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,border-radius:8px
+    classDef core fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a,border-radius:8px
+    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87,border-radius:8px
+    classDef validation fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,border-radius:8px
+    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,border-radius:8px
+    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,border-radius:8px
 
     A["👤 User Request<br/>(Prompt + Dataset + Flags)"]:::input --> B["shinygen API / CLI"]:::core
     
