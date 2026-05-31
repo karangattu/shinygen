@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from playwright.sync_api import Page
 
 # Shared viewport/wait constants (mirrored from config.py for standalone use)
-DEFAULT_VIEWPORT = (1920, 1080)
+DEFAULT_VIEWPORT = (1920, 2200)
 DEFAULT_WAIT = 7.0
 SHINY_CONNECT_TIMEOUT = 20000  # ms
 SHINY_BUSY_TIMEOUT = 10000  # ms
