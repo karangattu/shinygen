@@ -424,9 +424,9 @@ kbd {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(6, 9, 16, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(6, 9, 16, 0.97); /* Increased to 0.97 for complete background occlusion */
+    backdrop-filter: blur(16px); /* Increased blur for richer glass effect */
+    -webkit-backdrop-filter: blur(16px);
     z-index: 100;
     display: none;
     align-items: center;
