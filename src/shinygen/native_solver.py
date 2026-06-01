@@ -35,7 +35,7 @@ from __future__ import annotations
 import os
 import shlex
 
-from inspect_ai.agent import Agent, AgentPrompt, react
+from inspect_ai.agent import AgentPrompt, react
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser, Model, get_model
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.tool import bash, text_editor, python, tool, Tool
@@ -56,7 +56,7 @@ from .validation import validate_framework_artifact
 # OpenCode Go models like to run package installs / linters between edits.
 _TOOL_TIMEOUT = 180
 _DATA_CONTEXT_CHAR_LIMIT = 12_000
-_DIRECT_ARTIFACT_ATTEMPTS = 3
+_DIRECT_ARTIFACT_ATTEMPTS = 2
 _SERVER_VALIDATION_TIMEOUT = 45
 
 
@@ -434,6 +434,14 @@ def native_react_solver(
     extra_instructions: str | None = None,
 ) -> Solver:
     """Return an Inspect ``Solver`` driven by the native ``react()`` agent."""
+    lower_id = model_id.lower()
+    if "kimi" in lower_id or "minimax" in lower_id:
+        return native_direct_artifact_solver(
+            cwd=cwd,
+            framework=framework,
+            artifact=artifact,
+            extra_instructions=extra_instructions,
+        )
     if is_lmstudio_model(model_id):
         model = _build_lmstudio_model(model_id)
     elif is_opencode_go_model(model_id):
