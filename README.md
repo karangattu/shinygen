@@ -48,3 +48,6 @@ flowchart TD
 For full documentation — installation, CLI, Python API, batch mode, GitHub Actions, model aliases, skills, and data inputs — see the published docs:
 
 **[https://karangattu.github.io/shinygen/](https://karangattu.github.io/shinygen/)**
+
+Give your inputs in this survey to help us what kinds of dashboards we want AI to be able to generate:
+**[DashSwipe Survey](https://usertestingapp.vercel.app)**
