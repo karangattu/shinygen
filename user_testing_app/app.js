@@ -121,11 +121,13 @@ const detailTextarea = document.getElementById("disapproval_details");
 const btnCancelFeedback = document.getElementById("btn-cancel-feedback");
 
 const deckView = document.getElementById("deck-view");
+const welcomeView = document.getElementById("welcome-view");
 const summaryView = document.getElementById("summary-view");
 const valApprovalRate = document.getElementById("val-approval-rate");
 const valTotalSwipes = document.getElementById("val-total-swipes");
 const chartBarsContainer = document.getElementById("chart-bars-container");
 const btnRestart = document.getElementById("btn-restart");
+const btnStartEvaluation = document.getElementById("btn-start-evaluation");
 
 // 4. Card Initialization Functions
 function buildCardStack() {
@@ -180,6 +182,8 @@ function setupCardDrag(cardElement) {
         cardElement.style.transition = "none";
         startX = e.clientX;
         startY = e.clientY;
+        currentX = 0;
+        currentY = 0;
         
         cardElement.setPointerCapture(e.pointerId);
         cardElement.addEventListener("pointermove", onPointerMove);
@@ -231,6 +235,18 @@ function setupCardDrag(cardElement) {
             // Smoothly snap back to origin
             cardElement.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
             cardElement.style.transform = "translate3d(0, 0, 0) rotate(0deg)";
+            
+            // Check if it's a click on the image wrapper
+            if (Math.abs(currentX) < 8 && Math.abs(currentY) < 8) {
+                const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+                if (elementAtPoint) {
+                    const imgWrapper = elementAtPoint.closest(".card-img-wrapper");
+                    if (imgWrapper) {
+                        const item = DASHBOARDS[currentCardIndex];
+                        openLightbox(item.url, item.title);
+                    }
+                }
+            }
         }
     }
 }
@@ -452,7 +468,45 @@ btnRestart.addEventListener("click", () => {
     buildCardStack();
 });
 
+// Onboarding Start Action
+btnStartEvaluation.addEventListener("click", () => {
+    welcomeView.classList.remove("active-view");
+    deckView.classList.add("active-view");
+});
+
 // Start the deck stack
 document.addEventListener("DOMContentLoaded", () => {
     buildCardStack();
 });
+
+// ==========================================================================
+// Fullscreen Lightbox Modal System
+// ==========================================================================
+const lightboxModal = document.getElementById("lightbox-modal");
+const lightboxImg = document.getElementById("lightbox-img");
+const lightboxCaption = document.getElementById("lightbox-caption");
+const lightboxClose = document.querySelector(".lightbox-close");
+
+function openLightbox(url, title) {
+    lightboxImg.src = url;
+    lightboxCaption.innerText = title;
+    lightboxModal.style.display = "flex";
+    lightboxModal.offsetHeight; // Force reflow for transitions
+    lightboxModal.classList.add("active");
+}
+
+function closeLightbox() {
+    lightboxModal.classList.remove("active");
+    setTimeout(() => {
+        lightboxModal.style.display = "none";
+        lightboxImg.src = "";
+    }, 300);
+}
+
+lightboxClose.addEventListener("click", closeLightbox);
+lightboxModal.addEventListener("click", (e) => {
+    if (e.target === lightboxModal || e.target.classList.contains("lightbox-content")) {
+        closeLightbox();
+    }
+});
+

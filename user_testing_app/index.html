@@ -28,8 +28,101 @@
     </header>
 
     <main class="app-container">
+        <!-- Welcome Onboarding View (Glassmorphic) -->
+        <div id="welcome-view" class="welcome-view glass-card active-view">
+            <div class="welcome-icon"><i class="fa-solid fa-cubes"></i></div>
+            <h2>Dashboard Evaluation</h2>
+            <p class="welcome-tagline">Evaluate LLM-generated interactive dashboards against professional design principles.</p>
+
+            <div class="welcome-section">
+                <h3>The Challenge Prompt</h3>
+                <blockquote class="challenge-prompt">
+                    "Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data."
+                </blockquote>
+            </div>
+
+            <div class="welcome-section">
+                <h3>The Evaluation Dataset</h3>
+                <p class="dataset-meta">Dataset: <code>employee_retention.csv</code> (First 5 sample records)</p>
+                <div class="dataset-table-wrapper glass-subcard">
+                    <table class="dataset-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Hire Date</th>
+                                <th>Department</th>
+                                <th>Job Role</th>
+                                <th>Salary</th>
+                                <th>Gender</th>
+                                <th>Satisfaction</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>EMP-001</td>
+                                <td>2020-03-12</td>
+                                <td>Engineering</td>
+                                <td>Senior Associate</td>
+                                <td>$98,000</td>
+                                <td>Female</td>
+                                <td>8/10</td>
+                                <td class="status-active">Active</td>
+                            </tr>
+                            <tr>
+                                <td>EMP-002</td>
+                                <td>2021-06-15</td>
+                                <td>Sales</td>
+                                <td>Manager</td>
+                                <td>$115,000</td>
+                                <td>Male</td>
+                                <td>7/10</td>
+                                <td class="status-active">Active</td>
+                            </tr>
+                            <tr>
+                                <td>EMP-003</td>
+                                <td>2023-01-10</td>
+                                <td>Marketing</td>
+                                <td>Junior Associate</td>
+                                <td>$55,000</td>
+                                <td>Non-binary</td>
+                                <td>5/10</td>
+                                <td class="status-active">Active</td>
+                            </tr>
+                            <tr>
+                                <td>EMP-004</td>
+                                <td>2018-09-05</td>
+                                <td>HR</td>
+                                <td>Manager</td>
+                                <td>$85,000</td>
+                                <td>Female</td>
+                                <td>9/10</td>
+                                <td class="status-active">Active</td>
+                            </tr>
+                            <tr>
+                                <td>EMP-005</td>
+                                <td>2019-11-20</td>
+                                <td>Finance</td>
+                                <td>Director</td>
+                                <td>$155,000</td>
+                                <td>Male</td>
+                                <td>8/10</td>
+                                <td class="status-active">Active</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="welcome-actions">
+                <button id="btn-start-evaluation" class="btn-primary btn-large">
+                    <i class="fa-solid fa-arrow-right"></i> Start Swipe Evaluation
+                </button>
+            </div>
+        </div>
+
         <!-- Tinder Deck Interface -->
-        <div id="deck-view" class="active-view">
+        <div id="deck-view">
             <div class="progress-container">
                 <div class="progress-labels">
                     <span id="progress-text">Dashboard 1 of 10</span>
@@ -273,6 +366,15 @@
     <footer class="app-footer">
         <p>&copy; 2026 shinygen. Powered by Supabase. Secure local testing stack.</p>
     </footer>
+
+    <!-- Fullscreen Lightbox Modal -->
+    <div id="lightbox-modal" class="lightbox-overlay">
+        <span class="lightbox-close"><i class="fa-solid fa-xmark"></i></span>
+        <div class="lightbox-content">
+            <img id="lightbox-img" src="" alt="Fullscreen Dashboard">
+            <div id="lightbox-caption">Dashboard Title</div>
+        </div>
+    </div>
 
     <!-- App JavaScript Logic -->
     <script src="app.js"></script>
