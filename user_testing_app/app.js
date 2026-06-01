@@ -59,11 +59,11 @@ const DASHBOARDS = [
         url: "assets/dashboard6.png"
     },
     {
-        id: "model=deepseek-v4-pro|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
+        id: "model=minimax-m3|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
         title: "Workforce Retention Dashboard (Layout 7)",
         badge: "excellent",
         badgeText: "Layout 7",
-        desc: "Standard Bootstrap layout with customized card shadows, and a unique multi-dimensional department metrics radar chart.",
+        desc: "Standard layout featuring five essential KPI cards, status mix donut, department headcounts, and metric box plots.",
         url: "assets/dashboard7.png"
     },
     {
@@ -75,11 +75,11 @@ const DASHBOARDS = [
         url: "assets/dashboard8.png"
     },
     {
-        id: "model=qwen-3-6-plus|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
+        id: "model=minimax-m3|arm=skills|tab=Overview|framework=shiny_python|theme=standard",
         title: "Workforce Retention Dashboard (Layout 9)",
         badge: "excellent",
         badgeText: "Layout 9",
-        desc: "Stacked single-page layout featuring 6 solid-colored value boxes and 11 visual elements requiring extensive scrolling.",
+        desc: "Premium styled layout utilizing sidebar controls, left-bordered accent KPI value boxes, and high-contrast department metrics.",
         url: "assets/dashboard9.png"
     },
     {
