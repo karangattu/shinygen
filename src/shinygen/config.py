@@ -8,7 +8,6 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
 
 PACKAGE_DIR = Path(__file__).parent
 
@@ -64,6 +63,7 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
 OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
     "minimax-m2.5",
     "minimax-m2.7",
+    "minimax-m3",
 )
 
 

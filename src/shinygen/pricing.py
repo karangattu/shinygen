@@ -161,15 +161,17 @@ _PRICING: dict[str, tuple[float, float]] = {
     "mimo-v2-omni": (0.40, 2.00),
     "glm-5.1": (1.40, 4.40),
     "glm-5": (1.00, 3.20),
-    "mimo-v2.5-pro": (1.00, 3.00),
+    "mimo-v2.5-pro": (1.74, 3.48),
     "kimi-k2.6": (0.95, 4.00),
     "kimi-k2.5": (0.60, 3.00),
-    "qwen3.6-plus": (0.325, 1.95),
+    "minimax-m3": (0.60, 2.40),
     "minimax-m2.7": (0.30, 1.20),
+    "minimax-m2.5": (0.30, 1.20),
+    "qwen3.7-max": (2.50, 7.50),
+    "qwen3.6-plus": (0.50, 3.00),
     "qwen3.5-plus": (0.26, 1.56),
-    "minimax-m2.5": (0.15, 1.15),
     "deepseek-v4-flash": (0.14, 0.28),
-    "mimo-v2.5": (0.10, 0.20),
+    "mimo-v2.5": (0.14, 0.28),
     "gemma-4-26b-a4b": (0.0, 0.0),
     "qwen3.6-27b": (0.0, 0.0),
 }
@@ -188,20 +190,30 @@ _CACHE_MULTIPLIERS: dict[str, tuple[float, float]] = {
 # pricing is not a clean multiple of the standard input price. Used by
 # OpenCode Go where each model publishes its own cache-read rate.
 _CACHE_READ_PRICE_OVERRIDES: dict[str, float] = {
-    "deepseek-v4-pro": 0.145,
+    "deepseek-v4-pro": 0.0145,
     "mimo-v2-pro": 0.20,
     "mimo-v2-omni": 0.08,
-    "glm-5.1": 0.21,  # upper bound of the published $0.18-$0.21 range
-    "glm-5": 0.15,
-    "mimo-v2.5-pro": 0.25,
-    "kimi-k2.6": 0.24,
-    "kimi-k2.5": 0.15,
-    "qwen3.6-plus": 0.033,
-    "minimax-m2.7": 0.075,
+    "glm-5.1": 0.26,
+    "glm-5": 0.20,
+    "mimo-v2.5-pro": 0.0145,
+    "kimi-k2.6": 0.16,
+    "kimi-k2.5": 0.10,
+    "minimax-m3": 0.12,
+    "minimax-m2.7": 0.06,
+    "minimax-m2.5": 0.06,
+    "qwen3.7-max": 0.50,
+    "qwen3.6-plus": 0.05,
     "qwen3.5-plus": 0.026,
-    "minimax-m2.5": 0.038,
-    "deepseek-v4-flash": 0.028,
-    "mimo-v2.5": 0.025,
+    "deepseek-v4-flash": 0.0028,
+    "mimo-v2.5": 0.0028,
+}
+
+_CACHE_WRITE_PRICE_OVERRIDES: dict[str, float] = {
+    "minimax-m3": 0.75,
+    "minimax-m2.7": 0.375,
+    "minimax-m2.5": 0.375,
+    "qwen3.7-max": 3.125,
+    "qwen3.6-plus": 0.625,
 }
 
 # model_short_name -> (input_token_threshold, input_multiplier, output_multiplier)
@@ -281,14 +293,21 @@ def calculate_cost(
         provider = _detect_provider(model_id)
         write_mult, read_mult = _CACHE_MULTIPLIERS.get(provider or "", (1.0, 1.0))
         cache_read_override = _CACHE_READ_PRICE_OVERRIDES.get(normalized_name)
+        cache_write_override = _CACHE_WRITE_PRICE_OVERRIDES.get(normalized_name)
         regular_input = max(0, input_tokens - cache_write_tokens - cache_read_tokens)
         if cache_read_override is not None:
             cache_read_cost_component = cache_read_tokens * cache_read_override
         else:
             cache_read_cost_component = cache_read_tokens * input_price * read_mult
+
+        if cache_write_override is not None:
+            cache_write_cost_component = cache_write_tokens * cache_write_override
+        else:
+            cache_write_cost_component = cache_write_tokens * input_price * write_mult
+
         input_cost = (
             regular_input * input_price
-            + cache_write_tokens * input_price * write_mult
+            + cache_write_cost_component
             + cache_read_cost_component
         ) / 1_000_000
     else:

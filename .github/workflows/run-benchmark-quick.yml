@@ -39,6 +39,7 @@ on:
           - mimo-v2.5-pro
           - minimax-m2.5
           - minimax-m2.7
+          - minimax-m3
           - qwen3.5-plus
           - qwen3.6-plus
           - deepseek-v4-pro

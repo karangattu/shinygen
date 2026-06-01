@@ -336,14 +336,25 @@ class TestOpenCodeGoPricing:
         assert abs(cost - (0.06 + 0.12)) < 1e-12
 
     def test_cache_read_uses_per_model_override(self):
-        # kimi-k2.6 cache-read price is $0.24/MTok (not 0.10x of $0.95).
+        # kimi-k2.6 cache-read price is $0.16/MTok.
         # 10k input split into 6k regular + 4k cache-read.
         cost = calculate_cost(
             "openai-api/opencode-go/kimi-k2.6", 10_000, 0,
             cache_write_tokens=0, cache_read_tokens=4_000,
         )
         assert cost is not None
-        expected = (6_000 * 0.95 + 4_000 * 0.24) / 1_000_000
+        expected = (6_000 * 0.95 + 4_000 * 0.16) / 1_000_000
+        assert abs(cost - expected) < 1e-12
+
+    def test_cache_write_uses_per_model_override(self):
+        # minimax-m3 cache-write price is $0.75/MTok.
+        # 10k input split into 6k regular + 4k cache-write.
+        cost = calculate_cost(
+            "anthropic/opencode-go/minimax-m3", 10_000, 0,
+            cache_write_tokens=4_000, cache_read_tokens=0,
+        )
+        assert cost is not None
+        expected = (6_000 * 0.60 + 4_000 * 0.75) / 1_000_000
         assert abs(cost - expected) < 1e-12
 
     def test_all_documented_opencode_go_models_have_pricing(self):
@@ -361,6 +372,7 @@ class TestOpenCodeGoPricing:
             "mimo-v2.5-pro", "mimo-v2.5",
             "qwen3.6-plus", "qwen3.5-plus",
             "minimax-m2.5", "minimax-m2.7",
+            "minimax-m3", "qwen3.7-max",
         }
         for model in OPENCODE_GO_OPENAI_COMPATIBLE_MODELS:
             if model in priced_models:
