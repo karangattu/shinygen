@@ -8,86 +8,86 @@ const SUPABASE_URL = "https://ovwktjjeoowlktdfbuuu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 2. Data Definition for the 10 Dashboard Screenshots
+// 2. Data Definition for the 10 Dashboard Screenshots (Real Landing Pages of all 10 Benchmark Apps)
 const DASHBOARDS = [
     {
-        id: "dash_01",
-        title: "Global Analytics Hub",
+        id: "model=deepseek-v4-pro|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
+        title: "Workforce Retention Dashboard (Layout 1)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Sleek dark theme overview with real-time region growth and KPIs.",
+        badgeText: "Layout 1",
+        desc: "Clean zephyr theme with left-bordered KPI cards, status donut charts, and department headcount col-plots.",
         url: "assets/dashboard1.png"
     },
     {
-        id: "dash_02",
-        title: "Cluttered Revenue Monitor",
-        badge: "needs-work",
-        badgeText: "Needs Work",
-        desc: "Ugly light theme sales dashboard with severe grid overlaps.",
+        id: "model=opus-4-8|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
+        title: "Workforce Retention Dashboard (Layout 2)",
+        badge: "excellent",
+        badgeText: "Layout 2",
+        desc: "Modern theme utilizing gear menu card popovers, styled SVG icons, and a gt-based department summary table.",
         url: "assets/dashboard2.png"
     },
     {
-        id: "dash_03",
-        title: "Clinical Trials Overview",
+        id: "model=opus-4-8|arm=skills|tab=Overview|framework=shiny_r|theme=shiny_light",
+        title: "Workforce Retention Dashboard (Layout 3)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Polished light theme scatter and trend visualizer for CT studies.",
+        badgeText: "Layout 3",
+        desc: "Pristine R bslib corporate blue layout with tooltip helpers, five value boxes, and horizontal ggplot charts.",
         url: "assets/dashboard3.png"
     },
     {
-        id: "dash_04",
-        title: "Biogenetic Live Telemetry",
+        id: "model=opus-4-8|arm=vanilla|tab=Overview|framework=shiny_r|theme=flatly",
+        title: "Workforce Retention Dashboard (Layout 4)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Beautiful dark biotech panel with purple/teal genomic radar charts.",
+        badgeText: "Layout 4",
+        desc: "Highly interactive flatly-themed layout featuring interactive plotly tooltips, value boxes, and dual column grids.",
         url: "assets/dashboard4.png"
     },
     {
-        id: "dash_05",
-        title: "Sales KPI Trends",
+        id: "model=opus-4-7|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
+        title: "Workforce Retention Dashboard (Layout 5)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Modern business trend dashboard showing quarterly metrics.",
+        badgeText: "Layout 5",
+        desc: "Structured zephyr theme showcasing multi-select dropdown card toolbar filters and geographic office footprint maps.",
         url: "assets/dashboard5.png"
     },
     {
-        id: "dash_06",
-        title: "Chaotic User Engagement",
-        badge: "needs-work",
-        badgeText: "Needs Work",
-        desc: "Ugly pink and neon layout with overlapping submit inputs.",
+        id: "model=qwen-3-6-plus|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
+        title: "Workforce Retention Dashboard (Layout 6)",
+        badge: "excellent",
+        badgeText: "Layout 6",
+        desc: "Single-page scroll layout integrating live interactive maps, great-tables directory grids, and spacing details.",
         url: "assets/dashboard6.png"
     },
     {
-        id: "dash_07",
-        title: "Study Enrollment Metrics",
+        id: "model=deepseek-v4-pro|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
+        title: "Workforce Retention Dashboard (Layout 7)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Clean medical metrics bar grid with site dropout rate.",
+        badgeText: "Layout 7",
+        desc: "Standard Bootstrap layout with customized card shadows, and a unique multi-dimensional department metrics radar chart.",
         url: "assets/dashboard7.png"
     },
     {
-        id: "dash_08",
-        title: "Cell Viability Telemetry",
+        id: "model=opus-4-8|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
+        title: "Workforce Retention Dashboard (Layout 8)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Biotech radar display profiling molecular viabilities.",
+        badgeText: "Layout 8",
+        desc: "Standard theme utilizing saturated gradient metric value cards, a bubble locations map, and a burnout quadrant.",
         url: "assets/dashboard8.png"
     },
     {
-        id: "dash_09",
-        title: "Revenue Analytics Tracker",
+        id: "model=qwen-3-6-plus|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
+        title: "Workforce Retention Dashboard (Layout 9)",
         badge: "excellent",
-        badgeText: "Excellent Design",
-        desc: "Clean financial overview mapping EMEA and NAM growth.",
+        badgeText: "Layout 9",
+        desc: "Stacked single-page layout featuring 6 solid-colored value boxes and 11 visual elements requiring extensive scrolling.",
         url: "assets/dashboard9.png"
     },
     {
-        id: "dash_10",
-        title: "Global Sales Scatter",
-        badge: "needs-work",
-        badgeText: "Needs Work",
-        desc: "Chaotic sales scatterplot layout with overlapping text grids.",
+        id: "model=opus-4-7|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
+        title: "Workforce Retention Dashboard (Layout 10)",
+        badge: "excellent",
+        badgeText: "Layout 10",
+        desc: "Palmer Penguins species distribution morphological catalog with simple colored cards and low-contrast borders.",
         url: "assets/dashboard10.png"
     }
 ];
