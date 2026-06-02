@@ -23,18 +23,18 @@ from .config import (
     FRAMEWORKS,
     OPENCODE_GO_BASE_URL,
     SANDBOX_IMAGE_ENV_DEFAULTS,
+    _build_lmstudio_model,
     find_free_port,
     is_lmstudio_model,
-    _build_lmstudio_model,
     is_opencode_go_anthropic_model,
     opencode_go_anthropic_model_name,
-    prepare_model_environment,
     preflight_checks,
+    prepare_model_environment,
     resolve_framework,
     resolve_model,
 )
-from .pricing import Timer, UsageStats, calculate_value_score
 from .extract import _read_zip_member, extract_from_log
+from .pricing import Timer, UsageStats, calculate_value_score
 
 if TYPE_CHECKING:
     from inspect_ai.log import EvalLog
@@ -163,7 +163,7 @@ def _runtime_validation_command(
     if framework_key == "shiny_r":
         start_cmd = (
             f"Rscript -e \"shiny::runApp('{artifact_name}', port={port}, "
-            "launch.browser=FALSE)\""
+            'launch.browser=FALSE)"'
         )
         process_pattern = f"Rscript.*{artifact_name}.*{port}"
     else:
@@ -1074,6 +1074,14 @@ def generate_and_refine(
             best_score = 10.0 if runtime_valid else 0.0
             best_quality_score = best_score
             result.screenshot_paths = screenshot_paths
+
+            if runtime_valid:
+                logger.info("Runtime validation passed! Accepting app early.")
+                result.passed = True
+                result.score = best_score
+                result.quality_score = best_quality_score
+                result.value_score = best_score
+                break
 
             if iteration < max_iterations:
                 from .prompts import build_runtime_refinement_prompt
