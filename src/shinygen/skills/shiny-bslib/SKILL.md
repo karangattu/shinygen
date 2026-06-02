@@ -207,12 +207,14 @@ See [migration.md](references/migration.md) for a complete mapping of legacy pat
 7. **Use responsive widths** like `width = "250px"` in `layout_column_wrap()` for auto-adjusting columns
 8. **Group sidebar inputs** with `accordion()` when sidebars have many controls
 9. **See [migration.md](references/migration.md)** for mapping legacy Shiny patterns to modern bslib equivalents
+10. **Load CSV datasets dynamically** from the working directory (e.g. `read.csv("data.csv")` or finding `.csv` files). **NEVER** use default/built-in datasets (like `ggplot2::diamonds` or `mtcars`) when custom datasets are provided in the environment.
 
 ## Avoid Common Errors
 
 1. Avoid directly nesting `card()` containers. `navset_card_*()` functions are already cards; `nav_panel()` content goes directly inside them without wrapping in `card()`
 2. Only use `layout_columns()` and `layout_column_wrap()` for laying out multiple elements. Single children should be passed directly to their container functions.
 3. Never nest `page_*()` functions. Only use one top-level page function per app.
+4. Never hardcode built-in datasets like `diamonds` or `mtcars` when a local CSV file is available. Always load the CSV file using `read.csv` or similar.
 
 ## Reference Files
 

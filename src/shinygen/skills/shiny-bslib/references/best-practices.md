@@ -5,6 +5,7 @@ This reference covers bslib-specific layout patterns, UX tips, and common pitfal
 ## Table of Contents
 
 - [Layout Patterns](#layout-patterns)
+- [Data Loading](#data-loading)
 - [Mobile and Responsive Design](#mobile-and-responsive-design)
 - [User Experience with bslib Components](#user-experience-with-bslib-components)
   - [Add Contextual Help](#add-contextual-help)
@@ -121,6 +122,42 @@ page_sidebar(
     plotOutput("plot2")
   )
 )
+```
+
+## Data Loading
+
+Load local dataset CSV files once at the top of the script (global scope). Do not use built-in R datasets like `ggplot2::diamonds`, `mtcars`, or `iris` if a CSV dataset is provided in the workspace.
+
+To load the CSV dataset robustly, read it from the local directory:
+
+```r
+df <- read.csv("data.csv", stringsAsFactors = FALSE)
+```
+
+If multiple CSV files are present or the name is dynamic, detect the file:
+
+```r
+csv_files <- list.files(pattern = "\\.csv$")
+df <- read.csv(csv_files[1], stringsAsFactors = FALSE)
+```
+
+### Preprocessing and Normalizing Data
+
+Normalize and clean types before the data is used by charts and inputs:
+
+```r
+df$price <- as.numeric(df$price)
+df$rating <- as.numeric(df$rating)
+df$latitude <- as.numeric(df$latitude)
+df$longitude <- as.numeric(df$longitude)
+df <- df[!is.na(df$latitude) & !is.na(df$longitude), ]
+```
+
+Precompute choice lists and slider ranges once at the top of the file:
+
+```r
+metric_columns <- c("price", "rating")
+neighborhood_choices <- sort(unique(na.omit(df$neighborhood)))
 ```
 
 ## Mobile and Responsive Design
