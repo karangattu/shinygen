@@ -213,15 +213,16 @@ Guidelines:
 
 ### Tables with `@render.data_frame`
 
-Use `render.DataGrid(...)` for sortable, filterable tables.
+Use `render.DataGrid` for dense, detailed tables that require grid lines, vertical scrolling, or column-based filtering, and `render.DataTable` for presentation-quality summary cards. Both are bound to `ui.output_data_frame()` in the UI.
 
 ```python
 @render.data_frame
-def summary_table():
-    return render.DataGrid(filtered_data(), filters=True)
+def listings_table():
+    # Use DataGrid for detailed lists
+    return render.DataGrid(filtered_data(), filters=True, height="450px")
 ```
 
-Treat the data table as the detailed layer beneath charts and KPIs.
+Treat the data table or grid as the detailed layer beneath charts and KPIs.
 
 #### Format numbers in `DataGrid` columns
 

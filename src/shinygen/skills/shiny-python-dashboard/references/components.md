@@ -409,15 +409,26 @@ with ui.value_box(showcase=sw.output_widget("sparkline"), showcase_layout="botto
 
 
 
-## Summary tables with Shiny Data Table
+## Data Tables vs. Data Grids (`ui.output_data_frame`)
 
-Use Shiny's native `render.DataTable` for presentation-quality summary tables — leaderboards, KPI breakdowns, executive rollups. Reach for `render.DataGrid` only when users need an editable or highly interactive layout.
+Shiny provides two native renderers for tabular data, both bound to `ui.output_data_frame("id")` in the UI:
+
+| Feature | `render.DataTable` | `render.DataGrid` |
+| --- | --- | --- |
+| **Visual Style** | Figure-like view, minimal grid lines, clean margins. | Spreadsheet-like view, full grid lines separating cells. |
+| **Primary Use Case** | Executive summaries, KPI breakouts, leaderboards. | Large, dense datasets requiring clear cell borders and sorting. |
+| **Row Density** | Best for shorter datasets (typically < 25 rows). | Best for larger datasets (hundreds of rows, virtualized scrolling). |
+
+### Decision Rules:
+- **Choose `render.DataTable`** when presenting a polished summary card (e.g., top 10 products, regional sales). It keeps cognitive load low by minimizing borders and grids.
+- **Choose `render.DataGrid`** when showing the detailed dataset at the bottom of the page, where users benefit from spreadsheet-style borders, column-by-column filtering (`filters=True`), or editing (`editable=True`).
+
+### Data Table Example (Polished Summary Table)
 
 ```python
 from shiny import render, ui
 
-# In UI:
-# ui.output_data_frame("revenue_summary")
+# In UI: ui.output_data_frame("revenue_summary")
 
 @render.data_frame
 def revenue_summary():
@@ -428,7 +439,6 @@ def revenue_summary():
         .sort_values("revenue", ascending=False)
     )
     
-    # Format the DataFrame columns natively before rendering
     summary_df = summary.copy()
     summary_df["revenue"] = summary_df["revenue"].map(lambda v: f"${v:,.0f}")
     summary_df["orders"] = summary_df["orders"].map(lambda v: f"{int(v):,}")
@@ -455,15 +465,44 @@ def revenue_summary():
     )
 ```
 
-Wire it into the UI with `ui.output_data_frame("revenue_summary")` inside a card.
+### Data Grid Example (Dense Drill-Down Table)
+
+```python
+from shiny import render, ui
+
+# In UI: ui.output_data_frame("detail_grid")
+
+@render.data_frame
+def detail_grid():
+    detail_df = filtered_data()[["id", "name", "price", "rating", "status"]].copy()
+    
+    # Format numeric columns
+    detail_df["price"] = detail_df["price"].map(lambda v: f"${v:,.2f}")
+    detail_df["rating"] = detail_df["rating"].map(lambda v: f"{v:.1f}")
+    
+    detail_df = detail_df.rename(columns={
+        "id": "ID",
+        "name": "Name",
+        "price": "Price",
+        "rating": "Rating",
+        "status": "Status",
+    })
+    
+    return render.DataGrid(
+        detail_df,
+        width="100%",
+        height="450px",
+        filters=True,  # Enable column filters for search
+        editable=False,
+    )
+```
 
 Guidelines:
 
-- Use `render.DataTable` for presentation-quality summary tables, and `render.DataGrid` for tabular layouts that need to be editable or highly interactive.
-- Format every numeric column in the pandas DataFrame (e.g. currency, percentages, integers) before passing it to `render.DataTable`.
-- Rename columns to human-readable labels just before returning.
-- Pass an explicit height (e.g., `height="350px"`) and set `width="100%"` to ensure the table fills its container nicely without collapsing.
-- Use the `styles` parameter in `render.DataTable` (or `render.DataGrid`) to apply CSS classes or styles to specific rows and columns. Specify a list of dictionaries with `"class"` (CSS class name string) or `"style"` (dict of CSS property-value pairs), and optionally restrict scope using `"rows"` and/or `"cols"` lists containing 0-based column/row indices.
+- **Format Numbers First**: Always format numbers (currencies, percentages, counts) in the pandas DataFrame before passing it to the renderer.
+- **Rename Columns**: Use human-readable column headers via `.rename(columns=...)`.
+- **Set Explicit Height**: Always set a reasonable height (e.g., `height="350px"`) and set `width="100%"` to prevent the table from collapsing or layout shift.
+- **Use Styles Natively**: Use the `styles` parameter in `render.DataTable` (or `render.DataGrid`) to apply CSS classes or styles to specific rows and columns. Specify a list of dictionaries with `"class"` (CSS class name string) or `"style"` (dict of CSS property-value pairs), and optionally restrict scope using `"rows"` and/or `"cols"` lists containing 0-based column/row indices.
 
 ## Accordions
 
