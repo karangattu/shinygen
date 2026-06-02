@@ -46,7 +46,7 @@ on:
         description: "Prompt passed to shinygen generate"
         required: true
         default: >-
-          Build a professional-grade, well-designed Shiny dashboard for the selected dataset. The dashboard should showcase exceptional design aesthetics, polished custom styling, and thoughtful layout choices. It should include clear summary insights, well-formatted data representations, and intuitive interactive elements that help users explore and compare important patterns in the data.
+          Build a professional-grade Shiny dashboard for the selected dataset with clear summary metrics, well-labeled visualizations, and thoughtful interactions that help users compare important patterns in the data.
       max_iterations:
         description: "Max iteration count"
         required: true
@@ -138,7 +138,7 @@ jobs:
           for i in "${ADDR[@]}"; do
             trimmed=$(echo "${i}" | xargs)
             if [[ -n "${trimmed}" ]]; then
-              models_json=$(echo "${models_json}" | jq --arg val "${trimmed}" '. += [$val]')
+              models_json=$(echo "${models_json}" | jq -c --arg val "${trimmed}" '. += [$val]')
             fi
           done
 
@@ -158,8 +158,10 @@ jobs:
             echo "benchmark_dataset_basename=${dataset_basename}"
             echo "benchmark_dataset_stem=${dataset_stem}"
             echo "benchmark_slug=${benchmark_slug}"
-            echo "models_json=${models_json}"
             echo "use_skills=${use_skills}"
+            echo "models_json<<EOF"
+            echo "${models_json}"
+            echo "EOF"
             echo "benchmark_prompt<<EOF"
             printf '%s\n' "${RAW_BENCHMARK_PROMPT}"
             echo "EOF"
