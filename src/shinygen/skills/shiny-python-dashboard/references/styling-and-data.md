@@ -101,7 +101,7 @@ BRAND_COLORS = {
 }
 
 # Reuse this ordered list anywhere you need a categorical color sequence
-# (Plotly, Matplotlib, lonboard, great_tables data_color).
+# (Plotly, Matplotlib, lonboard, etc.).
 BRAND_SEQUENCE = [
     BRAND_COLORS["primary"],
     BRAND_COLORS["success"],
@@ -122,7 +122,7 @@ Guidelines:
 
 - Always pass an explicit `theme=` to your `ui.page_*()` call. Prefer `shinyswatch.theme.zephyr`, `flatly`, `minty`, `cosmo`, `lumen`, or `yeti`.
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
-- Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, and `great_tables.data_color()` ramps.
+- Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, and other visual components.
 - Use standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes to leverage default bslib styling.
 - Avoid mixing rainbow palettes with the brand sequence — pick one and stick to it.
 

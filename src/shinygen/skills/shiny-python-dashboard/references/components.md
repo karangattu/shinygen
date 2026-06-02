@@ -409,16 +409,17 @@ with ui.value_box(showcase=sw.output_widget("sparkline"), showcase_layout="botto
 
 
 
-## Summary tables with `great_tables`
+## Summary tables with Shiny Data Table
 
-Use `great_tables.GT(...)` for short, presentation-quality summary tables — leaderboards, KPI breakdowns, executive rollups. Reach for `render.DataGrid` only when users need to sort or filter long tables.
+Use Shiny's native `render.DataTable` for presentation-quality summary tables — leaderboards, KPI breakdowns, executive rollups. Reach for `render.DataGrid` only when users need an editable or highly interactive layout.
 
 ```python
-from great_tables import GT, md, style, loc
 from shiny import render, ui
 
+# In UI:
+# ui.output_data_frame("revenue_summary")
 
-@render.ui
+@render.data_frame
 def revenue_summary():
     summary = (
         filtered_data()
@@ -426,36 +427,43 @@ def revenue_summary():
         .agg(revenue=("revenue", "sum"), orders=("order_id", "nunique"))
         .sort_values("revenue", ascending=False)
     )
-    table = (
-        GT(summary)
-        .tab_header(title="Revenue by region", subtitle=md("Last 30 days"))
-        .fmt_currency(columns="revenue", currency="USD", decimals=0)
-        .fmt_integer(columns="orders")
-        .data_color(
-            columns="revenue",
-            palette=["#e7f1ff", "#0d6efd"],
-        )
-        .cols_label(region="Region", revenue="Revenue", orders="Orders")
-        .tab_options(
-            table_font_size="0.9rem",
-            heading_title_font_size="1.05rem",
-            column_labels_font_weight="600",
-            table_border_top_style="hidden",
-        )
+    
+    # Format the DataFrame columns natively before rendering
+    summary_df = summary.copy()
+    summary_df["revenue"] = summary_df["revenue"].map(lambda v: f"${v:,.0f}")
+    summary_df["orders"] = summary_df["orders"].map(lambda v: f"{int(v):,}")
+    
+    summary_df = summary_df.rename(columns={
+        "region": "Region",
+        "revenue": "Revenue",
+        "orders": "Orders",
+    })
+    
+    return render.DataTable(
+        summary_df,
+        width="100%",
+        height="350px",
+        filters=False,
+        styles=[
+            # Center the cell text (using Bootstrap utility class)
+            {"class": "text-center"},
+            # Bold the first column (Region)
+            {"cols": [0], "style": {"font-weight": "bold"}},
+            # Highlight the top row (index 0) with a light gray background
+            {"rows": [0], "style": {"background-color": "#f8f9fa"}},
+        ]
     )
-    return ui.HTML(table.as_raw_html())
 ```
 
-Wire it into the UI with `ui.output_ui("revenue_summary")` inside a card.
+Wire it into the UI with `ui.output_data_frame("revenue_summary")` inside a card.
 
 Guidelines:
 
-- Keep `GT` tables short — typically under 25 rows. For longer tables, switch to `render.DataGrid`.
-- Always set a `tab_header()` so the table reads as a finished artifact.
-- Format every numeric column (`fmt_currency`, `fmt_percent`, `fmt_integer`, `fmt_number`).
-- Use a single soft `data_color` ramp on the most important column instead of coloring every column.
-- Rename columns with `cols_label()` so headers are human-readable.
-- Wrap `.as_raw_html()` with `ui.HTML(...)` and render through `@render.ui`; returning the raw string directly makes Shiny escape or display the HTML source.
+- Use `render.DataTable` for presentation-quality summary tables, and `render.DataGrid` for tabular layouts that need to be editable or highly interactive.
+- Format every numeric column in the pandas DataFrame (e.g. currency, percentages, integers) before passing it to `render.DataTable`.
+- Rename columns to human-readable labels just before returning.
+- Pass an explicit height (e.g., `height="350px"`) and set `width="100%"` to ensure the table fills its container nicely without collapsing.
+- Use the `styles` parameter in `render.DataTable` (or `render.DataGrid`) to apply CSS classes or styles to specific rows and columns. Specify a list of dictionaries with `"class"` (CSS class name string) or `"style"` (dict of CSS property-value pairs), and optionally restrict scope using `"rows"` and/or `"cols"` lists containing 0-based column/row indices.
 
 ## Accordions
 

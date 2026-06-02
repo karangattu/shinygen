@@ -16,7 +16,7 @@ After reading this file, load only the references you need:
 | Task surface | Read this file |
 | --- | --- |
 | Page structure, sidebar vs navbar, responsive grids, fill behavior, branded navbar with per-tab icons | [references/layout-and-navigation.md](references/layout-and-navigation.md) |
-| Cards, value boxes, accordions, toolbars, tooltips, summary tables with `great_tables` | [references/components.md](references/components.md) |
+| Cards, value boxes, accordions, toolbars, tooltips, summary tables with native `render.DataTable` | [references/components.md](references/components.md) |
 | Reactive graph design, `@render.plot`, Plotly brand template, `DataGrid` number formatting, empty-state handling | [references/reactivity-and-rendering.md](references/reactivity-and-rendering.md) |
 | Themes and brand palette, CSS spacing safety net, number formatting, data loading, project structure | [references/styling-and-data.md](references/styling-and-data.md) |
 | Icons, geographic outputs, map-library picker, lonboard / pydeck / Plotly map tiers | [references/icons-and-maps.md](references/icons-and-maps.md) |
@@ -59,7 +59,7 @@ Use these shortcuts to stay consistent:
 
 1. Need the fastest path to a production-feeling app: navbar layout, light theme, tab icons, Plotly white template, one card per chart.
 2. Need a geographic view: read [references/icons-and-maps.md](references/icons-and-maps.md) and use the dependency-safe Plotly map pattern unless the app already has a declared richer map stack.
-3. Need a polished summary table: read [references/components.md](references/components.md) and prefer `great_tables`.
+3. Need a polished summary table: read [references/components.md](references/components.md) and prefer native `render.DataTable`.
 4. Need maintainable server logic: read [references/reactivity-and-rendering.md](references/reactivity-and-rendering.md) and centralize filtering in `@reactive.calc`.
 5. Need translation guidance: read [references/core-vs-express.md](references/core-vs-express.md).
 6. Need local chart/table controls: use `ui.toolbar()` in `ui.card_header()` instead of adding more global sidebar controls.

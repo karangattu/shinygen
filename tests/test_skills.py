@@ -1,7 +1,5 @@
 """Tests for skill loading and agent wiring."""
 
-from pathlib import Path
-
 import pytest
 
 from shinygen.config import SANDBOX_TIME_LIMIT_BY_FRAMEWORK
@@ -71,12 +69,12 @@ class TestLoadDefaultSkills:
             in instructions
         )
 
-    def test_shiny_python_skill_wraps_great_tables_html(self):
+    def test_shiny_python_skill_teaches_native_data_table(self):
         instructions = load_skill_context_text("shiny_python")
 
-        assert "return ui.HTML(table.as_raw_html())" in instructions
-        assert "return `.as_raw_html()`" not in instructions
-        assert "returning the raw string directly" in instructions
+        assert "render.DataTable(" in instructions
+        assert "ui.output_data_frame(" in instructions
+        assert "height=" in instructions
 
     def test_shiny_python_skill_warns_about_lonboard_arrow_dtypes(self):
         instructions = load_skill_context_text("shiny_python")
@@ -98,15 +96,9 @@ class TestLoadDefaultSkills:
     def test_shiny_python_skill_forbids_plotly_in_render_plot(self):
         instructions = load_skill_context_text("shiny_python")
 
-        assert (
-            "Never return a Plotly figure from `@render.plot`"
-            in instructions
-        )
+        assert "Never return a Plotly figure from `@render.plot`" in instructions
         assert "output_widget" in instructions
-        assert (
-            "render_plotly" in instructions
-            or "render_widget" in instructions
-        )
+        assert "render_plotly" in instructions or "render_widget" in instructions
 
 
 class TestBuildGenerationTask:
@@ -190,9 +182,7 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_agent
-        assert captured["model_id"] == (
-            "openai-api/opencode-go/deepseek-v4-flash"
-        )
+        assert captured["model_id"] == ("openai-api/opencode-go/deepseek-v4-flash")
         # Fail-fast 10-min ceiling for the open-weights tier.
         assert task.time_limit == 600
         assert task.working_limit == 600
@@ -224,9 +214,7 @@ class TestBuildGenerationTask:
         )
 
         assert task.solver is sentinel_agent
-        assert captured["model_id"] == (
-            "anthropic/opencode-go/minimax-m2.7"
-        )
+        assert captured["model_id"] == ("anthropic/opencode-go/minimax-m2.7")
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_use_skills_false_runs_vanilla_baseline(

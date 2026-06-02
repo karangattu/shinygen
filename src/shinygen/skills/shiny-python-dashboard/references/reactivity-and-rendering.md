@@ -249,7 +249,7 @@ Guidelines:
 - Format currency, percent, and integer columns up front with f-strings or `fmt_*` helpers from `shared.py`.
 - Rename columns to human-readable labels just before rendering.
 - Pass `height="420px"` (or larger) so the grid does not collapse inside a card.
-- Use `filters=True` for drill-down tables; turn it off for short summary tables (and consider `great_tables` instead — see [components.md](components.md)).
+- Use `filters=True` for drill-down tables; turn it off for short summary tables (and consider `render.DataTable` instead — see [components.md](components.md)).
 
 ### Dynamic UI with `@render.ui`
 
