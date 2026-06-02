@@ -68,19 +68,41 @@ Import `matplotlib.pyplot` inside the render function.
 @render.plot
 def histogram():
     import matplotlib.pyplot as plt
-    from shared import BRAND_COLORS
+    from shared import BRAND_COLORS, apply_brand_style
 
     series = req(metric_series())
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.hist(series, bins=20, color=BRAND_COLORS["primary"], edgecolor="white")
     ax.set_xlabel(input.metric())
     ax.set_ylabel("Count")
+    apply_brand_style(ax)
+    fig.tight_layout()
+    return fig
+```
+
+Per-category bar chart (the most common pattern that breaks color alignment):
+
+```python
+@render.plot
+def price_by_neighborhood():
+    import matplotlib.pyplot as plt
+    from shared import BRAND_SEQUENCE, apply_brand_style
+
+    agg = filtered_data().groupby("neighborhood")["price"].median().sort_values()
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.barh(agg.index, agg.values, color=BRAND_SEQUENCE[:len(agg)], edgecolor="white")
+    for i, v in enumerate(agg.values):
+        ax.text(v + 2, i, f"${v:,.0f}", va="center", fontsize=9, color="#374151")
+    ax.set_xlabel("Median Price ($)")
+    apply_brand_style(ax)
     fig.tight_layout()
     return fig
 ```
 
 Rules:
 
+- Always pass `color=BRAND_COLORS["primary"]` for single-series charts or `color=BRAND_SEQUENCE[:len(categories)]` for per-category charts. Never omit the `color` parameter.
+- Call `apply_brand_style(ax)` on every axes after plotting.
 - use `figsize=(8, 4)` as a strong default
 - label axes
 - call `fig.tight_layout()` before returning
@@ -179,12 +201,12 @@ def styled_bar(frame, *, x, y, color=None, title=None):
 
 Guidelines:
 
+- **Mandatory color rule**: Pass an explicit color palette via `color_discrete_sequence=BRAND_SEQUENCE` or `color_discrete_sequence=[BRAND_COLORS["primary"]]` on every `px.*` call. This is required even when using the registered brand template, because `px.bar(color="column")` without `color_discrete_sequence` will use Plotly's built-in defaults. Never allow plots to fall back to default Plotly colors.
 - Always start from `template="plotly_white"` (or the registered `"brand"` template).
 - **Chart Choice by Purpose**:
   * **Trends over time**: Use thin line charts or continuous area charts.
   * **Category comparisons**: Use standard horizontal bar charts or vertical column charts.
   * **Parts-of-a-whole**: Use donut charts or stacked bars, but limit them to fewer than 5–8 categories.
-- Pass an explicit color palette via `color_discrete_sequence=BRAND_SEQUENCE` or `color_discrete_sequence=[BRAND_COLORS["primary"]]`. Never allow plots to fall back to default Plotly or Matplotlib colors.
 - **Null / NaN Serialization Safety**: Shiny for Python widgets (e.g. `@render_plotly`) serialize figure data to JSON. If any column passed to Plotly functions (like `px.scatter`, `px.bar`, `px.histogram`) for styling (`color=`, `size=`), hover details (`hover_name=`, `hover_data=`), or axes contains missing (`NaN`/`NaT`) values, the serializer will crash with `ValueError: Out of range float values are not JSON compliant: nan`. Always clean and fill null values in all plotted columns (using `.fillna(0)` or `.fillna("Unknown")`) or drop those rows before building the plot.
 - Strip chart junk: hide the top/right spines, drop the y-axis line, soften gridlines.
 - Place the legend horizontally above the plot. If the legend is redundant (e.g., when the categories are already clearly labeled on the axis or bars, or there is only a single series), completely hide it using `showlegend=False` in `update_layout`.

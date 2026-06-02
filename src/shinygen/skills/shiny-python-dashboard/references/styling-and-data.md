@@ -87,6 +87,8 @@ Avoid raw values like `12345.6789` or `0.873421` in user-facing UI.
 
 Keep your theme choices clean and modern. Use Shiny's default Bootstrap 5 theme, or ship a polished light theme and a small brand palette.
 
+**Every chart must use these colors — defining them is not enough, you must pass them at every call site.**
+
 ```python
 from shiny import ui
 
@@ -99,8 +101,6 @@ BRAND_COLORS = {
     "accent":    "#6610f2",
 }
 
-# Reuse this ordered list anywhere you need a categorical color sequence
-# (Plotly, Matplotlib, lonboard, etc.).
 BRAND_SEQUENCE = [
     BRAND_COLORS["primary"],
     BRAND_COLORS["success"],
@@ -109,6 +109,16 @@ BRAND_SEQUENCE = [
     BRAND_COLORS["accent"],
 ]
 
+
+def apply_brand_style(ax):
+    """Call on every Matplotlib axes to match the dashboard theme."""
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(colors="#374151", labelsize=10)
+    ax.grid(axis="y", color="#eef0f3", linewidth=0.6)
+    ax.set_axisbelow(True)
+
+
 app_ui = ui.page_navbar(
     ...,
     title="Analytics Platform",
@@ -116,13 +126,56 @@ app_ui = ui.page_navbar(
 )
 ```
 
+### Common color mistakes (❌ wrong → ✅ correct)
+
+These are the exact mistakes that produce rainbow charts next to Bootstrap-colored value boxes:
+
+```python
+# ❌ WRONG — Matplotlib per-category bar with random colormap
+import matplotlib.cm as cm
+colors = cm.Set2(range(len(categories)))
+ax.barh(categories, values, color=colors)
+
+# ✅ CORRECT — slice BRAND_SEQUENCE for per-category bars
+from shared import BRAND_SEQUENCE
+ax.barh(categories, values, color=BRAND_SEQUENCE[:len(categories)], edgecolor="white")
+```
+
+```python
+# ❌ WRONG — Plotly bar with color= but no color_discrete_sequence (uses Plotly defaults)
+fig = px.bar(df, x="neighborhood", y="price", color="neighborhood")
+
+# ✅ CORRECT — always pass color_discrete_sequence alongside color=
+fig = px.bar(df, x="neighborhood", y="price", color="neighborhood",
+             color_discrete_sequence=BRAND_SEQUENCE)
+```
+
+```python
+# ❌ WRONG — single-series histogram with no color (uses Plotly default blue)
+fig = px.histogram(df, x="price", nbins=25)
+
+# ✅ CORRECT — pass brand primary as a single-element list
+fig = px.histogram(df, x="price", nbins=25,
+                   color_discrete_sequence=[BRAND_COLORS["primary"]])
+```
+
+```python
+# ❌ WRONG — Matplotlib histogram with no color argument
+ax.hist(series, bins=20)
+
+# ✅ CORRECT — pass explicit color
+from shared import BRAND_COLORS
+ax.hist(series, bins=20, color=BRAND_COLORS["primary"], edgecolor="white")
+```
+
 Guidelines:
 
 - You can use the default modern Bootstrap 5 theme, or pass an explicit light theme (e.g. `shinyswatch.theme.zephyr`, `flatly`, `cosmo`) to your `ui.page_*()` call.
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
-- Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, and other visual components.
+- Define `BRAND_COLORS`, `BRAND_SEQUENCE`, and `apply_brand_style()` once in `shared.py` and import them in every render function that creates a chart.
 - Use standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes to leverage default bslib styling.
-- Align plot colors (lines, bars, markers) with the dashboard's bslib theme/Bootstrap colors (e.g. using `BRAND_COLORS` or `BRAND_SEQUENCE`). Plots must never fall back to default Plotly or Matplotlib color cycles (like Plotly's default blue/purple or Matplotlib's default cycle) which look mismatched next to semantic value boxes.
+- **Mandatory**: Every `px.*` chart call must include `color_discrete_sequence=BRAND_SEQUENCE` (or `[BRAND_COLORS["primary"]]` for single-series). Every Matplotlib `ax.bar/barh/hist/scatter/plot` must pass an explicit `color=` using `BRAND_COLORS` or `BRAND_SEQUENCE`. Never omit the `color` parameter.
+- After creating any Matplotlib axes, call `apply_brand_style(ax)` to strip chart junk and match the dashboard theme.
 - Avoid mixing rainbow palettes with the brand sequence — pick one and stick to it.
 
 ## CSS and Theming
