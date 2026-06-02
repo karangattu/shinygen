@@ -124,6 +124,7 @@ Guidelines:
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
 - Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, and other visual components.
 - Use standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes to leverage default bslib styling.
+- Align plot colors (lines, bars, markers) with the dashboard's bslib theme/Bootstrap colors (e.g. using `BRAND_COLORS` or `BRAND_SEQUENCE`). Plots must never fall back to default Plotly or Matplotlib color cycles (like Plotly's default blue/purple or Matplotlib's default cycle) which look mismatched next to semantic value boxes.
 - Avoid mixing rainbow palettes with the brand sequence — pick one and stick to it.
 
 ## CSS and Theming
@@ -163,11 +164,7 @@ app_ui = ui.page_sidebar(
 
 ### Card-spacing safety net
 
-The CSS above is the mandatory card-spacing safety net. Unlike R bslib,
-Python Shiny's `ui.layout_columns()` and `ui.layout_column_wrap()` render
-`<div class="bslib-grid">` with `gap: 0` by default unless `gap=` is passed
-explicitly. This inline style block catches the most common visual defect:
-cards rendered edge-to-edge with no spacing.
+The CSS block above is the mandatory card-spacing safety net. Python Shiny's layout primitives do not automatically add spacing between adjacent cards or grids. You must include the full block of adjacent sibling selectors (using `+` e.g., `.bslib-grid + .bslib-grid`, `.card + .bslib-grid`, etc.) with `margin-top: 1.5rem !important` and `.bslib-grid { gap: 1rem !important; }` in your inline stylesheet. Failing to include these rules will result in adjacent rows/cards touching each other vertically with no margins.
 
 Use CSS only for:
 

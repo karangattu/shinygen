@@ -319,10 +319,11 @@ ui.value_box(
 
 @sw.render_widget
 def sparkline():
+    from shared import BRAND_COLORS
     economics = pd.read_csv(app_dir / "economics.csv")
     fig = px.line(economics, x="date", y="psavert")
     fig.update_traces(
-        line_color="#0d6efd",
+        line_color=BRAND_COLORS["primary"],
         line_width=1.5,
         fill="tozeroy",
         fillcolor="rgba(13,110,253,0.15)",
@@ -350,10 +351,11 @@ with ui.value_box(showcase=sw.output_widget("sparkline"), showcase_layout="botto
     with ui.hold():
         @sw.render_widget
         def sparkline():
+            from shared import BRAND_COLORS
             economics = pd.read_csv(app_dir / "economics.csv")
             fig = px.line(economics, x="date", y="psavert")
             fig.update_traces(
-                line_color="#0d6efd",
+                line_color=BRAND_COLORS["primary"],
                 line_width=1.5,
                 fill="tozeroy",
                 fillcolor="rgba(13,110,253,0.15)",

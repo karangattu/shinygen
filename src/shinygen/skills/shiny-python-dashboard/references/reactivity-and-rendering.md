@@ -68,10 +68,11 @@ Import `matplotlib.pyplot` inside the render function.
 @render.plot
 def histogram():
     import matplotlib.pyplot as plt
+    from shared import BRAND_COLORS
 
     series = req(metric_series())
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(series, bins=20, color="#0d6efd", edgecolor="white")
+    ax.hist(series, bins=20, color=BRAND_COLORS["primary"], edgecolor="white")
     ax.set_xlabel(input.metric())
     ax.set_ylabel("Count")
     fig.tight_layout()
@@ -112,6 +113,8 @@ COLOR_LABELS = {"time": "Meal time", "day": "Day", "smoker": "Smoker"}
 
 @render_plotly
 def scatterplot():
+    from shared import BRAND_SEQUENCE
+
     frame = filtered_data()
     color_column = input.color_column()
     if color_column not in frame.columns:
@@ -122,6 +125,7 @@ def scatterplot():
         y="tip",
         color=color_column,
         labels={color_column: COLOR_LABELS[color_column]},
+        color_discrete_sequence=BRAND_SEQUENCE,
     )
 ```
 
@@ -180,7 +184,8 @@ Guidelines:
   * **Trends over time**: Use thin line charts or continuous area charts.
   * **Category comparisons**: Use standard horizontal bar charts or vertical column charts.
   * **Parts-of-a-whole**: Use donut charts or stacked bars, but limit them to fewer than 5–8 categories.
-- Pass an explicit 3–4 color palette via `color_discrete_sequence`. Never accept default rainbow.
+- Pass an explicit color palette via `color_discrete_sequence=BRAND_SEQUENCE` or `color_discrete_sequence=[BRAND_COLORS["primary"]]`. Never allow plots to fall back to default Plotly or Matplotlib colors.
+- **Null / NaN Serialization Safety**: Shiny for Python widgets (e.g. `@render_plotly`) serialize figure data to JSON. If any column passed to Plotly functions (like `px.scatter`, `px.bar`, `px.histogram`) for styling (`color=`, `size=`), hover details (`hover_name=`, `hover_data=`), or axes contains missing (`NaN`/`NaT`) values, the serializer will crash with `ValueError: Out of range float values are not JSON compliant: nan`. Always clean and fill null values in all plotted columns (using `.fillna(0)` or `.fillna("Unknown")`) or drop those rows before building the plot.
 - Strip chart junk: hide the top/right spines, drop the y-axis line, soften gridlines.
 - Place the legend horizontally above the plot. If the legend is redundant (e.g., when the categories are already clearly labeled on the axis or bars, or there is only a single series), completely hide it using `showlegend=False` in `update_layout`.
 - Set `margin` explicitly so titles do not collide with the card header.
@@ -195,15 +200,19 @@ Guidelines:
   ```python
   fig.update_traces(texttemplate="%{y:,.0f}", textposition="outside")
   ```
-- **Histogram Widths & Overlays**: Prevent thin, unreadable histogram bars. Define a generous, explicit bin spacing, add solid white borders (`line=dict(color="white", width=1)`), and add a marginal box-plot overlay to provide a rich distribution breakdown:
+- **Histogram Widths & Overlays**: Prevent thin, unreadable histogram bars. Define a generous, explicit bin spacing, add solid white borders (`line=dict(color="white", width=1)`), use the brand primary color, and add a marginal box-plot overlay to provide a rich distribution breakdown:
   ```python
-  fig = px.histogram(df, x="price", nbins=25, marginal="box")
+  from shared import BRAND_COLORS
+  fig = px.histogram(df, x="price", nbins=25, marginal="box", color_discrete_sequence=[BRAND_COLORS["primary"]])
   fig.update_traces(marker=dict(line=dict(color="white", width=1.5)))
   ```
-- **Scatter Plot Legibility & Tooltips**: Ensure scatter plots are easy to interpret. Increase marker dots to an explicit readable scale (`size=8` or `size=9`), add soft opacity to handle overlaps, add white borders, completely disable trendlines unless statistically significant, and build highly informative hover cards using `hover_name` and `hover_data`:
+- **Scatter Plot Legibility & Tooltips**: Ensure scatter plots are easy to interpret. Use `BRAND_SEQUENCE` for categorizing series, increase marker dots to an explicit readable scale (`size=8` or `size=9`), add soft opacity to handle overlaps, add white borders, completely disable trendlines unless statistically significant, and build highly informative hover cards using `hover_name` and `hover_data`:
   ```python
+  from shared import BRAND_SEQUENCE
   fig = px.scatter(
       df, x="price", y="rating",
+      color="room_type",
+      color_discrete_sequence=BRAND_SEQUENCE,
       hover_name="listing_name",
       hover_data={"neighborhood": True, "price": ":$,.0f", "rating": ":.2f"}
   )

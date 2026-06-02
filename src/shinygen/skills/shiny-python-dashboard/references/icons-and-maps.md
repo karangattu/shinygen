@@ -747,6 +747,7 @@ fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=540)
 - Give the map card `min_height="420px"` to `"560px"` and `full_screen=True`.
 - For Plotly point maps, prefer `px.scatter_map` over deprecated `px.scatter_mapbox` in new code.
 - Never set a `line` property (e.g. `line=dict(...)`) inside `marker` when calling `fig.update_traces()` on map objects (`px.scatter_map` or `px.scatter_mapbox`). Geographic markers do not support line properties and will raise a ValueError.
+- Sizing Null Safety: Sizing columns with missing (`NaN`) values will crash Plotly maps. Always handle and fill null values in columns used for marker sizing (e.g. `size="price"`) using `.fillna(0)` or dropping those rows to avoid a `'size' property is a number` ValueError.
 - For `lonboard`, build color and size arrays as `numpy.uint8` / `numpy.float32` once per render — do not iterate per-row in the render function.
 - Push live styling/radius filter changes via `@reactive.effect` updating layer attributes directly instead of re-rendering the whole map.
 - If coordinates or geometries change, replace the list of layers on the active widget (e.g. `map.widget.layers = [new_layer]`).

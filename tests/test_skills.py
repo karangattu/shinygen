@@ -68,6 +68,8 @@ class TestLoadDefaultSkills:
             "Do not place more than 2 medium or large visualization cards in a row"
             in instructions
         )
+        assert "+ .bslib-grid" in instructions
+        assert "Sizing Null Safety" in instructions
 
     def test_shiny_python_skill_teaches_native_data_table(self):
         instructions = load_skill_context_text("shiny_python")
@@ -99,6 +101,19 @@ class TestLoadDefaultSkills:
         assert "Never return a Plotly figure from `@render.plot`" in instructions
         assert "output_widget" in instructions
         assert "render_plotly" in instructions or "render_widget" in instructions
+
+    def test_shiny_python_skill_teaches_plot_color_alignment(self):
+        instructions = load_skill_context_text("shiny_python")
+        assert "Align plot colors" in instructions
+        assert "mismatched next to semantic value boxes" in instructions
+        assert "from shared import BRAND_COLORS" in instructions
+        assert "from shared import BRAND_SEQUENCE" in instructions
+        assert "color_discrete_sequence=BRAND_SEQUENCE" in instructions
+
+    def test_shiny_python_skill_teaches_nan_serialization_safety(self):
+        instructions = load_skill_context_text("shiny_python")
+        assert "Null / NaN Serialization Safety" in instructions
+        assert "Out of range float values are not JSON compliant: nan" in instructions
 
 
 class TestBuildGenerationTask:
