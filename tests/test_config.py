@@ -115,7 +115,7 @@ class TestResolveModel:
             "mimo-v2-omni",
             "minimax-m2.5",
             "minimax-m2.7",
-            "qwen3.5-plus",
+            "qwen3.7-max",
             "qwen3.6-plus",
             "deepseek-v4-pro",
             "deepseek-v4-flash",

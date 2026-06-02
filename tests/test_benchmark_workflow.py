@@ -153,7 +153,7 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
         "mimo-v2.5-pro",
         "minimax-m2.5",
         "minimax-m2.7",
-        "qwen3.5-plus",
+        "qwen3.7-max",
         "qwen3.6-plus",
         "deepseek-v4-pro",
         "deepseek-v4-flash",

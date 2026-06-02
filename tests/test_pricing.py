@@ -335,6 +335,15 @@ class TestOpenCodeGoPricing:
         assert cost is not None
         assert abs(cost - (0.06 + 0.12)) < 1e-12
 
+    def test_qwen37_max_known_input_output(self):
+        assert get_pricing("qwen3.7-max") == (2.50, 7.50)
+        cost = calculate_cost("openai-api/opencode-go/qwen3.7-max", 1_000_000, 100_000)
+        assert cost is not None
+        assert abs(cost - (2.50 + 0.75)) < 1e-12
+
+    def test_qwen35_plus_returns_none(self):
+        assert get_pricing("qwen3.5-plus") is None
+
     def test_cache_read_uses_per_model_override(self):
         # kimi-k2.6 cache-read price is $0.16/MTok.
         # 10k input split into 6k regular + 4k cache-read.
@@ -370,7 +379,7 @@ class TestOpenCodeGoPricing:
             "glm-5.1", "glm-5", "kimi-k2.5", "kimi-k2.6",
             "deepseek-v4-pro", "deepseek-v4-flash",
             "mimo-v2.5-pro", "mimo-v2.5",
-            "qwen3.6-plus", "qwen3.5-plus",
+            "qwen3.6-plus",
             "minimax-m2.5", "minimax-m2.7",
             "minimax-m3", "qwen3.7-max",
         }

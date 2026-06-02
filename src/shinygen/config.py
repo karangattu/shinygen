@@ -52,8 +52,8 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "mimo-v2-omni",
     "mimo-v2.5-pro",
     "mimo-v2.5",
+    "qwen3.7-max",
     "qwen3.6-plus",
-    "qwen3.5-plus",
 )
 
 # OpenCode Go MiniMax models expose an Anthropic-compatible messages endpoint.

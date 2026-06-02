@@ -169,7 +169,6 @@ _PRICING: dict[str, tuple[float, float]] = {
     "minimax-m2.5": (0.30, 1.20),
     "qwen3.7-max": (2.50, 7.50),
     "qwen3.6-plus": (0.50, 3.00),
-    "qwen3.5-plus": (0.26, 1.56),
     "deepseek-v4-flash": (0.14, 0.28),
     "mimo-v2.5": (0.14, 0.28),
     "gemma-4-26b-a4b": (0.0, 0.0),
@@ -203,7 +202,6 @@ _CACHE_READ_PRICE_OVERRIDES: dict[str, float] = {
     "minimax-m2.5": 0.06,
     "qwen3.7-max": 0.50,
     "qwen3.6-plus": 0.05,
-    "qwen3.5-plus": 0.026,
     "deepseek-v4-flash": 0.0028,
     "mimo-v2.5": 0.0028,
 }
