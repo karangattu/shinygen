@@ -57,7 +57,7 @@ Use these component defaults unless the prompt conflicts:
 
 Use these shortcuts to stay consistent:
 
-1. Need the fastest path to a production-feeling app: navbar layout, light theme, tab icons, Plotly white template, one card per chart.
+1. Need the fastest path to a production-feeling app: navbar layout, default or clean light theme, tab icons, Plotly white template, one card per chart.
 2. Need a geographic view: read [references/icons-and-maps.md](references/icons-and-maps.md) and use the dependency-safe Plotly map pattern unless the app already has a declared richer map stack.
 3. Need a polished summary table: read [references/components.md](references/components.md) and prefer native `render.DataTable`.
 4. Need maintainable server logic: read [references/reactivity-and-rendering.md](references/reactivity-and-rendering.md) and centralize filtering in `@reactive.calc`.
@@ -66,17 +66,16 @@ Use these shortcuts to stay consistent:
 
 ## Avoid common failure modes
 
-1. Do not ship the default theme.
-2. Do not reference a stylesheet file that does not exist. Prefer `ui.tags.style(...)` instead.
-3. Do not let KPI rows stretch edge to edge or exceed 4 cards before wrapping.
-4. Do not cram 3 or more serious charts into one row.
-5. Do not put multiple Matplotlib charts into one render function.
-6. Do not leave cards untitled.
-7. Do not leave numeric columns unformatted in tables.
-8. Do not use a map when geography is incidental to the question.
-9. Do not ignore the provided CSV or replace it with a package sample dataset.
-10. Do not leave a page that appears to render but shows errors, spinners, blank cards, or all-zero KPIs.
-11. Do not put every control in the sidebar. Use card toolbars for local display controls so the sidebar stays focused on global filters.
+1. Do not reference a stylesheet file that does not exist. Prefer `ui.tags.style(...)` instead.
+2. Do not let KPI rows stretch edge to edge or exceed 4 cards before wrapping.
+3. Do not cram 3 or more serious charts into one row.
+4. Do not put multiple Matplotlib charts into one render function.
+5. Do not leave cards untitled.
+6. Do not leave numeric columns unformatted in tables.
+7. Do not use a map when geography is incidental to the question.
+8. Do not ignore the provided CSV or replace it with a package sample dataset.
+9. Do not leave a page that appears to render but shows errors, spinners, blank cards, or all-zero KPIs.
+10. Do not put every control in the sidebar. Use card toolbars for local display controls so the sidebar stays focused on global filters.
 
 ## Minimal execution order
 

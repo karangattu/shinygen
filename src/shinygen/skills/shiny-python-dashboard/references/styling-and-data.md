@@ -85,10 +85,9 @@ Avoid raw values like `12345.6789` or `0.873421` in user-facing UI.
 
 ## Themes and brand palette
 
-The single biggest visual upgrade for a Python Shiny dashboard is shipping an explicit light theme and a small brand palette. Default bslib styling reads as stock Shiny.
+Keep your theme choices clean and modern. Use Shiny's default Bootstrap 5 theme, or ship a polished light theme and a small brand palette.
 
 ```python
-import shinyswatch
 from shiny import ui
 
 BRAND_COLORS = {
@@ -113,14 +112,13 @@ BRAND_SEQUENCE = [
 app_ui = ui.page_navbar(
     ...,
     title="Analytics Platform",
-    theme=shinyswatch.theme.zephyr,
     fillable=False,
 )
 ```
 
 Guidelines:
 
-- Always pass an explicit `theme=` to your `ui.page_*()` call. Prefer `shinyswatch.theme.zephyr`, `flatly`, `minty`, `cosmo`, `lumen`, or `yeti`.
+- You can use the default modern Bootstrap 5 theme, or pass an explicit light theme (e.g. `shinyswatch.theme.zephyr`, `flatly`, `cosmo`) to your `ui.page_*()` call.
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
 - Define `BRAND_COLORS` and `BRAND_SEQUENCE` once in `shared.py` and reuse them across Plotly templates, Matplotlib charts, and other visual components.
 - Use standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes to leverage default bslib styling.
