@@ -104,11 +104,12 @@ class TestLoadDefaultSkills:
 
     def test_shiny_python_skill_teaches_plot_color_alignment(self):
         instructions = load_skill_context_text("shiny_python")
-        assert "Align plot colors" in instructions
-        assert "mismatched next to semantic value boxes" in instructions
+        assert "Mandatory" in instructions
+        assert "color_discrete_sequence=BRAND_SEQUENCE" in instructions
         assert "from shared import BRAND_COLORS" in instructions
         assert "from shared import BRAND_SEQUENCE" in instructions
-        assert "color_discrete_sequence=BRAND_SEQUENCE" in instructions
+        assert "WRONG" in instructions
+        assert "CORRECT" in instructions
 
     def test_shiny_python_skill_teaches_nan_serialization_safety(self):
         instructions = load_skill_context_text("shiny_python")
