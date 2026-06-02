@@ -102,6 +102,13 @@ class TestResolveModel:
         assert is_opencode_go_anthropic_model(model_id)
         assert opencode_go_anthropic_model_name(model_id) == "minimax-m2.7"
 
+    def test_opencode_go_qwen37_max_alias_resolves_to_anthropic_provider_marker(self):
+        agent, model_id = resolve_model("qwen3.7-max")
+        assert agent == "native_react_solver"
+        assert model_id == "anthropic/opencode-go/qwen3.7-max"
+        assert is_opencode_go_anthropic_model(model_id)
+        assert opencode_go_anthropic_model_name(model_id) == "qwen3.7-max"
+
     @pytest.mark.parametrize(
         "alias",
         [

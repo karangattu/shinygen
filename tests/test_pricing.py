@@ -337,7 +337,7 @@ class TestOpenCodeGoPricing:
 
     def test_qwen37_max_known_input_output(self):
         assert get_pricing("qwen3.7-max") == (2.50, 7.50)
-        cost = calculate_cost("openai-api/opencode-go/qwen3.7-max", 1_000_000, 100_000)
+        cost = calculate_cost("anthropic/opencode-go/qwen3.7-max", 1_000_000, 100_000)
         assert cost is not None
         assert abs(cost - (2.50 + 0.75)) < 1e-12
 

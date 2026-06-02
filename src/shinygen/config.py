@@ -52,7 +52,6 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "mimo-v2-omni",
     "mimo-v2.5-pro",
     "mimo-v2.5",
-    "qwen3.7-max",
     "qwen3.6-plus",
 )
 
@@ -64,6 +63,7 @@ OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
     "minimax-m2.5",
     "minimax-m2.7",
     "minimax-m3",
+    "qwen3.7-max",
 )
 
 
