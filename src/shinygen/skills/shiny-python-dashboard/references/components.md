@@ -303,6 +303,111 @@ def change_icon():
 
 In Express, `with ui.hold():` is useful when an output is referenced before it is defined.
 
+### Interactive Sparklines & Showcase Layouts
+
+Embedding a line chart or sparkline is highly effective for visualising trend data directly within a KPI card. Use `showcase_layout="bottom"` to position the widget across the full width of the card's bottom, and `showcase_layout="top right"` for smaller icons.
+
+**Core API:**
+
+```python
+ui.value_box(
+    "Total Sales in Q2",
+    "$2.45M",
+    showcase=sw.output_widget("sparkline"),
+    showcase_layout="bottom",
+)
+
+@sw.render_widget
+def sparkline():
+    economics = pd.read_csv(app_dir / "economics.csv")
+    fig = px.line(economics, x="date", y="psavert")
+    fig.update_traces(
+        line_color="#0d6efd",
+        line_width=1.5,
+        fill="tozeroy",
+        fillcolor="rgba(13,110,253,0.15)",
+        hoverinfo="y",
+    )
+    fig.update_xaxes(visible=False, showgrid=False)
+    fig.update_yaxes(visible=False, showgrid=False)
+    fig.update_layout(
+        height=100,
+        hovermode="x",
+        margin=dict(t=0, r=0, l=0, b=0),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+```
+
+**Express API:**
+
+```python
+with ui.value_box(showcase=sw.output_widget("sparkline"), showcase_layout="bottom"):
+    "Total Sales in Q2"
+    "$2.45M"
+
+    with ui.hold():
+        @sw.render_widget
+        def sparkline():
+            economics = pd.read_csv(app_dir / "economics.csv")
+            fig = px.line(economics, x="date", y="psavert")
+            fig.update_traces(
+                line_color="#0d6efd",
+                line_width=1.5,
+                fill="tozeroy",
+                fillcolor="rgba(13,110,253,0.15)",
+                hoverinfo="y",
+            )
+            fig.update_xaxes(visible=False, showgrid=False)
+            fig.update_yaxes(visible=False, showgrid=False)
+            fig.update_layout(
+                height=100,
+                hovermode="x",
+                margin=dict(t=0, r=0, l=0, b=0),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+            )
+            return fig
+```
+
+#### Sparkline Styling Guidelines:
+- **Hide gridlines and axes**: Always set `visible=False` and `showgrid=False` on both X and Y axes.
+- **Transparent background**: Set `plot_bgcolor="rgba(0,0,0,0)"` and `paper_bgcolor="rgba(0,0,0,0)"` so the plot inherits the card's theme color.
+- **Remove margins**: Pass `margin=dict(t=0, r=0, l=0, b=0)` so the chart extends edge-to-edge.
+- **Accent line and fill**: Color the line with your brand sequence color and fill the area underneath with a low opacity alpha value (e.g. `rgba(..., 0.15)`).
+- **Required CSS for ipywidgets / Plotly scaling**: Because ipywidget outputs (like `shinywidgets.output_widget`) nested in value boxes do not automatically expand to fill their parents, you must include CSS styling to force the widget elements to stretch and to hide the Plotly modebar:
+
+  ```css
+  .bslib-value-box .plotly .modebar-container {
+    display: none;
+  }
+  .shiny-ipywidget-output {
+    display: flex;
+    flex: 1 1 auto !important;
+    width: 100%;
+  }
+  .shiny-ipywidget-output > * {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .shiny-ipywidget-output > * > * {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .shiny-ipywidget-output > * > * > * {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  ```
+
+  Include this CSS in the page using `ui.tags.style(...)` or within the application's style sheet to ensure the sparkline stretches to fill the bottom of the value box showcase container.
+
+
+
 
 ## Summary tables with `great_tables`
 
