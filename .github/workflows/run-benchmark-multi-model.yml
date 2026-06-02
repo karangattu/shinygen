@@ -14,7 +14,7 @@ on:
       models:
         description: "Comma-separated list of models to benchmark"
         required: true
-        default: "gpt-5.4-mini, minimax-m3, deepseek-v4-flash"
+        default: "claude-opus-4-8, minimax-m3, gpt-5.5, mimo-v2.5-pro, qwen3.7-max, deepseek-v4-pro, glm-5.1"
       arm:
         description: "Benchmark arm (skills or vanilla)"
         required: true
