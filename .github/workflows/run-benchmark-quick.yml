@@ -80,7 +80,7 @@ on:
       max_iterations:
         description: "Max iteration count (lower = cheaper; 1 = smoke test)"
         required: true
-        default: "2"
+        default: "5"
       quality_threshold:
         description: "Minimum quality score"
         required: true
