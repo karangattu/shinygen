@@ -1,0 +1,477 @@
+name: Run benchmark (multi model, single arm)
+
+on:
+  workflow_dispatch:
+    inputs:
+      framework:
+        description: "Target framework"
+        required: true
+        default: shiny_python
+        type: choice
+        options:
+          - shiny_python
+          - shiny_r
+      models:
+        description: "Comma-separated list of models to benchmark"
+        required: true
+        default: "gpt-5.4-mini, minimax-m3, deepseek-v4-flash"
+      arm:
+        description: "Benchmark arm (skills or vanilla)"
+        required: true
+        default: "skills"
+        type: choice
+        options:
+          - skills
+          - vanilla
+      dataset:
+        description: "Bundled CSV dataset from test_data_csv_files/"
+        required: true
+        default: "airbnb-asheville-short.csv"
+        type: choice
+        options:
+          - airbnb-asheville-short.csv
+          - air_quality.csv
+          - e_commerce_sales.csv
+          - ed_operations.csv
+          - employee_retention.csv
+          - ev_charging_stations.csv
+          - marketing_campaigns.csv
+          - supply_chain.csv
+          - trials_short_50.csv
+      challenge:
+        description: "Optional short benchmark label used in artifact names and summaries"
+        required: false
+        default: ""
+      benchmark_prompt:
+        description: "Prompt passed to shinygen generate"
+        required: true
+        default: >-
+          Build a professional-grade, well-designed Shiny dashboard for the selected dataset. The dashboard should showcase exceptional design aesthetics, polished custom styling, and thoughtful layout choices. It should include clear summary insights, well-formatted data representations, and intuitive interactive elements that help users explore and compare important patterns in the data.
+      max_iterations:
+        description: "Max iteration count"
+        required: true
+        default: "5"
+      quality_threshold:
+        description: "Minimum quality score"
+        required: true
+        default: "5.0"
+
+concurrency:
+  group: benchmark-multi-${{ github.workflow }}-${{ inputs.framework }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '2' }}
+  BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '5.0' }}
+  SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "0"
+  SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "0"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      benchmark_challenge: ${{ steps.normalize.outputs.benchmark_challenge }}
+      benchmark_dataset: ${{ steps.normalize.outputs.benchmark_dataset }}
+      benchmark_dataset_basename: ${{ steps.normalize.outputs.benchmark_dataset_basename }}
+      benchmark_dataset_stem: ${{ steps.normalize.outputs.benchmark_dataset_stem }}
+      benchmark_prompt: ${{ steps.normalize.outputs.benchmark_prompt }}
+      benchmark_slug: ${{ steps.normalize.outputs.benchmark_slug }}
+      models_json: ${{ steps.normalize.outputs.models_json }}
+      use_skills: ${{ steps.normalize.outputs.use_skills }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Normalize benchmark inputs
+        id: normalize
+        shell: bash
+        env:
+          RAW_BENCHMARK_PROMPT: ${{ inputs.benchmark_prompt }}
+          RAW_CHALLENGE: ${{ inputs.challenge }}
+          RAW_DATASET: ${{ inputs.dataset }}
+          RAW_MODELS: ${{ inputs.models }}
+          RAW_ARM: ${{ inputs.arm }}
+        run: |
+          set -euo pipefail
+
+          dataset_input="${RAW_DATASET#./}"
+          if [[ "${dataset_input}" != test_data_csv_files/* ]]; then
+            dataset_path="test_data_csv_files/${dataset_input}"
+          else
+            dataset_path="${dataset_input}"
+          fi
+
+          if [[ ! "${dataset_path}" =~ ^test_data_csv_files/.+\.csv$ ]]; then
+            echo "Dataset must point to a CSV inside test_data_csv_files/." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${dataset_path}" ]]; then
+            echo "Missing benchmark dataset: ${dataset_path}" >&2
+            exit 1
+          fi
+
+          dataset_basename="$(basename "${dataset_path}")"
+          dataset_stem="${dataset_basename%.csv}"
+
+          challenge="${RAW_CHALLENGE}"
+          if [[ -z "$(printf '%s' "${challenge}" | tr -d '[:space:]')" ]]; then
+            challenge="multi-${RAW_ARM}-${dataset_stem}"
+          fi
+
+          if [[ -z "$(printf '%s' "${RAW_BENCHMARK_PROMPT}" | tr -d '[:space:]')" ]]; then
+            echo "Benchmark prompt must not be empty." >&2
+            exit 1
+          fi
+
+          benchmark_slug="$(printf '%s' "${challenge}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
+          if [[ -z "${benchmark_slug}" ]]; then
+            benchmark_slug="multi-${RAW_ARM}-${dataset_stem}"
+          fi
+
+          models_json="[]"
+          IFS=',' read -ra ADDR <<< "${RAW_MODELS}"
+          for i in "${ADDR[@]}"; do
+            trimmed=$(echo "${i}" | xargs)
+            if [[ -n "${trimmed}" ]]; then
+              models_json=$(echo "${models_json}" | jq --arg val "${trimmed}" '. += [$val]')
+            fi
+          done
+
+          if [[ "$(echo "${models_json}" | jq 'length')" -eq 0 ]]; then
+            echo "Models list must not be empty." >&2
+            exit 1
+          fi
+
+          use_skills="true"
+          if [[ "${RAW_ARM}" == "vanilla" ]]; then
+            use_skills="false"
+          fi
+
+          {
+            echo "benchmark_challenge=${challenge}"
+            echo "benchmark_dataset=${dataset_path}"
+            echo "benchmark_dataset_basename=${dataset_basename}"
+            echo "benchmark_dataset_stem=${dataset_stem}"
+            echo "benchmark_slug=${benchmark_slug}"
+            echo "models_json=${models_json}"
+            echo "use_skills=${use_skills}"
+            echo "benchmark_prompt<<EOF"
+            printf '%s\n' "${RAW_BENCHMARK_PROMPT}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+  run:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJson(needs.prepare.outputs.models_json) }}
+    env:
+      BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
+      BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
+      BENCHMARK_DATASET_BASENAME: ${{ needs.prepare.outputs.benchmark_dataset_basename }}
+      BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
+      BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
+      OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ inputs.framework }}/${{ matrix.model }}-${{ inputs.arm }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+      SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
+      SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Validate API keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          needs_anthropic=0
+          needs_openai=0
+          needs_opencode_go=0
+
+          case "${{ matrix.model }}" in
+            claude-*)
+              needs_anthropic=1
+              ;;
+            gpt-*)
+              needs_openai=1
+              ;;
+            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*)
+              needs_opencode_go=1
+              ;;
+          esac
+
+          missing=0
+          if [[ "${needs_anthropic}" -eq 1 && -z "${ANTHROPIC_API_KEY:-}" ]]; then
+            echo "Missing required secret: ANTHROPIC_API_KEY" >&2
+            missing=1
+          fi
+          if [[ "${needs_openai}" -eq 1 && -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "Missing required secret: OPENAI_API_KEY" >&2
+            missing=1
+          fi
+          if [[ "${needs_opencode_go}" -eq 1 && -z "${OPENCODE_GO_API_KEY:-}" ]]; then
+            echo "Missing required secret: OPENCODE_GO_API_KEY" >&2
+            missing=1
+          fi
+          if [[ "${missing}" -ne 0 ]]; then
+            echo "Configure the required repository secrets before running this workflow." >&2
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-pull pre-built sandbox image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.framework }}" == "shiny_python" ]]; then
+            image="${SHINYGEN_SANDBOX_PYTHON_IMAGE}"
+          else
+            image="${SHINYGEN_SANDBOX_R_IMAGE}"
+          fi
+          docker pull "${image}" || echo "::warning::Failed to pull ${image}"
+
+      - name: Install shinygen CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e "."
+
+      - name: Run shinygen benchmark generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+
+          shinygen generate \
+            --prompt "${BENCHMARK_PROMPT}" \
+            --model "${{ matrix.model }}" \
+            --framework "${{ inputs.framework }}" \
+            --output "${OUTPUT_DIR}" \
+            --csv-file "${BENCHMARK_DATASET}" \
+            --no-screenshot \
+            --max-iterations "${BENCHMARK_MAX_ITERATIONS}" \
+            --quality-threshold "${BENCHMARK_QUALITY_THRESHOLD}" \
+            --web-fetch \
+            $([[ "${{ needs.prepare.outputs.use_skills }}" == "true" ]] && echo "--skills" || echo "--no-skills") \
+            2>&1 | tee "${OUTPUT_DIR}/run.log"
+
+      - name: Write benchmark metrics summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+
+          OUTPUT_DIR="${OUTPUT_DIR}" \
+          MODEL="${{ matrix.model }}" \
+          FRAMEWORK="${{ inputs.framework }}" \
+          ARM="${{ inputs.arm }}" \
+          GHA_RUN_ID="${{ github.run_id }}" \
+          GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
+          GHA_WORKFLOW="${{ github.workflow }}" \
+          GHA_JOB="${{ github.job }}" \
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          output_dir = Path(os.environ["OUTPUT_DIR"])
+          model = os.environ["MODEL"]
+          framework = os.environ["FRAMEWORK"]
+          arm = os.environ["ARM"]
+          summary_path = output_dir / "run_summary.json"
+          metrics_path = output_dir / "run_metrics.txt"
+
+          lines = [
+              "shinygen benchmark summary (multi-model)",
+              f"run_id: {os.environ['GHA_RUN_ID']}",
+              f"run_attempt: {os.environ['GHA_RUN_ATTEMPT']}",
+              f"workflow: {os.environ['GHA_WORKFLOW']}",
+              f"job: {os.environ['GHA_JOB']}",
+              f"benchmark_challenge: {os.environ['BENCHMARK_CHALLENGE']}",
+              f"benchmark_dataset: {os.environ['BENCHMARK_DATASET']}",
+              f"model: {model}",
+              f"framework: {framework}",
+              f"arm: {arm}",
+              "timestamp_utc: " + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "",
+          ]
+
+          if summary_path.exists():
+              summary = json.loads(summary_path.read_text(encoding="utf-8"))
+              usage = summary.get("usage") or {}
+              lines.extend(
+                  [
+                      f"passed: {summary.get('passed')}",
+                      f"score: {summary.get('score')}",
+                      f"iterations: {summary.get('iterations')}",
+                      f"generation_cost_usd: {usage.get('generation_cost')}",
+                      f"total_cost_usd: {usage.get('total_cost')}",
+                      f"input_tokens: {usage.get('total_input_tokens')}",
+                      f"output_tokens: {usage.get('total_output_tokens')}",
+                      f"generation_time_seconds: {usage.get('generation_time_seconds')}",
+                  ]
+              )
+          else:
+              lines.extend(
+                  [
+                      "run_summary.json: missing",
+                      "passed: unknown",
+                      "score: unknown",
+                      "iterations: unknown",
+                      "total_cost_usd: unknown",
+                  ]
+              )
+
+          metrics_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload per-model benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: shinygen-multi-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-${{ inputs.framework }}-${{ matrix.model }}-${{ inputs.arm }}
+          path: ${{ env.OUTPUT_DIR }}
+          if-no-files-found: warn
+
+  aggregate:
+    needs:
+      - prepare
+      - run
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BENCHMARK_CHALLENGE: ${{ needs.prepare.outputs.benchmark_challenge }}
+      BENCHMARK_DATASET: ${{ needs.prepare.outputs.benchmark_dataset }}
+      BENCHMARK_PROMPT: ${{ needs.prepare.outputs.benchmark_prompt }}
+      BENCHMARK_SLUG: ${{ needs.prepare.outputs.benchmark_slug }}
+    steps:
+      - name: Download per-model benchmark artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: shinygen-multi-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-*
+          path: gha_runs/aggregate-${{ github.run_id }}
+          merge-multiple: false
+
+      - name: Build aggregate benchmark summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="gha_runs/aggregate-${{ github.run_id }}"
+          mkdir -p "${root}"
+
+          AGGREGATE_ROOT="${root}" \
+          GHA_RUN_ID="${{ github.run_id }}" \
+          GHA_RUN_ATTEMPT="${{ github.run_attempt }}" \
+          BENCHMARK_CHALLENGE="${BENCHMARK_CHALLENGE}" \
+          BENCHMARK_DATASET="${BENCHMARK_DATASET}" \
+          BENCHMARK_PROMPT="${BENCHMARK_PROMPT}" \
+          BENCHMARK_ARM="${{ inputs.arm }}" \
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["AGGREGATE_ROOT"])
+          rows = []
+          missing = []
+
+          if not root.exists():
+              print(f"No aggregate root at {root}; nothing to summarize.")
+              raise SystemExit(0)
+
+          for artifact_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+              summary_paths = sorted(artifact_dir.rglob("run_summary.json"))
+              if not summary_paths:
+                  missing.append(artifact_dir.name)
+                  continue
+              summary = json.loads(summary_paths[0].read_text(encoding="utf-8"))
+              usage = summary.get("usage") or {}
+              model = summary.get("model") or {}
+              rows.append(
+                  {
+                      "artifact_dir": artifact_dir.name,
+                      "framework": summary.get("framework"),
+                      "model": model.get("requested"),
+                      "agent": model.get("agent"),
+                      "arm": summary.get("arm"),
+                      "use_skills": summary.get("use_skills"),
+                      "passed": summary.get("passed"),
+                      "iterations": summary.get("iterations"),
+                      "total_cost": usage.get("total_cost"),
+                      "generation_cost": usage.get("generation_cost"),
+                      "total_input_tokens": usage.get("total_input_tokens"),
+                      "total_output_tokens": usage.get("total_output_tokens"),
+                      "generation_time": usage.get("generation_time_seconds"),
+                  }
+              )
+
+          def fmt_cost(v):
+              return "n/a" if v is None else f"${v:.4f}"
+
+          lines = [
+              f"# Multi-Model Benchmark: {os.environ['BENCHMARK_CHALLENGE']}",
+              "",
+              f"Dataset: {os.environ['BENCHMARK_DATASET']}",
+              f"Arm: {os.environ['BENCHMARK_ARM']}",
+              f"Run ID: {os.environ['GHA_RUN_ID']} (attempt {os.environ['GHA_RUN_ATTEMPT']})",
+              "",
+              "| Framework | Model | Passed | Iterations | Gen Time (s) | Total Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+          ]
+          for r in rows:
+              lines.append(
+                  "| {f} | {m} | {p} | {it} | {gt} | {tc} | {itok} | {otok} | {ad} |".format(
+                      f=r.get("framework") or "n/a",
+                      m=r.get("model") or "n/a",
+                      p="yes" if r.get("passed") else "no",
+                      it=r.get("iterations") if r.get("iterations") is not None else "n/a",
+                      gt=f"{r.get('generation_time'):.1f}" if r.get("generation_time") is not None else "n/a",
+                      tc=fmt_cost(r.get("total_cost")),
+                      itok=f"{r.get('total_input_tokens'):,}" if r.get("total_input_tokens") is not None else "0",
+                      otok=f"{r.get('total_output_tokens'):,}" if r.get("total_output_tokens") is not None else "0",
+                      ad=r.get("artifact_dir"),
+                  )
+              )
+
+          if missing:
+              lines.extend(["", "## Missing summaries", ""])
+              lines.extend(f"- {name}" for name in missing)
+
+          (root / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          if [[ -n "${GITHUB_STEP_SUMMARY:-}" && -f "${root}/INDEX.md" ]]; then
+            cat "${root}/INDEX.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload aggregate benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: shinygen-multi-${{ needs.prepare.outputs.benchmark_slug }}-${{ github.run_id }}-aggregate
+          path: gha_runs/aggregate-${{ github.run_id }}
+          if-no-files-found: warn
