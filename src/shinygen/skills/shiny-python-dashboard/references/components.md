@@ -16,7 +16,6 @@ ui.card(
 ```
 
 Use cards for:
-
 - charts
 - tables
 - maps
@@ -24,14 +23,14 @@ Use cards for:
 - module-like dashboard sections
 
 Guidelines:
-
 - Add `ui.card_header()` to every card.
 - Default to `full_screen=True` for charts, maps, and tables.
 - Give visualization cards a floor like `min_height="320px"` so charts stay readable.
 - Use a larger floor such as `min_height="420px"` for detailed tables.
 - Do not place more than 2 medium or large visualization cards in a row.
 - Use `ui.card_footer()` for provenance, notes, or small actions.
-- Keep static text cards shorter than plot cards; large paragraphs belong in scrolling pages, not dashboard grids.
+- Keep static text cards shorter than plot cards.
+- **Fill Behavior**: Outputs (like plots, maps, and data grids) placed directly inside `ui.card_body()` automatically resize to fill the card's height. Let layout containers determine heights when grouping cards.
 
 ### Card headers with inline controls
 
@@ -51,6 +50,62 @@ ui.card_header(
 ```
 
 Use this for secondary options that do not deserve a full sidebar section.
+
+### Tabbed Cards
+
+Use `ui.navset_card_underline()` or `ui.navset_card_pill()` to create cards with internal tabs.
+
+**Express API:**
+```python
+with ui.navset_card_underline(title="Project Status"):
+    with ui.nav_panel("Overview"):
+        "Overview content"
+    with ui.nav_panel("Team"):
+        "Team list"
+```
+
+**Core API:**
+```python
+ui.navset_card_underline(
+    ui.nav_panel("Overview", "Overview content"),
+    ui.nav_panel("Team", "Team list"),
+    title="Project Status",
+)
+```
+
+### Cards with Sidebars
+
+Use `ui.layout_sidebar()` and `ui.sidebar()` inside a card to create a local, card-scoped sidebar layout for filtering or configuring the card's specific visualization.
+
+**Express API:**
+```python
+with ui.card(full_screen=True, height="400px"):
+    ui.card_header("Flower Data Explorer")
+    with ui.layout_sidebar():
+        with ui.sidebar():
+            ui.input_select("color_filter", "Color", ["All", "Red", "Yellow"])
+            ui.input_slider("rows", "Rows", 1, 8, 5)
+        with ui.card_body():
+            ui.output_data_frame("flower_table")
+```
+
+**Core API:**
+```python
+ui.card(
+    ui.card_header("Flower Data Explorer"),
+    ui.layout_sidebar(
+        ui.sidebar(
+            ui.input_select("color_filter", "Color", ["All", "Red", "Yellow"]),
+            ui.input_slider("rows", "Rows", 1, 8, 5),
+        ),
+        ui.card_body(
+            ui.output_data_frame("flower_table"),
+        ),
+    ),
+    full_screen=True,
+    height="400px",
+)
+```
 
 ### Toolbars (Shiny ≥ 1.6)
 
