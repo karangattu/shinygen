@@ -54,56 +54,128 @@ Use this for secondary options that do not deserve a full sidebar section.
 
 ### Toolbars (Shiny ≥ 1.6)
 
-Use `ui.toolbar()` to embed compact controls inside `ui.card_header()`, `ui.card_footer()`, input labels, or `ui.input_submit_textarea(toolbar=...)`. This is the modern, low-noise way to scope controls to a single card instead of pushing more inputs into the global sidebar.
+Use `ui.toolbar()` to embed compact controls inside `ui.card_header()`, `ui.card_footer()`, input labels, or `ui.input_submit_textarea(toolbar=...)`. This scopes controls to a single card instead of pushing more inputs into the global sidebar.
 
-For professional dashboards, use toolbars by default when Shiny >= 1.6 is available. A dashboard with several chart/table cards should normally include at least one or two toolbars: one for local chart display options and one for table/map actions. This makes the UI feel deliberate and keeps the global sidebar focused on filters that affect the whole page.
+A card with several chart/table cards should normally include at least one or two toolbars: one for local chart display options and one for table/map actions. This makes the UI feel deliberate and keeps the global sidebar focused on filters that affect the whole page.
+
+#### UI Express Code Example
 
 ```python
 from faicons import icon_svg
-from shiny import ui
+from shiny.express import input, render, ui
 
-ui.card(
-    ui.card_header(
-        "Listing map",
-        ui.toolbar(
+with ui.card(full_screen=True):
+    with ui.card_header():
+        "Data View"
+        with ui.toolbar(align="right"):
             ui.toolbar_input_select(
-                id="map_basemap",
-                label="Basemap",
-                choices=["Positron", "Voyager"],
-                selected="Positron",
+                id="view_mode",
+                label="View Mode",
+                choices=["Table", "Chart", "Map"],
+                icon=icon_svg("eye"),
+                show_label=True,
+            )
+            ui.toolbar_divider()
+            ui.toolbar_input_select(
+                id="filter_status",
+                label="Filter Status",
+                choices=["All", "Active", "Archived"],
+                icon=icon_svg("filter"),
+            )
+
+    @render.text
+    def selected_view():
+        return f"View Mode: {input.view_mode()}, Filter: {input.filter_status()}"
+```
+
+#### UI Core Code Example
+
+```python
+from faicons import icon_svg
+from shiny import App, render, ui
+
+app_ui = ui.page_fixed(
+    ui.card(
+        ui.card_header(
+            "Data View",
+            ui.toolbar(
+                ui.toolbar_input_select(
+                    id="view_mode",
+                    label="View Mode",
+                    choices=["Table", "Chart", "Map"],
+                    icon=icon_svg("eye"),
+                    show_label=True,
+                ),
+                ui.toolbar_divider(),
+                ui.toolbar_input_select(
+                    id="filter_status",
+                    label="Filter Status",
+                    choices=["All", "Active", "Archived"],
+                    icon=icon_svg("filter"),
+                ),
+                align="right",
             ),
-            ui.toolbar_divider(),
-            ui.toolbar_input_button(
-                id="map_legend_info",
-                label="Legend",
-                icon=icon_svg("circle-info"),
-                tooltip="H = entire home · P = private · S = shared · L = lodging",
-            ),
-            align="right",
         ),
-    ),
-    output_widget("density_map"),
-    full_screen=True,
+        ui.card_body(
+            ui.output_text("selected_view"),
+        ),
+        full_screen=True,
+    )
 )
 ```
 
-Components: `ui.toolbar()` (container with `align="left"|"right"`), `ui.toolbar_input_button()` (small action button with optional `tooltip=`), `ui.toolbar_input_select()` (compact dropdown), `ui.toolbar_divider()` (separator), `ui.toolbar_spacer()` (push items to opposite sides). Each input has a matching `ui.update_toolbar_input_*()`. Read inputs in the server with `input.<id>()` like any other input.
+#### Toolbar Select Configuration (`ui.toolbar_input_select`)
 
-Use toolbars for: per-card filters (date range, metric selector, grouping selector, basemap, palette toggle), display modes (absolute vs percent, top 10 vs all, bars vs line), info/help tooltips next to inputs (`label=ui.toolbar(ui.toolbar_input_button(..., icon=icon_svg("circle-info"), tooltip="..."), "Threshold", align="left")`), reset/export/details actions, and message-composer actions inside `ui.input_submit_textarea(toolbar=...)`. Do **not** use them as a substitute for the global sidebar — keep cross-cutting filters there.
+A compact select input designed for constrained spaces:
+- **`id`**: Unique string identifier (accessed in server via `input.<id>()`).
+- **`label`**: The select label text. Always provide a meaningful label (even when using `show_label=False`) because it is used for screen readers and tooltips, ensuring your app is accessible.
+- **`choices`**: A list of strings, a dictionary mapping values to labels, or a nested dictionary for grouped choices.
+- **`icon`**: An optional icon (`faicons.icon_svg(...)`) displayed alongside the select.
+- **`show_label`**: Boolean (default `False`). If `False`, the text label is hidden and instead appears as a tooltip on hover. If `True`, the label text is visible alongside the icon.
+- **`tooltip`**: Optional custom tooltip text. If omitted and `show_label=False`, the `label` text is automatically used for the tooltip.
+- **`selected`**: The initially selected value (defaults to first choice).
 
-Toolbar decision rule:
+#### Toolbar Button Configuration (`ui.toolbar_input_button`)
 
-- If a control changes the entire dashboard, put it in the sidebar.
-- If a control changes one card's encoding, sorting, aggregation, annotation, or display mode, put it in that card's toolbar.
-- If a button explains, resets, expands, exports, or toggles details for one card, put it in that card's toolbar.
-- If no local control is obvious, add a small info toolbar button to a complex chart explaining denominator, filter scope, or caveats.
+A compact button designed for toolbars:
+- **`id`**: Unique identifier. Behaves like an action button.
+- **`label`**: Button label.
+- **`icon`**: Optional icon (`icon_svg(...)`).
+- **`show_label`**: Boolean. If an icon is provided, `show_label` defaults to `False` and the label text is shown as a tooltip instead.
+- **`tooltip`**: Optional custom tooltip text.
+
+#### Structural Elements
+
+- **`ui.toolbar_divider()`**: A thin vertical rule for visually grouping toolbar elements.
+- **`ui.toolbar_spacer()`**: An invisible spacer to push items to opposite sides of the toolbar.
+
+#### Server-Side Updates
+
+Inside reactive effects, use the update helpers to dynamically change toolbar inputs:
+```python
+ui.update_toolbar_input_select(
+    "view_mode",
+    choices=["Table", "Chart", "Map", "Grid"],
+    selected="Chart",
+    label="View Mode (Updated)",
+    show_label=True,
+)
+
+ui.update_toolbar_input_button(
+    "export_btn",
+    label="Exporting...",
+    disabled=True,
+)
+```
+
+#### Toolbar Decision Rules
+
+- **Sidebar vs Toolbar**: If a control changes the entire dashboard layout or filters the main dataset across cards, put it in the sidebar. If a control changes one card's encoding, sorting, aggregation, annotation, or display mode, put it in that card's toolbar.
+- **Popover vs Toolbar**: Use `ui.toolbar()` when a card has multiple inputs/buttons that need custom spacing and grouping. Use `ui.popover()` or `ui.tooltip()` directly inside `ui.card_header()` for single settings icons or simple info popups without toolbars.
 
 ## Value Boxes
 
 Use `ui.value_box()` for KPIs and headline metrics.
-
-> [!WARNING]
-> **WCAG Contrast & Readability Warning**: Never use standard saturated colored background themes (`theme="primary"`, `"success"`, `"danger"`, `"info"`) for value boxes. Pairings of dynamic trends (like green `text-success` or gray `text-muted`) on saturated backgrounds fail contrast standards. Always use neutral light/white themes with thick semantic left borders and colored showcase icons instead.
 
 **Core API:**
 
@@ -117,9 +189,8 @@ ui.layout_column_wrap(
             " vs last month",
             class_="fs-6 text-muted mb-0",
         ),
-        showcase=ui.div(icon_svg("users"), class_="text-primary fs-3"),
-        theme="light",
-        class_="border-start border-primary border-4 shadow-sm bg-white",
+        showcase=icon_svg("users"),
+        theme="primary",
     ),
     ui.value_box(
         "Average Order",
@@ -129,9 +200,8 @@ ui.layout_column_wrap(
             " vs target",
             class_="fs-6 text-muted mb-0",
         ),
-        showcase=ui.div(icon_svg("wallet"), class_="text-success fs-3"),
-        theme="light",
-        class_="border-start border-success border-4 shadow-sm bg-white",
+        showcase=icon_svg("wallet"),
+        theme="success",
     ),
     width="240px",
     fill=False,
@@ -143,9 +213,8 @@ ui.layout_column_wrap(
 ```python
 with ui.layout_columns(fill=False):
     with ui.value_box(
-        showcase=ui.div(icon_svg("users"), class_="text-primary fs-3"),
-        theme="light",
-        class_="border-start border-primary border-4 shadow-sm bg-white",
+        showcase=icon_svg("users"),
+        theme="primary",
     ):
         "Total Users"
         f"{len(df):,}"
@@ -160,9 +229,8 @@ Guidelines:
 
 - Keep the row to 3 or 4 boxes.
 - Prefer `ui.layout_column_wrap(..., width="240px", fill=False)` so KPI cards wrap before becoming cramped.
-- Discourage solid background fills. Instead, designate semantic metric categories using thick, 4px-thick left borders (`border-start border-{theme} border-4 shadow-sm bg-white`).
+- Use default bslib theme colors (`theme="primary"`, `"success"`, `"danger"`, `"info"`, etc.) for value boxes.
 - Use icons that reinforce the metric; do not use emojis or generic/unrelated icons.
-- Wrap showcase icons in colored divs (e.g., `class_="text-primary fs-3"`) to bring in semantic color contexts cleanly.
 - Format the displayed value instead of passing a raw float or integer.
 - **Mandatory Metric Context & Trends**: Headline metrics must never stand alone. Always provide a clear comparison trend or period label styled with high-contrast Bootstrap tags.
 
