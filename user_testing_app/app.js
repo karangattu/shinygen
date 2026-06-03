@@ -279,6 +279,7 @@ let selectedDashboardId = null;
 let assignedTiers = {}; // dashboardId -> 'S'|'A'|'B'|'C'|'D'
 let assignedTags = {};  // dashboardId -> Array of 2 strings
 let tempTargetTier = null;
+let currentLightboxDbId = null;
 
 // DOM Elements
 const welcomeView = document.getElementById("welcome-view");
@@ -339,18 +340,16 @@ function initializeBoard() {
             <img src="${db.url}" alt="${db.name}" draggable="false">
             <div class="card-label-tag">${db.name}</div>
             <div class="card-overlay-actions">
-                <button class="zoom-btn" title="Zoom in"><i class="fa-solid fa-expand"></i></button>
+                <button class="mini-zoom-btn-pool" title="Zoom in"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom</button>
+                <div class="card-placed-actions">
+                    <button class="mini-action-btn zoom-placed-btn" title="Zoom in"><i class="fa-solid fa-expand"></i></button>
+                </div>
             </div>
         `;
 
-        // Click selection system (alternative to drag-and-drop, highly non-intimidating)
         card.addEventListener("click", (e) => {
-            if (e.target.closest(".zoom-btn")) {
-                openLightbox(db.url, db.name);
-                e.stopPropagation();
-                return;
-            }
-            selectCard(db.id);
+            openLightbox(db.id);
+            e.stopPropagation();
         });
 
         // HTML5 Drag and Drop events
@@ -612,20 +611,21 @@ btnSubmitTiers.addEventListener("click", async () => {
             };
         });
 
-    try {
-        const { error } = await supabaseClient
-            .from("dashboard_tiered_rankings_python")
-            .insert(records);
+    // Optimistic flow: immediately reveal results without blocking UX
+    revealResults();
 
-        if (error) throw error;
-        
-        revealResults();
-    } catch (err) {
-        console.error("Supabase Submission Error:", err);
-        alert("Failed to submit feedback to Supabase. Check developer console.");
-        btnSubmitTiers.disabled = false;
-        btnSubmitTiers.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submit Tier List`;
-    }
+    // Insert records in the background
+    supabaseClient
+        .from("dashboard_tiered_rankings_python")
+        .insert(records)
+        .then(({ error }) => {
+            if (error) {
+                console.error("Supabase background submission error:", error);
+            }
+        })
+        .catch(err => {
+            console.error("Supabase background insertion failed:", err);
+        });
 });
 
 // 7. Results Page Presentation
@@ -791,9 +791,70 @@ btnRestart.addEventListener("click", () => {
 });
 
 // Fullscreen Lightbox
-function openLightbox(url, title) {
+function openLightbox(dbIdOrUrl, title = null) {
+    let db = null;
+    let url = "";
+    let caption = "";
+    let isReviewMode = false;
+
+    if (title !== null) {
+        url = dbIdOrUrl;
+        caption = title;
+        isReviewMode = true;
+        currentLightboxDbId = null;
+    } else {
+        db = DASHBOARDS.find(d => d.id === dbIdOrUrl);
+        if (!db) return;
+        url = db.url;
+        caption = db.name;
+        currentLightboxDbId = db.id;
+    }
+
     lightboxImg.src = url;
-    lightboxCaption.innerText = title;
+    const titleEl = document.getElementById("lightbox-title");
+    if (titleEl) titleEl.innerText = caption;
+
+    const sidebar = document.querySelector(".lightbox-sidebar");
+    if (sidebar) {
+        if (isReviewMode) {
+            sidebar.style.display = "none";
+        } else {
+            sidebar.style.display = "flex";
+            
+            const currentTier = assignedTiers[db.id];
+            const rankButtons = document.querySelectorAll(".lightbox-rank-btn");
+            const removeBtn = document.getElementById("lightbox-remove-btn");
+
+            rankButtons.forEach(btn => {
+                btn.classList.remove("active");
+                const tier = btn.dataset.tier;
+                if (currentTier === tier) {
+                    btn.classList.add("active");
+                }
+                
+                btn.onclick = () => {
+                    placeCard(db.id, tier);
+                    showNextDashboard();
+                };
+            });
+
+            if (currentTier) {
+                removeBtn.style.display = "flex";
+                removeBtn.onclick = () => {
+                    const cardEl = document.getElementById(`card-${db.id}`);
+                    poolZone.appendChild(cardEl);
+                    delete assignedTiers[db.id];
+                    delete assignedTags[db.id];
+                    updatePoolCount();
+                    checkIfComplete();
+                    showNextDashboard();
+                };
+            } else {
+                removeBtn.style.display = "none";
+            }
+        }
+    }
+
     lightboxModal.style.display = "flex";
     lightboxModal.offsetHeight;
     lightboxModal.classList.add("active");
@@ -801,15 +862,140 @@ function openLightbox(url, title) {
 
 function closeLightbox() {
     lightboxModal.classList.remove("active");
+    currentLightboxDbId = null;
     setTimeout(() => {
         lightboxModal.style.display = "none";
         lightboxImg.src = "";
     }, 300);
 }
 
+function showNextDashboard() {
+    if (!currentLightboxDbId) return;
+    const currentIndex = DASHBOARDS.findIndex(d => d.id === currentLightboxDbId);
+    if (currentIndex !== -1 && currentIndex < DASHBOARDS.length - 1) {
+        openLightbox(DASHBOARDS[currentIndex + 1].id);
+    } else {
+        closeLightbox();
+    }
+}
+
+function showPrevDashboard() {
+    if (!currentLightboxDbId) return;
+    const currentIndex = DASHBOARDS.findIndex(d => d.id === currentLightboxDbId);
+    if (currentIndex > 0) {
+        openLightbox(DASHBOARDS[currentIndex - 1].id);
+    }
+}
+
+// Event Listeners for closing lightbox
 lightboxClose.addEventListener("click", closeLightbox);
 lightboxModal.addEventListener("click", (e) => {
-    if (e.target === lightboxModal || e.target.classList.contains("lightbox-content")) {
+    if (e.target === lightboxModal) {
         closeLightbox();
     }
 });
+
+// Keyboard Navigation and Hotkeys
+window.addEventListener("keydown", (e) => {
+    const isLightboxActive = lightboxModal.classList.contains("active");
+    const isTyping = document.activeElement.tagName === "TEXTAREA" || document.activeElement.tagName === "INPUT";
+    if (!isLightboxActive || isTyping) return;
+
+    const key = e.key.toLowerCase();
+    
+    if (key === "escape") {
+        closeLightbox();
+        e.preventDefault();
+    } else if (key === "arrowright") {
+        showNextDashboard();
+        e.preventDefault();
+    } else if (key === "arrowleft") {
+        showPrevDashboard();
+        e.preventDefault();
+    } else if (currentLightboxDbId) {
+        let tier = null;
+        if (key === "s" || key === "1") tier = "S";
+        else if (key === "a" || key === "2") tier = "A";
+        else if (key === "b" || key === "3") tier = "B";
+        else if (key === "c" || key === "4") tier = "C";
+        else if (key === "d" || key === "5") tier = "D";
+
+        if (tier) {
+            placeCard(currentLightboxDbId, tier);
+            showNextDashboard();
+            e.preventDefault();
+        }
+    }
+});
+
+// Amazon-style Magnifier Zoom
+function initMagnifier() {
+    const img = document.getElementById("lightbox-img");
+    const lens = document.getElementById("lightbox-lens-tracker");
+    const pane = document.getElementById("lightbox-zoom-pane");
+    const container = document.querySelector(".lightbox-image-area");
+    
+    if (!img || !lens || !pane || !container) return;
+
+    const zoom = 2.5; // magnification scale
+
+    img.addEventListener("mousemove", moveZoom);
+    img.addEventListener("mouseenter", showZoom);
+    img.addEventListener("mouseleave", hideZoom);
+
+    function showZoom() {
+        if (!img.src || window.innerWidth <= 768) return;
+        pane.style.display = "block";
+        lens.style.display = "block";
+        pane.style.backgroundImage = `url('${img.src}')`;
+        
+        const r = img.getBoundingClientRect();
+        
+        const lensWidth = pane.offsetWidth / zoom;
+        const lensHeight = pane.offsetHeight / zoom;
+        
+        lens.style.width = `${lensWidth}px`;
+        lens.style.height = `${lensHeight}px`;
+        
+        pane.style.backgroundSize = `${r.width * zoom}px ${r.height * zoom}px`;
+    }
+
+    function hideZoom() {
+        pane.style.display = "none";
+        lens.style.display = "none";
+    }
+
+    function moveZoom(e) {
+        if (window.innerWidth <= 768) return;
+        
+        const r = img.getBoundingClientRect();
+        const cr = container.getBoundingClientRect();
+        
+        let x = e.clientX - r.left;
+        let y = e.clientY - r.top;
+        
+        if (x < 0) x = 0;
+        if (x > r.width) x = r.width;
+        if (y < 0) y = 0;
+        if (y > r.height) y = r.height;
+
+        let lensX = x - (lens.offsetWidth / 2);
+        let lensY = y - (lens.offsetHeight / 2);
+        
+        if (lensX < 0) lensX = 0;
+        if (lensX > r.width - lens.offsetWidth) lensX = r.width - lens.offsetWidth;
+        if (lensY < 0) lensY = 0;
+        if (lensY > r.height - lens.offsetHeight) lensY = r.height - lens.offsetHeight;
+
+        lens.style.left = `${lensX + r.left - cr.left}px`;
+        lens.style.top = `${lensY + r.top - cr.top}px`;
+        
+        const bgX = lensX * zoom;
+        const bgY = lensY * zoom;
+        
+        pane.style.backgroundPosition = `-${bgX}px -${bgY}px`;
+    }
+}
+
+// Initialize magnifier zoom on page load
+initMagnifier();
