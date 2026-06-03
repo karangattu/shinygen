@@ -441,6 +441,7 @@ function placeCard(dbId, tier) {
     selectedDashboardId = null;
     updatePoolCount();
     checkIfComplete();
+    triggerGradePopup(tier);
 }
 
 function checkIfComplete() {
@@ -999,3 +1000,26 @@ function initMagnifier() {
 
 // Initialize magnifier zoom on page load
 initMagnifier();
+
+// Animated Neon Toast Popup
+function triggerGradePopup(tier) {
+    const popup = document.getElementById("grade-popup");
+    const valSpan = popup.querySelector(".neon-grade-val");
+    if (!popup || !valSpan) return;
+
+    valSpan.innerText = tier;
+    
+    // Reset classes
+    popup.className = "neon-grade-popup";
+    
+    // Add specific neon grade style
+    popup.classList.add(`neon-${tier.toLowerCase()}-tier`);
+    
+    // Trigger pop animation
+    popup.classList.add("show");
+    
+    // Remove after animation completes
+    setTimeout(() => {
+        popup.classList.remove("show");
+    }, 850);
+}

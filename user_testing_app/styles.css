@@ -1273,3 +1273,55 @@ textarea:focus {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Neon Grade Pop-up Toast */
+.neon-grade-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.6);
+    background: rgba(15, 23, 42, 0.95);
+    border: 2px solid var(--primary);
+    border-radius: 20px;
+    padding: 24px 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+    box-shadow: 0 0 30px rgba(0, 123, 194, 0.4);
+}
+
+.neon-grade-popup.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.neon-grade-val {
+    font-family: var(--font-heading);
+    font-size: 90px;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 0 20px currentColor;
+}
+
+.neon-grade-label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #ffffff;
+    opacity: 0.9;
+}
+
+/* Neon grade styles */
+.neon-s-tier { color: #ff8b94; border-color: #ff8b94; box-shadow: 0 0 45px rgba(255, 139, 148, 0.6), inset 0 0 15px rgba(255, 139, 148, 0.2); }
+.neon-a-tier { color: #ffcaa6; border-color: #ffcaa6; box-shadow: 0 0 45px rgba(255, 202, 166, 0.6), inset 0 0 15px rgba(255, 202, 166, 0.2); }
+.neon-b-tier { color: #ffdca3; border-color: #ffdca3; box-shadow: 0 0 45px rgba(255, 220, 163, 0.6), inset 0 0 15px rgba(255, 220, 163, 0.2); }
+.neon-c-tier { color: #d8f8a8; border-color: #d8f8a8; box-shadow: 0 0 45px rgba(216, 248, 168, 0.6), inset 0 0 15px rgba(216, 248, 168, 0.2); }
+.neon-d-tier { color: #a8f8b4; border-color: #a8f8b4; box-shadow: 0 0 45px rgba(168, 248, 180, 0.6), inset 0 0 15px rgba(168, 248, 180, 0.2); }
+
