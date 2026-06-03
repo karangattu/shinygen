@@ -199,6 +199,7 @@ Guidelines:
 
 - **Mandatory color rule**: Pass an explicit color palette via `color_discrete_sequence=BRAND_SEQUENCE` or `color_discrete_sequence=[BRAND_COLORS["primary"]]` on every `px.*` call. This is required even when using the registered brand template, because `px.bar(color="column")` without `color_discrete_sequence` will use Plotly's built-in defaults. Never allow plots to fall back to default Plotly colors.
 - Always start from `template="plotly_white"` (or the registered `"brand"` template).
+- **Output ID Uniqueness**: Every output element (`ui.output_text`, `ui.output_ui`, `output_widget`, `ui.output_data_frame`) must have a **globally unique ID** across the entire app. If you reuse a layout helper (like a metric row) in multiple tabs, you must pass a unique prefix to it (e.g. `kpi_row(prefix="overview")`) and prepend it to the output IDs (e.g. `ui.output_text(f"{prefix}_value")`) so that the same ID is never defined twice.
 - **Chart Choice by Purpose**:
   * **Trends over time**: Use thin line charts or continuous area charts.
   * **Category comparisons**: Use standard horizontal bar charts or vertical column charts.

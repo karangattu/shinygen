@@ -171,6 +171,18 @@ Guidelines:
 - You can use the default modern Bootstrap 5 theme, or pass an explicit light theme (e.g. `shinyswatch.theme.zephyr`, `flatly`, `cosmo`) to your `ui.page_*()` call.
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
 - Define `BRAND_COLORS`, `BRAND_SEQUENCE`, and `apply_brand_style()` once at module scope (the top of the application script) so they are available in every render function.
+- **Color Alignment**: The colors defined in your `BRAND_COLORS` dictionary **must match** the colors of your Bootstrap/Shiny theme.
+  * If you use a custom theme (e.g. `bs_theme(primary="#ff5a5f")`), define `BRAND_COLORS["primary"] = "#ff5a5f"`.
+  * If you use the default Shiny Bootstrap theme (preset="shiny"), define:
+    ```python
+    BRAND_COLORS = {
+        "primary": "#007bc2",   # Shiny blue
+        "success": "#5cb85c",   # Shiny green
+        "warning": "#f0ad4e",   # Shiny orange/yellow
+        "danger":  "#d9534f",   # Shiny red
+        "secondary": "#4d5d6c", # Shiny grey
+    }
+    ```
 - Use standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes to leverage default bslib styling.
 - **Mandatory**: Every `px.*` chart call must include `color_discrete_sequence=BRAND_SEQUENCE` (or `[BRAND_COLORS["primary"]]` for single-series). Every Matplotlib `ax.bar/barh/hist/scatter/plot` must pass an explicit `color=` using `BRAND_COLORS` or `BRAND_SEQUENCE`. Never omit the `color` parameter.
 - After creating any Matplotlib axes, call `apply_brand_style(ax)` to strip chart junk and match the dashboard theme.

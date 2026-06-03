@@ -77,6 +77,8 @@ Use these shortcuts to stay consistent:
 9. Do not leave a page that appears to render but shows errors, spinners, blank cards, or all-zero KPIs.
 10. Do not put every control in the sidebar. Use card toolbars for local display controls so the sidebar stays focused on global filters.
 11. Do not let any chart fall back to default Plotly or Matplotlib color cycles. Every `px.*` call must include `color_discrete_sequence=BRAND_SEQUENCE` (or a slice of `BRAND_COLORS`). Every Matplotlib `ax.bar/barh/hist/scatter` must pass an explicit `color=` using `BRAND_COLORS` or `BRAND_SEQUENCE`. Defining the palette is not enough — you must pass it at every call site.
+12. Do not reuse the same output IDs (like `kpi_listings`, `plot_price`) when copying layout containers or value boxes across different tabs or sidebars. Every output in a Shiny application must have a globally unique ID. Duplicate output IDs cause client-side rendering conflicts and silent data rendering failures.
+13. Do not use chart colors that clash with your page theme. If using a custom theme (e.g. `bs_theme(primary="#ff5a5f")`), define `BRAND_COLORS["primary"] = "#ff5a5f"`. If using the default Shiny theme (preset="shiny"), define your primary chart color as `#007bc2`, success color as `#5cb85c`, warning color as `#f0ad4e`, and danger color as `#d9534f` so the plots match the buttons, value boxes, and navigation headers exactly.
 
 ## Minimal execution order
 
