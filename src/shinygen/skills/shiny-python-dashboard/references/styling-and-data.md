@@ -137,7 +137,6 @@ colors = cm.Set2(range(len(categories)))
 ax.barh(categories, values, color=colors)
 
 # ✅ CORRECT — slice BRAND_SEQUENCE for per-category bars
-from shared import BRAND_SEQUENCE
 ax.barh(categories, values, color=BRAND_SEQUENCE[:len(categories)], edgecolor="white")
 ```
 
@@ -164,7 +163,6 @@ fig = px.histogram(df, x="price", nbins=25,
 ax.hist(series, bins=20)
 
 # ✅ CORRECT — pass explicit color
-from shared import BRAND_COLORS
 ax.hist(series, bins=20, color=BRAND_COLORS["primary"], edgecolor="white")
 ```
 
@@ -172,7 +170,7 @@ Guidelines:
 
 - You can use the default modern Bootstrap 5 theme, or pass an explicit light theme (e.g. `shinyswatch.theme.zephyr`, `flatly`, `cosmo`) to your `ui.page_*()` call.
 - Do not add `ui.input_dark_mode()` to dashboards. Ship a polished light theme instead.
-- Define `BRAND_COLORS`, `BRAND_SEQUENCE`, and `apply_brand_style()` once in `shared.py` and import them in every render function that creates a chart.
+- Define `BRAND_COLORS`, `BRAND_SEQUENCE`, and `apply_brand_style()` once at module scope (the top of the application script) so they are available in every render function.
 - Use standard Bootstrap solid colored themes (`"primary"`, `"success"`, etc.) for value boxes to leverage default bslib styling.
 - **Mandatory**: Every `px.*` chart call must include `color_discrete_sequence=BRAND_SEQUENCE` (or `[BRAND_COLORS["primary"]]` for single-series). Every Matplotlib `ax.bar/barh/hist/scatter/plot` must pass an explicit `color=` using `BRAND_COLORS` or `BRAND_SEQUENCE`. Never omit the `color` parameter.
 - After creating any Matplotlib axes, call `apply_brand_style(ax)` to strip chart junk and match the dashboard theme.

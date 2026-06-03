@@ -106,8 +106,8 @@ class TestLoadDefaultSkills:
         instructions = load_skill_context_text("shiny_python")
         assert "Mandatory" in instructions
         assert "color_discrete_sequence=BRAND_SEQUENCE" in instructions
-        assert "from shared import BRAND_COLORS" in instructions
-        assert "from shared import BRAND_SEQUENCE" in instructions
+        assert "BRAND_COLORS" in instructions
+        assert "BRAND_SEQUENCE" in instructions
         assert "WRONG" in instructions
         assert "CORRECT" in instructions
 

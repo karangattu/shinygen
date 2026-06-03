@@ -68,7 +68,6 @@ Import `matplotlib.pyplot` inside the render function.
 @render.plot
 def histogram():
     import matplotlib.pyplot as plt
-    from shared import BRAND_COLORS, apply_brand_style
 
     series = req(metric_series())
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -86,7 +85,6 @@ Per-category bar chart (the most common pattern that breaks color alignment):
 @render.plot
 def price_by_neighborhood():
     import matplotlib.pyplot as plt
-    from shared import BRAND_SEQUENCE, apply_brand_style
 
     agg = filtered_data().groupby("neighborhood")["price"].median().sort_values()
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -135,7 +133,6 @@ COLOR_LABELS = {"time": "Meal time", "day": "Day", "smoker": "Smoker"}
 
 @render_plotly
 def scatterplot():
-    from shared import BRAND_SEQUENCE
 
     frame = filtered_data()
     color_column = input.color_column()
@@ -169,7 +166,6 @@ Default Plotly rainbow palettes and the `plotly` template are the fastest tells 
 ```python
 import plotly.graph_objects as go
 import plotly.io as pio
-from shared import BRAND_SEQUENCE  # see references/styling-and-data.md
 
 PLOTLY_FONT = dict(family="Inter, system-ui, sans-serif", size=13, color="#1f2937")
 
@@ -224,13 +220,11 @@ Guidelines:
   ```
 - **Histogram Widths & Overlays**: Prevent thin, unreadable histogram bars. Define a generous, explicit bin spacing, add solid white borders (`line=dict(color="white", width=1)`), use the brand primary color, and add a marginal box-plot overlay to provide a rich distribution breakdown:
   ```python
-  from shared import BRAND_COLORS
   fig = px.histogram(df, x="price", nbins=25, marginal="box", color_discrete_sequence=[BRAND_COLORS["primary"]])
   fig.update_traces(marker=dict(line=dict(color="white", width=1.5)))
   ```
 - **Scatter Plot Legibility & Tooltips**: Ensure scatter plots are easy to interpret. Use `BRAND_SEQUENCE` for categorizing series, increase marker dots to an explicit readable scale (`size=8` or `size=9`), add soft opacity to handle overlaps, add white borders, completely disable trendlines unless statistically significant, and build highly informative hover cards using `hover_name` and `hover_data`:
   ```python
-  from shared import BRAND_SEQUENCE
   fig = px.scatter(
       df, x="price", y="rating",
       color="room_type",

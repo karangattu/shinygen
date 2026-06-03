@@ -76,14 +76,14 @@ Use these shortcuts to stay consistent:
 8. Do not ignore the provided CSV or replace it with a package sample dataset.
 9. Do not leave a page that appears to render but shows errors, spinners, blank cards, or all-zero KPIs.
 10. Do not put every control in the sidebar. Use card toolbars for local display controls so the sidebar stays focused on global filters.
-11. Do not let any chart fall back to default Plotly or Matplotlib color cycles. Every `px.*` call must include `color_discrete_sequence=BRAND_SEQUENCE` (or a slice of `BRAND_COLORS`). Every Matplotlib `ax.bar/barh/hist/scatter` must pass an explicit `color=` using `BRAND_COLORS` or `BRAND_SEQUENCE`. Defining the palette in `shared.py` is not enough — you must pass it at every call site.
+11. Do not let any chart fall back to default Plotly or Matplotlib color cycles. Every `px.*` call must include `color_discrete_sequence=BRAND_SEQUENCE` (or a slice of `BRAND_COLORS`). Every Matplotlib `ax.bar/barh/hist/scatter` must pass an explicit `color=` using `BRAND_COLORS` or `BRAND_SEQUENCE`. Defining the palette is not enough — you must pass it at every call site.
 
 ## Minimal execution order
 
 When implementing a dashboard, follow this order:
 
 1. Choose page structure.
-2. Choose theme. Define `BRAND_COLORS` and `BRAND_SEQUENCE` in `shared.py` (see styling reference). Register the Plotly brand template with `pio.templates.default = "plotly_white+brand"`. For Matplotlib, pass `color=BRAND_COLORS["primary"]` or `color=BRAND_SEQUENCE[:n]` on every chart call.
+2. Choose theme. Define `BRAND_COLORS` and `BRAND_SEQUENCE` at the top of the application script (see styling reference). Register the Plotly brand template with `pio.templates.default = "plotly_white+brand"`. For Matplotlib, pass `color=BRAND_COLORS["primary"]` or `color=BRAND_SEQUENCE[:n]` on every chart call.
 3. Define the shared filtered dataset.
 4. Build the KPI row.
 5. Add chart and map cards with at least one useful toolbar across the dashboard.
