@@ -1,6 +1,5 @@
 /* ==========================================================================
-   DashSwipe Application Logic
-   Tinder Card Deck Drag/Swipe Physics + Supabase Integration
+   Dashboard Ranker Application Logic (Interactive Tier List & Realtime Stats)
    ========================================================================== */
 
 // 1. Initialize Supabase
@@ -8,490 +7,795 @@ const SUPABASE_URL = "https://ovwktjjeoowlktdfbuuu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 2. Data Definition for the 10 Dashboard Screenshots (Real Landing Pages of all 10 Benchmark Apps)
+// 2. Data Definitions (Anonymous to user during ranking, revealed at end)
 const DASHBOARDS = [
     {
-        id: "model=deepseek-v4-pro|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
-        title: "Workforce Retention Dashboard (Layout 1)",
-        badge: "excellent",
-        badgeText: "Layout 1",
-        desc: "Clean zephyr theme with left-bordered KPI cards, status donut charts, and department headcount col-plots.",
-        url: "assets/dashboard1.png"
+        id: "py-ds-v4-pro-skills",
+        name: "Dashboard 1",
+        model: "DeepSeek V4 Pro",
+        arm: "skills",
+        url: "assets/deepseek-v4-pro-skills.png",
+        cost: 0.1038,
+        time: 508,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=opus-4-8|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
-        title: "Workforce Retention Dashboard (Layout 2)",
-        badge: "excellent",
-        badgeText: "Layout 2",
-        desc: "Modern theme utilizing gear menu card popovers, styled SVG icons, and a gt-based department summary table.",
-        url: "assets/dashboard2.png"
+        id: "py-claude-opus-skills",
+        name: "Dashboard 2",
+        model: "Claude Opus 4-8",
+        arm: "skills",
+        url: "assets/claude-opus-4-8-skills.png",
+        cost: 1.4623,
+        time: 309,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=opus-4-8|arm=skills|tab=Overview|framework=shiny_r|theme=shiny_light",
-        title: "Workforce Retention Dashboard (Layout 3)",
-        badge: "excellent",
-        badgeText: "Layout 3",
-        desc: "Pristine R bslib corporate blue layout with tooltip helpers, five value boxes, and horizontal ggplot charts.",
-        url: "assets/dashboard3.png"
+        id: "py-ds-v4-flash-skills",
+        name: "Dashboard 3",
+        model: "DeepSeek V4 Flash",
+        arm: "skills",
+        url: "assets/deepseek-v4-flash-skills.png",
+        cost: 0.0127,
+        time: 270,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=opus-4-8|arm=vanilla|tab=Overview|framework=shiny_r|theme=flatly",
-        title: "Workforce Retention Dashboard (Layout 4)",
-        badge: "excellent",
-        badgeText: "Layout 4",
-        desc: "Highly interactive flatly-themed layout featuring interactive plotly tooltips, value boxes, and dual column grids.",
-        url: "assets/dashboard4.png"
+        id: "py-gpt-5-5-skills",
+        name: "Dashboard 4",
+        model: "GPT 5.5",
+        arm: "skills",
+        url: "assets/gpt-5.5-skills.png",
+        cost: 0.4274,
+        time: 196,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=opus-4-7|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
-        title: "Workforce Retention Dashboard (Layout 5)",
-        badge: "excellent",
-        badgeText: "Layout 5",
-        desc: "Structured zephyr theme showcasing multi-select dropdown card toolbar filters and geographic office footprint maps.",
-        url: "assets/dashboard5.png"
+        id: "py-minimax-m3-skills",
+        name: "Dashboard 5",
+        model: "Minimax M3",
+        arm: "skills",
+        url: "assets/minimax-m3-skills.png",
+        cost: 0.1037,
+        time: 519,
+        iterations: 2,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=qwen-3-6-plus|arm=skills|tab=Overview|framework=shiny_python|theme=zephyr",
-        title: "Workforce Retention Dashboard (Layout 6)",
-        badge: "excellent",
-        badgeText: "Layout 6",
-        desc: "Single-page scroll layout integrating live interactive maps, great-tables directory grids, and spacing details.",
-        url: "assets/dashboard6.png"
+        id: "py-qwen-max-skills",
+        name: "Dashboard 6",
+        model: "Qwen 3.7 Max",
+        arm: "skills",
+        url: "assets/qwen3.7-max-skills.png",
+        cost: 0.5410,
+        time: 261,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=minimax-m3|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
-        title: "Workforce Retention Dashboard (Layout 7)",
-        badge: "excellent",
-        badgeText: "Layout 7",
-        desc: "Standard layout featuring five essential KPI cards, status mix donut, department headcounts, and metric box plots.",
-        url: "assets/dashboard7.png"
+        id: "py-ds-v4-pro-vanilla",
+        name: "Dashboard 7",
+        model: "DeepSeek V4 Pro",
+        arm: "vanilla",
+        url: "assets/deepseek-v4-pro-vanilla.png",
+        cost: 0.0862,
+        time: 570,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=opus-4-8|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
-        title: "Workforce Retention Dashboard (Layout 8)",
-        badge: "excellent",
-        badgeText: "Layout 8",
-        desc: "Standard theme utilizing saturated gradient metric value cards, a bubble locations map, and a burnout quadrant.",
-        url: "assets/dashboard8.png"
+        id: "py-claude-opus-vanilla",
+        name: "Dashboard 8",
+        model: "Claude Opus 4-8",
+        arm: "vanilla",
+        url: "assets/claude-opus-4-8-vanilla.png",
+        cost: 0.4908,
+        time: 142,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=minimax-m3|arm=skills|tab=Overview|framework=shiny_python|theme=standard",
-        title: "Workforce Retention Dashboard (Layout 9)",
-        badge: "excellent",
-        badgeText: "Layout 9",
-        desc: "Premium styled layout utilizing sidebar controls, left-bordered accent KPI value boxes, and high-contrast department metrics.",
-        url: "assets/dashboard9.png"
+        id: "py-ds-v4-flash-vanilla",
+        name: "Dashboard 9",
+        model: "DeepSeek V4 Flash",
+        arm: "vanilla",
+        url: "assets/deepseek-v4-flash-vanilla.png",
+        cost: 0.0020,
+        time: 92,
+        iterations: 1,
+        passed: true,
+        framework: "python"
     },
     {
-        id: "model=opus-4-7|arm=vanilla|tab=Overview|framework=shiny_python|theme=standard",
-        title: "Workforce Retention Dashboard (Layout 10)",
-        badge: "excellent",
-        badgeText: "Layout 10",
-        desc: "Palmer Penguins species distribution morphological catalog with simple colored cards and low-contrast borders.",
-        url: "assets/dashboard10.png"
+        id: "r-claude-opus-skills",
+        name: "Dashboard 10",
+        model: "Claude Opus 4-8",
+        arm: "skills",
+        url: "assets/r-claude-opus-4-8-skills.png",
+        cost: 0.5229,
+        time: 188,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-ds-v4-flash-skills",
+        name: "Dashboard 11",
+        model: "DeepSeek V4 Flash",
+        arm: "skills",
+        url: "assets/r-deepseek-v4-flash-skills.png",
+        cost: 0.0043,
+        time: 133,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-ds-v4-pro-skills",
+        name: "Dashboard 12",
+        model: "DeepSeek V4 Pro",
+        arm: "skills",
+        url: "assets/r-deepseek-v4-pro-skills.png",
+        cost: 0.0467,
+        time: 277,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-gpt-5-5-skills",
+        name: "Dashboard 13",
+        model: "GPT 5.5",
+        arm: "skills",
+        url: "assets/r-gpt-5.5-skills.png",
+        cost: 0.5972,
+        time: 267,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-minimax-m3-skills",
+        name: "Dashboard 14",
+        model: "Minimax M3",
+        arm: "skills",
+        url: "assets/r-minimax-m3-skills.png",
+        cost: 0.0869,
+        time: 415,
+        iterations: 2,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-qwen-max-skills",
+        name: "Dashboard 15",
+        model: "Qwen 3.7 Max",
+        arm: "skills",
+        url: "assets/r-qwen3.7-max-skills.png",
+        cost: 0.2984,
+        time: 116,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-claude-opus-vanilla",
+        name: "Dashboard 16",
+        model: "Claude Opus 4-8",
+        arm: "vanilla",
+        url: "assets/r-claude-opus-4-8-vanilla.png",
+        cost: 0.4266,
+        time: 123,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-ds-v4-flash-vanilla",
+        name: "Dashboard 17",
+        model: "DeepSeek V4 Flash",
+        arm: "vanilla",
+        url: "assets/r-deepseek-v4-flash-vanilla.png",
+        cost: 0.0029,
+        time: 129,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-ds-v4-pro-vanilla",
+        name: "Dashboard 18",
+        model: "DeepSeek V4 Pro",
+        arm: "vanilla",
+        url: "assets/r-deepseek-v4-pro-vanilla.png",
+        cost: 0.0905,
+        time: 603,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-gpt-5-5-vanilla",
+        name: "Dashboard 19",
+        model: "GPT 5.5",
+        arm: "vanilla",
+        url: "assets/r-gpt-5.5-vanilla.png",
+        cost: 0.4408,
+        time: 203,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-minimax-m3-vanilla",
+        name: "Dashboard 20",
+        model: "Minimax M3",
+        arm: "vanilla",
+        url: "assets/r-minimax-m3-vanilla.png",
+        cost: 0.0247,
+        time: 163,
+        iterations: 1,
+        passed: true,
+        framework: "r"
+    },
+    {
+        id: "r-qwen-max-vanilla",
+        name: "Dashboard 21",
+        model: "Qwen 3.7 Max",
+        arm: "vanilla",
+        url: "assets/r-qwen3.7-max-vanilla.png",
+        cost: 0.1523,
+        time: 103,
+        iterations: 1,
+        passed: true,
+        framework: "r"
     }
 ];
 
+const PRESET_TAGS = [
+    "Clean Layout", "Jarring Colors", "Interactive Controls",
+    "Confusing Chart", "Incorrect Data", "Very Basic",
+    "Beautiful Map", "Failed to Render", "Rainbow Plots",
+    "Text Overlap", "Great Colors", "Clear Labels"
+];
+
+// Tier scoring system for stats
+const TIER_SCORES = { "S": 5, "A": 4, "B": 3, "C": 2, "D": 1 };
+
 // 3. Application State Variables
-let currentCardIndex = 0;
-let sessionResponses = []; // Tracks local session votes to populate analytics
-let isSwiping = false;
+let sessionId = uuidv4();
+let selectedDashboardId = null;
+let assignedTiers = {}; // dashboardId -> 'S'|'A'|'B'|'C'|'D'
+let assignedTags = {};  // dashboardId -> Array of 2 strings
+let tempTargetTier = null;
 
-// Drag Physics Variables
-let isDragging = false;
-let startX = 0;
-let startY = 0;
-let currentX = 0;
-let currentY = 0;
-const SWIPE_THRESHOLD = 130; // Min drag pixels to execute swipe-off
-
-// DOM Element Selections
-const cardDeck = document.getElementById("card-deck");
-const progressText = document.getElementById("progress-text");
-const progressPercent = document.getElementById("progress-percent");
-const progressBarFill = document.getElementById("progress-bar-fill");
-const dislikeIndicator = document.querySelector(".swipe-indicator.dislike");
-const likeIndicator = document.querySelector(".swipe-indicator.like");
-
-const btnLike = document.getElementById("btn-like");
-const btnDislike = document.getElementById("btn-dislike");
-const feedbackModal = document.getElementById("feedback-modal");
-const feedbackForm = document.getElementById("feedback-form");
-const detailTextarea = document.getElementById("disapproval_details");
-const btnCancelFeedback = document.getElementById("btn-cancel-feedback");
-
-const deckView = document.getElementById("deck-view");
+// DOM Elements
 const welcomeView = document.getElementById("welcome-view");
+const boardView = document.getElementById("board-view");
 const summaryView = document.getElementById("summary-view");
-const valApprovalRate = document.getElementById("val-approval-rate");
-const valTotalSwipes = document.getElementById("val-total-swipes");
-const chartBarsContainer = document.getElementById("chart-bars-container");
-const btnRestart = document.getElementById("btn-restart");
+const feedbackModal = document.getElementById("feedback-modal");
+
+const poolZone = document.getElementById("pool-zone");
+const poolCount = document.getElementById("pool-count");
 const btnStartEvaluation = document.getElementById("btn-start-evaluation");
+const btnSubmitTiers = document.getElementById("btn-submit-tiers");
+const btnSaveTags = document.getElementById("btn-save-tags");
+const btnRestart = document.getElementById("btn-restart");
 
-// 4. Card Initialization Functions
-function buildCardStack() {
-    cardDeck.innerHTML = "";
-    // Build stack starting from index backwards so DOM orders them correctly (top card last)
-    for (let i = DASHBOARDS.length - 1; i >= currentCardIndex; i--) {
-        const item = DASHBOARDS[i];
-        const card = document.createElement("div");
-        card.className = "tinder-card glass-card";
-        card.dataset.id = item.id;
-        card.dataset.index = i;
-        
-        card.innerHTML = `
-            <div class="card-img-wrapper">
-                <img src="${item.url}" alt="${item.title}" draggable="false">
-            </div>
-            <div class="card-details">
-                <div>
-                    <h3>${item.title}</h3>
-                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">${item.desc}</p>
-                </div>
-                <span class="rating-badge ${item.badge}">${item.badgeText}</span>
-            </div>
-        `;
-        
-        if (i === currentCardIndex) {
-            setupCardDrag(card);
-        }
-        
-        cardDeck.appendChild(card);
-    }
-    updateProgressUI();
-}
+const tagSelectionGrid = document.getElementById("tag-selection-grid");
+const revealedTiersContainer = document.getElementById("revealed-tiers-container");
+const communityBarsContainer = document.getElementById("community-bars-container");
 
-function updateProgressUI() {
-    const total = DASHBOARDS.length;
-    const current = Math.min(currentCardIndex + 1, total);
-    const percent = Math.round((currentCardIndex / total) * 100);
-    
-    progressText.innerText = `Dashboard ${current} of ${total}`;
-    progressPercent.innerText = `${percent}% Completed`;
-    progressBarFill.style.width = `${percent}%`;
-}
-
-// 5. Drag/Swipe Physics Integration
-function setupCardDrag(cardElement) {
-    cardElement.addEventListener("pointerdown", onPointerDown);
-    
-    function onPointerDown(e) {
-        if (isSwiping) return;
-        isDragging = true;
-        cardElement.style.transition = "none";
-        startX = e.clientX;
-        startY = e.clientY;
-        currentX = 0;
-        currentY = 0;
-        
-        cardElement.setPointerCapture(e.pointerId);
-        cardElement.addEventListener("pointermove", onPointerMove);
-        cardElement.addEventListener("pointerup", onPointerUp);
-        cardElement.addEventListener("pointercancel", onPointerUp);
-    }
-
-    function onPointerMove(e) {
-        if (!isDragging) return;
-        currentX = e.clientX - startX;
-        currentY = e.clientY - startY;
-        
-        // Dynamic drag offsets & standard tilting rotation
-        const rot = currentX / 12;
-        cardElement.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) rotate(${rot}deg)`;
-        
-        // Handle drag opacity overlays
-        if (currentX > 25) {
-            const opacity = Math.min(currentX / 100, 0.95);
-            likeIndicator.style.opacity = opacity;
-            dislikeIndicator.style.opacity = 0;
-        } else if (currentX < -25) {
-            const opacity = Math.min(Math.abs(currentX) / 100, 0.95);
-            dislikeIndicator.style.opacity = opacity;
-            likeIndicator.style.opacity = 0;
-        } else {
-            likeIndicator.style.opacity = 0;
-            dislikeIndicator.style.opacity = 0;
-        }
-    }
-
-    function onPointerUp(e) {
-        if (!isDragging) return;
-        isDragging = false;
-        
-        likeIndicator.style.opacity = 0;
-        dislikeIndicator.style.opacity = 0;
-        
-        cardElement.removeEventListener("pointermove", onPointerMove);
-        cardElement.removeEventListener("pointerup", onPointerUp);
-        cardElement.removeEventListener("pointercancel", onPointerUp);
-        
-        // Execute swipe or snap back
-        if (currentX > SWIPE_THRESHOLD) {
-            executeSwipe(cardElement, "right");
-        } else if (currentX < -SWIPE_THRESHOLD) {
-            executeSwipe(cardElement, "left");
-        } else {
-            // Smoothly snap back to origin
-            cardElement.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-            cardElement.style.transform = "translate3d(0, 0, 0) rotate(0deg)";
-            
-            // Check if it's a click on the image wrapper
-            if (Math.abs(currentX) < 8 && Math.abs(currentY) < 8) {
-                const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
-                if (elementAtPoint) {
-                    const imgWrapper = elementAtPoint.closest(".card-img-wrapper");
-                    if (imgWrapper) {
-                        const item = DASHBOARDS[currentCardIndex];
-                        openLightbox(item.url, item.title);
-                    }
-                }
-            }
-        }
-    }
-}
-
-// 6. Action Execution (Swiping Animations)
-function executeSwipe(cardElement, direction) {
-    isSwiping = true;
-    const flyX = direction === "right" ? window.innerWidth + 200 : -window.innerWidth - 200;
-    const rot = direction === "right" ? 35 : -35;
-    
-    cardElement.style.transition = "transform 0.5s ease-in, opacity 0.5s ease-in";
-    cardElement.style.transform = `translate3d(${flyX}px, ${currentY}px, 0) rotate(${rot}deg)`;
-    cardElement.style.opacity = 0;
-    
-    setTimeout(() => {
-        cardElement.remove();
-        isSwiping = false;
-        handleSwipeOutcome(direction);
-    }, 450);
-}
-
-// Button click triggers
-function triggerSwipeByButton(direction) {
-    if (isSwiping || currentCardIndex >= DASHBOARDS.length) return;
-    
-    const activeCard = cardDeck.querySelector(`.tinder-card[data-index="${currentCardIndex}"]`);
-    if (!activeCard) return;
-    
-    isSwiping = true;
-    const flyX = direction === "right" ? window.innerWidth + 200 : -window.innerWidth - 200;
-    const rot = direction === "right" ? 35 : -35;
-    
-    // Animate swiping out
-    activeCard.style.transition = "transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-    activeCard.style.transform = `translate3d(${flyX}px, -40px, 0) rotate(${rot}deg)`;
-    activeCard.style.opacity = 0;
-    
-    setTimeout(() => {
-        activeCard.remove();
-        isSwiping = false;
-        handleSwipeOutcome(direction);
-    }, 400);
-}
-
-// Keyboard Arrow Listening
-window.addEventListener("keydown", (e) => {
-    // Ignore when modal is open
-    if (feedbackModal.classList.contains("active")) return;
-    
-    if (e.key === "ArrowLeft") {
-        triggerSwipeByButton("left");
-    } else if (e.key === "ArrowRight") {
-        triggerSwipeByButton("right");
-    }
-});
-
-btnLike.addEventListener("click", () => triggerSwipeByButton("right"));
-btnDislike.addEventListener("click", () => triggerSwipeByButton("left"));
-
-// 7. Supabase Database Commits
-function handleSwipeOutcome(direction) {
-    const currentItem = DASHBOARDS[currentCardIndex];
-    
-    if (direction === "right") {
-        // Committing APPROVED outcome directly to Supabase
-        commitFeedbackToSupabase(currentItem.id, currentItem.url, "approve", null, null);
-        proceedToNextCard();
-    } else {
-        // Open the disapproval feedback form
-        openFeedbackModal();
-    }
-}
-
-async function commitFeedbackToSupabase(screenshotId, screenshotUrl, rating, reason, details) {
-    try {
-        const record = {
-            screenshot_id: screenshotId,
-            screenshot_url: screenshotUrl,
-            user_rating: rating,
-            disapproval_reason: reason,
-            disapproval_details: details
-        };
-        
-        // Push local session variables for the end analytics
-        sessionResponses.push(record);
-        
-        const { data, error } = await supabaseClient
-            .from("dashboard_feedback")
-            .insert([record]);
-            
-        if (error) {
-            console.error("Supabase insert error:", error);
-        } else {
-            console.log("Feedback committed successfully to Supabase:", record);
-        }
-    } catch (err) {
-        console.error("Failed to commit feedback:", err);
-    }
-}
-
-function proceedToNextCard() {
-    currentCardIndex++;
-    if (currentCardIndex < DASHBOARDS.length) {
-        buildCardStack();
-    } else {
-        updateProgressUI();
-        displaySummaryView();
-    }
-}
-
-// 8. Feedback Form Submissions
-function openFeedbackModal() {
-    feedbackForm.reset();
-    detailTextarea.value = "";
-    feedbackModal.classList.add("active");
-}
-
-function closeFeedbackModal() {
-    feedbackModal.classList.remove("active");
-}
-
-feedbackForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const currentItem = DASHBOARDS[currentCardIndex];
-    const selectedOption = feedbackForm.querySelector('input[name="disapproval_reason"]:checked');
-    const reasonValue = selectedOption ? selectedOption.value : "Skip";
-    const detailsValue = detailTextarea.value.trim() || null;
-    
-    commitFeedbackToSupabase(
-        currentItem.id,
-        currentItem.url,
-        "disapprove",
-        reasonValue,
-        detailsValue
-    );
-    
-    closeFeedbackModal();
-    proceedToNextCard();
-});
-
-btnCancelFeedback.addEventListener("click", () => {
-    const currentItem = DASHBOARDS[currentCardIndex];
-    commitFeedbackToSupabase(currentItem.id, currentItem.url, "disapprove", "Skipped", null);
-    
-    closeFeedbackModal();
-    proceedToNextCard();
-});
-
-// 9. Session Stats & Summary Analytics Dashboard
-function displaySummaryView() {
-    deckView.classList.remove("active-view");
-    summaryView.style.display = "flex";
-    
-    // Approval Rate Calculations
-    const approves = sessionResponses.filter(r => r.user_rating === "approve").length;
-    const total = sessionResponses.length;
-    const rate = total > 0 ? Math.round((approves / total) * 100) : 0;
-    
-    valApprovalRate.innerText = `${rate}%`;
-    valTotalSwipes.innerText = total;
-    
-    // Flagged reasons metrics counts
-    const reasonsMap = {
-        "Visual Clutter": 0,
-        "Bad Color Theme": 0,
-        "Lack of Insights": 0,
-        "Confusing Charts": 0,
-        "Too Basic": 0,
-        "Other": 0
-    };
-    
-    sessionResponses.forEach(r => {
-        if (r.user_rating === "disapprove" && r.disapproval_reason in reasonsMap) {
-            reasonsMap[r.disapproval_reason]++;
-        }
-    });
-    
-    chartBarsContainer.innerHTML = "";
-    
-    // Render dynamic glassmorphic charts bars
-    Object.entries(reasonsMap).forEach(([reason, count]) => {
-        const item = document.createElement("div");
-        item.className = "chart-bar-item";
-        
-        // Find percentage size relative to the disapproval count
-        const totalDisapproves = sessionResponses.filter(r => r.user_rating === "disapprove").length;
-        const widthPercent = totalDisapproves > 0 ? Math.round((count / totalDisapproves) * 100) : 0;
-        
-        item.innerHTML = `
-            <div class="chart-bar-labels">
-                <span class="chart-bar-name">${reason}</span>
-                <span class="chart-bar-count">${count} vote(s)</span>
-            </div>
-            <div class="chart-bar-track">
-                <div class="chart-bar-fill" style="width: 0%;"></div>
-            </div>
-        `;
-        
-        chartBarsContainer.appendChild(item);
-        
-        // Animate the growth of the bar
-        setTimeout(() => {
-            const fill = item.querySelector(".chart-bar-fill");
-            if (fill) fill.style.width = `${widthPercent}%`;
-        }, 150);
-    });
-}
-
-// 10. Restart Session Handler
-btnRestart.addEventListener("click", () => {
-    currentCardIndex = 0;
-    sessionResponses = [];
-    isSwiping = false;
-    isDragging = false;
-    
-    summaryView.style.display = "none";
-    deckView.classList.add("active-view");
-    
-    buildCardStack();
-});
-
-// Onboarding Start Action
-btnStartEvaluation.addEventListener("click", () => {
-    welcomeView.classList.remove("active-view");
-    deckView.classList.add("active-view");
-});
-
-// Start the deck stack
-document.addEventListener("DOMContentLoaded", () => {
-    buildCardStack();
-});
-
-// ==========================================================================
-// Fullscreen Lightbox Modal System
-// ==========================================================================
+// Lightbox
 const lightboxModal = document.getElementById("lightbox-modal");
 const lightboxImg = document.getElementById("lightbox-img");
 const lightboxCaption = document.getElementById("lightbox-caption");
 const lightboxClose = document.querySelector(".lightbox-close");
 
+// Generate unique session ID
+function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// 4. Initialize Board UI
+function initializeBoard() {
+    poolZone.innerHTML = "";
+    // Clear zones
+    document.querySelectorAll(".tier-dropzone").forEach(zone => zone.innerHTML = "");
+    assignedTiers = {};
+    assignedTags = {};
+    selectedDashboardId = null;
+    btnSubmitTiers.disabled = true;
+    
+    const qualCard = document.getElementById("qualitative-feedback-card");
+    if (qualCard) qualCard.style.display = "none";
+    const topReasonInput = document.getElementById("input-top-reason");
+    const bottomReasonInput = document.getElementById("input-bottom-reason");
+    if (topReasonInput) topReasonInput.value = "";
+    if (bottomReasonInput) bottomReasonInput.value = "";
+
+    DASHBOARDS.forEach(db => {
+        const card = document.createElement("div");
+        card.className = "thumbnail-card";
+        card.id = `card-${db.id}`;
+        card.draggable = true;
+        card.dataset.id = db.id;
+
+        card.innerHTML = `
+            <img src="${db.url}" alt="${db.name}" draggable="false">
+            <div class="card-label-tag">${db.name}</div>
+            <div class="card-overlay-actions">
+                <button class="zoom-btn" title="Zoom in"><i class="fa-solid fa-expand"></i></button>
+            </div>
+        `;
+
+        // Click selection system (alternative to drag-and-drop, highly non-intimidating)
+        card.addEventListener("click", (e) => {
+            if (e.target.closest(".zoom-btn")) {
+                openLightbox(db.url, db.name);
+                e.stopPropagation();
+                return;
+            }
+            selectCard(db.id);
+        });
+
+        // HTML5 Drag and Drop events
+        card.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", db.id);
+            selectCard(db.id);
+        });
+
+        poolZone.appendChild(card);
+    });
+
+    updatePoolCount();
+}
+
+function selectCard(dbId) {
+    document.querySelectorAll(".thumbnail-card").forEach(c => c.classList.remove("selected"));
+    selectedDashboardId = dbId;
+    const selectedCard = document.getElementById(`card-${dbId}`);
+    if (selectedCard) selectedCard.classList.add("selected");
+}
+
+function updatePoolCount() {
+    const unrankedCount = DASHBOARDS.length - Object.keys(assignedTiers).length;
+    poolCount.innerText = `${unrankedCount} item${unrankedCount === 1 ? "" : "s"} left`;
+}
+
+// Setup drop zones click handlers and dragover events
+document.querySelectorAll(".tier-row").forEach(row => {
+    const tier = row.dataset.tier;
+    const zone = row.querySelector(".tier-dropzone");
+
+    // Click row target handler
+    row.addEventListener("click", () => {
+        if (selectedDashboardId) {
+            placeCard(selectedDashboardId, tier);
+        }
+    });
+
+    // Drag-and-drop logic
+    zone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        zone.classList.add("dragover");
+    });
+
+    zone.addEventListener("dragleave", () => {
+        zone.classList.remove("dragover");
+    });
+
+    zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.classList.remove("dragover");
+        const dbId = e.dataTransfer.getData("text/plain");
+        if (dbId) {
+            placeCard(dbId, tier);
+        }
+    });
+});
+
+// Pool drop support
+poolZone.addEventListener("dragover", (e) => e.preventDefault());
+poolZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const dbId = e.dataTransfer.getData("text/plain");
+    if (dbId && assignedTiers[dbId]) {
+        // Move back to pool (unassign)
+        const card = document.getElementById(`card-${dbId}`);
+        poolZone.appendChild(card);
+        delete assignedTiers[dbId];
+        delete assignedTags[dbId];
+        updatePoolCount();
+        checkIfComplete();
+    }
+});
+
+// 5. Direct Placement & Feedback Tags Review Logic (Option A)
+function placeCard(dbId, tier) {
+    assignedTiers[dbId] = tier;
+    if (!assignedTags[dbId]) {
+        assignedTags[dbId] = [];
+    }
+
+    const card = document.getElementById(`card-${dbId}`);
+    const dropzone = document.getElementById(`zone-${tier}`);
+    if (card && dropzone) {
+        dropzone.appendChild(card);
+        card.classList.remove("selected");
+    }
+
+    selectedDashboardId = null;
+    updatePoolCount();
+    checkIfComplete();
+}
+
+function checkIfComplete() {
+    const rankedCount = Object.keys(assignedTiers).length;
+    const qualCard = document.getElementById("qualitative-feedback-card");
+    if (rankedCount >= 4) {
+        if (qualCard) qualCard.style.display = "block";
+        renderDynamicReviews();
+    } else {
+        if (qualCard) qualCard.style.display = "none";
+        btnSubmitTiers.disabled = true;
+    }
+}
+
+function getFeedbackTargets() {
+    const tiersOrder = ["S", "A", "B", "C", "D"];
+    let topDb = null;
+    for (const tier of tiersOrder) {
+        const dbs = DASHBOARDS.filter(db => assignedTiers[db.id] === tier);
+        if (dbs.length > 0) {
+            topDb = dbs[0];
+            break;
+        }
+    }
+    let bottomDb = null;
+    for (const tier of [...tiersOrder].reverse()) {
+        const dbs = DASHBOARDS.filter(db => assignedTiers[db.id] === tier);
+        if (dbs.length > 0) {
+            bottomDb = dbs[0];
+            break;
+        }
+    }
+    if (topDb && bottomDb && topDb.id === bottomDb.id) {
+        const tier = assignedTiers[topDb.id];
+        const dbs = DASHBOARDS.filter(db => assignedTiers[db.id] === tier);
+        if (dbs.length > 1) {
+            bottomDb = dbs[1];
+        }
+    }
+    const targets = [];
+    if (topDb) targets.push(topDb);
+    if (bottomDb && bottomDb.id !== topDb.id) targets.push(bottomDb);
+    return targets;
+}
+
+function renderDynamicReviews() {
+    const dynamicList = document.getElementById("dynamic-reviews-list");
+    if (!dynamicList) return;
+    dynamicList.innerHTML = "";
+
+    const targets = getFeedbackTargets();
+
+    const topDb = targets[0];
+    const topTier = topDb ? assignedTiers[topDb.id] : "S";
+    const labelTopReason = document.getElementById("label-top-reason");
+    if (labelTopReason) {
+        labelTopReason.innerText = `Why did you rank your ${topTier}-Tier dashboard(s) highly?`;
+    }
+
+    const bottomDb = targets.length > 1 ? targets[1] : null;
+    const bottomTier = bottomDb ? assignedTiers[bottomDb.id] : "D";
+    const labelBottomReason = document.getElementById("label-bottom-reason");
+    if (labelBottomReason) {
+        labelBottomReason.innerText = `What made your ${bottomTier}-Tier dashboard(s) fail?`;
+    }
+
+    if (targets.length === 0) {
+        dynamicList.innerHTML = `<div style="font-size: 13px; color: var(--text-muted); font-style: italic; padding: 12px; text-align: center;">No dashboards placed. Ready to submit!</div>`;
+        btnSubmitTiers.disabled = false;
+        return;
+    }
+
+    targets.forEach(db => {
+        const tier = assignedTiers[db.id];
+        const container = document.createElement("div");
+        container.className = "glass-subcard";
+        container.style.padding = "16px";
+        container.style.display = "flex";
+        container.style.flexDirection = "column";
+        container.style.gap = "10px";
+
+        const labelClass = tier.toLowerCase() + "-tier";
+        container.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="tier-label ${labelClass}" style="width: auto; min-height: auto; padding: 4px 10px; border-radius: 6px; font-weight: bold; color: #111; font-size: 11px; text-transform: uppercase;">${tier} Tier</span>
+                    <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">${db.name} (Anonymous)</span>
+                </div>
+                <button class="zoom-btn" style="width:22px; height:22px; font-size:9px;" title="Zoom in"><i class="fa-solid fa-expand"></i></button>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 2px;">Select exactly 2 tags to describe this layout:</div>
+            <div class="tag-selection-grid" style="margin: 0; gap: 8px;"></div>
+        `;
+
+        container.querySelector(".zoom-btn").addEventListener("click", () => openLightbox(db.url, db.name));
+
+        const grid = container.querySelector(".tag-selection-grid");
+        if (!assignedTags[db.id]) assignedTags[db.id] = [];
+
+        PRESET_TAGS.forEach(tag => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "tag-btn";
+            if (assignedTags[db.id].includes(tag)) btn.classList.add("active");
+            btn.innerText = tag;
+
+            btn.addEventListener("click", () => {
+                let tags = assignedTags[db.id] || [];
+                if (btn.classList.contains("active")) {
+                    btn.classList.remove("active");
+                    tags = tags.filter(t => t !== tag);
+                } else {
+                    if (tags.length < 2) {
+                        btn.classList.add("active");
+                        tags.push(tag);
+                    } else if (tags.length === 2) {
+                        const first = tags.shift();
+                        grid.querySelectorAll(".tag-btn").forEach(b => {
+                            if (b.innerText === first) b.classList.remove("active");
+                        });
+                        btn.classList.add("active");
+                        tags.push(tag);
+                    }
+                }
+                assignedTags[db.id] = tags;
+                validateSubmission();
+            });
+
+            grid.appendChild(btn);
+        });
+
+        dynamicList.appendChild(container);
+    });
+
+    validateSubmission();
+}
+
+function validateSubmission() {
+    const targets = getFeedbackTargets();
+    const valid = targets.every(db => assignedTags[db.id] && assignedTags[db.id].length === 2);
+    btnSubmitTiers.disabled = !valid;
+}
+
+// 6. Supabase Commit & Realtime Results
+btnSubmitTiers.addEventListener("click", async () => {
+    btnSubmitTiers.disabled = true;
+    btnSubmitTiers.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Submitting...`;
+
+    const topReason = document.getElementById("input-top-reason")?.value.trim() || "";
+    const bottomReason = document.getElementById("input-bottom-reason")?.value.trim() || "";
+
+    // Package records
+    const rankedIds = Object.keys(assignedTiers);
+    const records = DASHBOARDS
+        .filter(db => rankedIds.includes(db.id))
+        .map(db => {
+            const feedback = assignedTags[db.id] && assignedTags[db.id].length === 2 ? assignedTags[db.id].join(", ") : "";
+            return {
+                session_id: sessionId,
+                dashboard_id: db.id,
+                model: db.model,
+                arm: db.arm,
+                tier: assignedTiers[db.id],
+                feedback_words: feedback,
+                top_reason: topReason,
+                bottom_reason: bottomReason,
+                framework: db.framework || "python"
+            };
+        });
+
+    try {
+        const { error } = await supabaseClient
+            .from("dashboard_tiered_rankings_python")
+            .insert(records);
+
+        if (error) throw error;
+        
+        revealResults();
+    } catch (err) {
+        console.error("Supabase Submission Error:", err);
+        alert("Failed to submit feedback to Supabase. Check developer console.");
+        btnSubmitTiers.disabled = false;
+        btnSubmitTiers.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submit Tier List`;
+    }
+});
+
+// 7. Results Page Presentation
+function revealResults() {
+    boardView.style.display = "none";
+    summaryView.classList.add("active-view");
+
+    // Clear previous elements
+    revealedTiersContainer.innerHTML = "";
+
+    // Show revealed tier ranks
+    const tiers = ["S", "A", "B", "C", "D"];
+    tiers.forEach(tier => {
+        const tierDbs = DASHBOARDS.filter(db => assignedTiers[db.id] === tier);
+        if (tierDbs.length === 0) return;
+
+        const block = document.createElement("div");
+        block.className = "results-tier-block";
+
+        const headerClass = tier.toLowerCase() + "-tier";
+        block.innerHTML = `
+            <div class="results-tier-header ${headerClass}">
+                <span>${tier} Tier</span>
+            </div>
+            <div class="results-tier-body"></div>
+        `;
+
+        const body = block.querySelector(".results-tier-body");
+
+        tierDbs.forEach(db => {
+            const card = document.createElement("div");
+            card.className = "reveal-card";
+            
+            const costStr = `$${db.cost.toFixed(4)}`;
+
+            card.innerHTML = `
+                <div class="reveal-img-wrapper">
+                    <img src="${db.url}" alt="${db.name}">
+                </div>
+                <div class="reveal-details">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <span class="reveal-title">${db.model} (${db.name})</span>
+                        <div class="reveal-badges">
+                            ${db.arm === 'skills' 
+                                ? `<span class="reveal-badge reveal-badge-skills" title="Skills Arm: Built with structured dashboard styling, reactive design, and map guidelines."><i class="fa-solid fa-graduation-cap"></i> Skills</span>`
+                                : `<span class="reveal-badge reveal-badge-vanilla" title="Vanilla Arm: Built with plain/raw LLM prompts without guidelines or best practices."><i class="fa-solid fa-whiskey-glass"></i> Vanilla</span>`
+                            }
+                            ${db.passed 
+                                ? `<span class="reveal-badge reveal-badge-pass" title="Passed automated Shiny rendering validation."><i class="fa-solid fa-circle-check"></i> Passed</span>`
+                                : `<span class="reveal-badge reveal-badge-fail" title="Failed automated Shiny rendering validation."><i class="fa-solid fa-circle-xmark"></i> Failed</span>`
+                            }
+                        </div>
+                    </div>
+                    <div class="reveal-meta-row" style="display: flex; gap: 14px; font-size: 11px; color: var(--text-muted); margin: 4px 0 6px 0;">
+                        <span><i class="fa-solid fa-money-bill-wave" style="color: #059669;"></i> <strong>Cost:</strong> ${costStr}</span>
+                        <span><i class="fa-solid fa-clock" style="color: #2563eb;"></i> <strong>Time:</strong> ${db.time}s</span>
+                        <span><i class="fa-solid fa-arrows-spin" style="color: #7c3aed;"></i> <strong>Iterations:</strong> ${db.iterations}</span>
+                    </div>
+                    <div class="reveal-tags">
+                        ${(assignedTags[db.id] || []).map(t => `<span class="reveal-tag">${t}</span>`).join("")}
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener("click", () => openLightbox(db.url, `${db.model} (${db.name})`));
+            body.appendChild(card);
+        });
+
+        revealedTiersContainer.appendChild(block);
+    });
+
+    // Populate Community Stats and Subscribe Realtime
+    fetchCommunityStats();
+    subscribeRealtime();
+}
+
+async function fetchCommunityStats() {
+    try {
+        const { data, error } = await supabaseClient
+            .from("dashboard_tiered_rankings_python")
+            .select("model, arm, tier, framework");
+
+        if (error) throw error;
+        renderCommunityChart(data);
+    } catch (err) {
+        console.error("Error fetching community stats:", err);
+    }
+}
+
+function renderCommunityChart(rows) {
+    communityBarsContainer.innerHTML = "";
+    
+    const scoreMap = {};
+    const countMap = {};
+
+    DASHBOARDS.forEach(db => {
+        const label = `${db.model} (${db.framework.toUpperCase()} - ${db.arm})`;
+        scoreMap[label] = 0;
+        countMap[label] = 0;
+    });
+
+    rows.forEach(r => {
+        const frameworkStr = r.framework ? r.framework.toUpperCase() : "PYTHON";
+        const label = `${r.model} (${frameworkStr} - ${r.arm})`;
+        if (label in scoreMap) {
+            scoreMap[label] += TIER_SCORES[r.tier] || 0;
+            countMap[label]++;
+        }
+    });
+
+    const items = Object.keys(scoreMap).map(label => {
+        const votes = countMap[label];
+        const avg = votes > 0 ? (scoreMap[label] / votes).toFixed(2) : "0.00";
+        return { label, avg: parseFloat(avg), votes };
+    });
+
+    // Sort best to worst average score
+    items.sort((a, b) => b.avg - a.avg);
+
+    items.forEach(item => {
+        const block = document.createElement("div");
+        block.className = "chart-bar-item";
+
+        // Score maps S=5 to 100% width
+        const widthPercent = (item.avg / 5) * 100;
+
+        block.innerHTML = `
+            <div class="chart-bar-labels">
+                <span class="chart-bar-name">${item.label}</span>
+                <span class="chart-bar-count">Avg Score: ${item.avg} / 5.00 (${item.votes} votes)</span>
+            </div>
+            <div class="chart-bar-track">
+                <div class="chart-bar-fill" style="width: ${widthPercent}%;"></div>
+            </div>
+        `;
+        communityBarsContainer.appendChild(block);
+    });
+}
+
+// Supabase Realtime channel subscription
+function subscribeRealtime() {
+    supabaseClient
+        .channel("realtime-tiered-rankings")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "dashboard_tiered_rankings_python" }, () => {
+            fetchCommunityStats();
+        })
+        .subscribe();
+}
+
+// 8. Event handlers & Welcome onboarding
+btnStartEvaluation.addEventListener("click", () => {
+    welcomeView.classList.remove("active-view");
+    boardView.classList.add("active-view");
+    initializeBoard();
+});
+
+btnRestart.addEventListener("click", () => {
+    sessionId = uuidv4();
+    summaryView.classList.remove("active-view");
+    boardView.classList.add("active-view");
+    btnSubmitTiers.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submit Tier List`;
+    initializeBoard();
+});
+
+// Fullscreen Lightbox
 function openLightbox(url, title) {
     lightboxImg.src = url;
     lightboxCaption.innerText = title;
     lightboxModal.style.display = "flex";
-    lightboxModal.offsetHeight; // Force reflow for transitions
+    lightboxModal.offsetHeight;
     lightboxModal.classList.add("active");
 }
 
@@ -509,4 +813,3 @@ lightboxModal.addEventListener("click", (e) => {
         closeLightbox();
     }
 });
-

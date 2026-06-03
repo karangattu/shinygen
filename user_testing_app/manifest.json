@@ -1,0 +1,17 @@
+{
+  "short_name": "Dash Ranker",
+  "name": "Dashboard Ranker — Interactive Tier List",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#f8f9fa",
+  "theme_color": "#007bc2",
+  "display": "standalone",
+  "orientation": "portrait"
+}
