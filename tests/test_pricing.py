@@ -181,7 +181,9 @@ class TestUsageStats:
         assert usage.total_cost is not None
         assert usage.generation_cost > 0
         assert usage.judge_cost > 0
-        assert abs(usage.total_cost - (usage.generation_cost + usage.judge_cost)) < 1e-10
+        assert (
+            abs(usage.total_cost - (usage.generation_cost + usage.judge_cost)) < 1e-10
+        )
 
     def test_add_uses_cost_override(self):
         usage = UsageStats()
@@ -212,9 +214,14 @@ class TestUsageStats:
     def test_cache_tokens_tracked(self):
         usage = UsageStats()
         usage.add(
-            "generate", "anthropic/claude-sonnet-4-6",
-            10000, 500, 1.0, iteration=1,
-            cache_write_tokens=3000, cache_read_tokens=2000,
+            "generate",
+            "anthropic/claude-sonnet-4-6",
+            10000,
+            500,
+            1.0,
+            iteration=1,
+            cache_write_tokens=3000,
+            cache_read_tokens=2000,
         )
         assert usage.total_cache_write_tokens == 3000
         assert usage.total_cache_read_tokens == 2000
@@ -276,8 +283,11 @@ class TestCalculateCostWithCache:
         # regular = 10000 - 3000 - 2000 = 5000
         # input_cost = (5000*3 + 3000*3*1.25 + 2000*3*0.10) / 1e6
         cost = calculate_cost(
-            "anthropic/claude-sonnet-4-6", 10000, 0,
-            cache_write_tokens=3000, cache_read_tokens=2000,
+            "anthropic/claude-sonnet-4-6",
+            10000,
+            0,
+            cache_write_tokens=3000,
+            cache_read_tokens=2000,
         )
         assert cost is not None
         expected = (5000 * 3 + 3000 * 3 * 1.25 + 2000 * 3 * 0.10) / 1_000_000
@@ -287,8 +297,11 @@ class TestCalculateCostWithCache:
         # gpt-5.4: $2.50/MTok input
         # 10000 total, 0 write, 4000 read (0.1x)
         cost = calculate_cost(
-            "openai/gpt-5.4", 10000, 0,
-            cache_write_tokens=0, cache_read_tokens=4000,
+            "openai/gpt-5.4",
+            10000,
+            0,
+            cache_write_tokens=0,
+            cache_read_tokens=4000,
         )
         assert cost is not None
         expected = (6000 * 2.50 + 4000 * 2.50 * 0.10) / 1_000_000
@@ -297,8 +310,11 @@ class TestCalculateCostWithCache:
     def test_no_cache_same_as_before(self):
         with_cache = calculate_cost("anthropic/claude-sonnet-4-6", 1000, 500)
         without = calculate_cost(
-            "anthropic/claude-sonnet-4-6", 1000, 500,
-            cache_write_tokens=0, cache_read_tokens=0,
+            "anthropic/claude-sonnet-4-6",
+            1000,
+            500,
+            cache_write_tokens=0,
+            cache_read_tokens=0,
         )
         assert with_cache == without
 
@@ -321,17 +337,13 @@ class TestOpenCodeGoPricing:
 
     def test_calculate_cost_for_kimi_k26(self):
         # 1M input + 500k output = $0.95 + $2.00 = $2.95
-        cost = calculate_cost(
-            "openai-api/opencode-go/kimi-k2.6", 1_000_000, 500_000
-        )
+        cost = calculate_cost("openai-api/opencode-go/kimi-k2.6", 1_000_000, 500_000)
         assert cost is not None
         assert abs(cost - (0.95 + 2.00)) < 1e-12
 
     def test_calculate_cost_for_minimax_m27_anthropic_route(self):
         # 200k input + 100k output = $0.06 + $0.12 = $0.18
-        cost = calculate_cost(
-            "anthropic/opencode-go/minimax-m2.7", 200_000, 100_000
-        )
+        cost = calculate_cost("anthropic/opencode-go/minimax-m2.7", 200_000, 100_000)
         assert cost is not None
         assert abs(cost - (0.06 + 0.12)) < 1e-12
 
@@ -341,6 +353,18 @@ class TestOpenCodeGoPricing:
         assert cost is not None
         assert abs(cost - (2.50 + 0.75)) < 1e-12
 
+    def test_qwen37_plus_known_input_output(self):
+        assert get_pricing("qwen3.7-plus") == (0.40, 1.60)
+        cost = calculate_cost(
+            "anthropic/opencode-go/qwen3.7-plus",
+            1_000_000,
+            100_000,
+            cache_write_tokens=100_000,
+            cache_read_tokens=200_000,
+        )
+        assert cost is not None
+        assert abs(cost - 0.498) < 1e-12
+
     def test_qwen35_plus_returns_none(self):
         assert get_pricing("qwen3.5-plus") is None
 
@@ -348,8 +372,11 @@ class TestOpenCodeGoPricing:
         # kimi-k2.6 cache-read price is $0.16/MTok.
         # 10k input split into 6k regular + 4k cache-read.
         cost = calculate_cost(
-            "openai-api/opencode-go/kimi-k2.6", 10_000, 0,
-            cache_write_tokens=0, cache_read_tokens=4_000,
+            "openai-api/opencode-go/kimi-k2.6",
+            10_000,
+            0,
+            cache_write_tokens=0,
+            cache_read_tokens=4_000,
         )
         assert cost is not None
         expected = (6_000 * 0.95 + 4_000 * 0.16) / 1_000_000
@@ -359,8 +386,11 @@ class TestOpenCodeGoPricing:
         # minimax-m3 cache-write price is $0.75/MTok.
         # 10k input split into 6k regular + 4k cache-write.
         cost = calculate_cost(
-            "anthropic/opencode-go/minimax-m3", 10_000, 0,
-            cache_write_tokens=4_000, cache_read_tokens=0,
+            "anthropic/opencode-go/minimax-m3",
+            10_000,
+            0,
+            cache_write_tokens=4_000,
+            cache_read_tokens=0,
         )
         assert cost is not None
         expected = (6_000 * 0.60 + 4_000 * 0.75) / 1_000_000
@@ -376,12 +406,19 @@ class TestOpenCodeGoPricing:
         # (mimo-v2-pro / mimo-v2-omni are advertised but not in the public
         # OpenCode Go pricing table, so they are excluded here).
         priced_models = {
-            "glm-5.1", "glm-5", "kimi-k2.5", "kimi-k2.6",
-            "deepseek-v4-pro", "deepseek-v4-flash",
-            "mimo-v2.5-pro", "mimo-v2.5",
+            "glm-5.1",
+            "glm-5",
+            "kimi-k2.5",
+            "kimi-k2.6",
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
+            "mimo-v2.5-pro",
+            "mimo-v2.5",
             "qwen3.6-plus",
-            "minimax-m2.5", "minimax-m2.7",
-            "minimax-m3", "qwen3.7-max",
+            "minimax-m2.5",
+            "minimax-m2.7",
+            "minimax-m3",
+            "qwen3.7-max",
         }
         for model in OPENCODE_GO_OPENAI_COMPATIBLE_MODELS:
             if model in priced_models:

@@ -168,6 +168,7 @@ _PRICING: dict[str, tuple[float, float]] = {
     "minimax-m2.7": (0.30, 1.20),
     "minimax-m2.5": (0.30, 1.20),
     "qwen3.7-max": (2.50, 7.50),
+    "qwen3.7-plus": (0.40, 1.60),
     "qwen3.6-plus": (0.50, 3.00),
     "deepseek-v4-flash": (0.14, 0.28),
     "mimo-v2.5": (0.14, 0.28),
@@ -201,6 +202,7 @@ _CACHE_READ_PRICE_OVERRIDES: dict[str, float] = {
     "minimax-m2.7": 0.06,
     "minimax-m2.5": 0.06,
     "qwen3.7-max": 0.50,
+    "qwen3.7-plus": 0.04,
     "qwen3.6-plus": 0.05,
     "deepseek-v4-flash": 0.0028,
     "mimo-v2.5": 0.0028,
@@ -211,6 +213,7 @@ _CACHE_WRITE_PRICE_OVERRIDES: dict[str, float] = {
     "minimax-m2.7": 0.375,
     "minimax-m2.5": 0.375,
     "qwen3.7-max": 3.125,
+    "qwen3.7-plus": 0.50,
     "qwen3.6-plus": 0.625,
 }
 
@@ -225,6 +228,7 @@ _LONG_CONTEXT_SURCHARGES: dict[str, tuple[int, float, float]] = {
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def _normalize_model_name(model_id: str) -> str:
     """Strip provider prefix and normalise for lookup."""
     name = model_id.lower().strip()
@@ -237,10 +241,10 @@ def _normalize_model_name(model_id: str) -> str:
         "opencode-go/",
     ):
         if name.startswith(opencode_prefix):
-            return name[len(opencode_prefix):]
+            return name[len(opencode_prefix) :]
     for prefix in ("anthropic/", "openai/", "openai-api/"):
         if name.startswith(prefix):
-            name = name[len(prefix):]
+            name = name[len(prefix) :]
             break
     return name
 
@@ -358,8 +362,11 @@ class UsageStats:
             cost_override
             if cost_override is not None
             else calculate_cost(
-                model, input_tokens, output_tokens,
-                cache_write_tokens, cache_read_tokens,
+                model,
+                input_tokens,
+                output_tokens,
+                cache_write_tokens,
+                cache_read_tokens,
             )
         )
         if cost is not None and self.total_cost is not None:

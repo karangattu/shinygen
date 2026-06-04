@@ -64,6 +64,7 @@ OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
     "minimax-m2.7",
     "minimax-m3",
     "qwen3.7-max",
+    "qwen3.7-plus",
 )
 
 

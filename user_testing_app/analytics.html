@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Ranker — Analytics & Insights</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="analytics.css">
+</head>
+<body>
+    <div class="glow-bg glow-blue"></div>
+    <div class="glow-bg glow-purple"></div>
+    <div class="glow-bg glow-accent"></div>
+
+    <header class="dashboard-header">
+        <div class="header-container">
+            <div class="header-left">
+                <a href="index.html" class="header-back" title="Back to Evaluator">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <div class="logo">
+                    <span class="logo-icon"><i class="fa-solid fa-chart-line"></i></span>
+                    <div class="logo-text">
+                        <h1>Analytics</h1>
+                        <span class="logo-sub">LLM Performance Insights</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="live-status">
+                    <span class="status-pulse"></span>
+                    <span>LIVE</span>
+                </div>
+                <button id="btn-refresh" class="header-btn" title="Refresh Data">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+                <button id="btn-export" class="header-btn" title="Export CSV">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        <div class="stats-row">
+            <div class="stat-card glass-panel">
+                <div class="stat-icon"><i class="fa-solid fa-people-group"></i></div>
+                <div class="stat-info">
+                    <div class="stat-label">Total Voters</div>
+                    <div class="stat-value" id="val-total-voters">0</div>
+                </div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-icon"><i class="fa-solid fa-square-poll-vertical"></i></div>
+                <div class="stat-info">
+                    <div class="stat-label">Total Ratings</div>
+                    <div class="stat-value" id="val-total-ratings">0</div>
+                </div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-icon"><i class="fa-solid fa-trophy"></i></div>
+                <div class="stat-info">
+                    <div class="stat-label">Top Model</div>
+                    <div class="stat-value" id="val-top-model">—</div>
+                </div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-icon"><i class="fa-solid fa-wallet"></i></div>
+                <div class="stat-info">
+                    <div class="stat-label">Avg Gen Cost</div>
+                    <div class="stat-value" id="val-avg-cost">$0.0000</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="insights-bar glass-panel" id="insights-bar">
+            <div class="insight-icon"><i class="fa-solid fa-lightbulb"></i></div>
+            <div class="insights-content" id="insights-content">
+                <span class="insight-pill">Analyzing data trends...</span>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-card glass-panel">
+                <h3>Quality vs. Cost ROI</h3>
+                <p class="chart-subtitle">Average tier rating plotted against generation cost</p>
+                <div class="chart-wrapper">
+                    <canvas id="chart-roi"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card glass-panel">
+                <h3>Skills vs. Vanilla Prompting</h3>
+                <p class="chart-subtitle">Average score comparison across all models</p>
+                <div class="chart-wrapper">
+                    <canvas id="chart-skills-comparison"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card glass-panel">
+                <h3>Framework Performance</h3>
+                <p class="chart-subtitle">Python Shiny vs. R Shiny average scores</p>
+                <div class="chart-wrapper">
+                    <canvas id="chart-frameworks"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card glass-panel">
+                <h3>Top Feedback Tags</h3>
+                <p class="chart-subtitle">Most frequent user feedback characteristics</p>
+                <div class="chart-wrapper">
+                    <canvas id="chart-tags"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-row">
+            <div class="table-card glass-panel flex-2">
+                <div class="table-header">
+                    <h3>Performance Leaderboard</h3>
+                    <span class="table-count" id="table-count"></span>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Model</th>
+                                <th>Approach</th>
+                                <th>Framework</th>
+                                <th>Avg Rating</th>
+                                <th>Votes</th>
+                                <th>Time</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <tr>
+                                <td colspan="8" class="loading-cell">
+                                    <span class="skeleton-pulse"></span> Loading leaderboard...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stream-card glass-panel flex-1">
+                <div class="stream-header">
+                    <h3>Live Feed</h3>
+                    <span class="badge" id="stream-count">0</span>
+                </div>
+                <div class="activity-stream" id="activity-stream">
+                    <div class="activity-loading">
+                        <span class="skeleton-pulse"></span> Awaiting submissions...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-footer glass-panel">
+            <span id="last-updated"><i class="fa-regular fa-clock"></i> Real-time telemetry</span>
+            <a href="index.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Return to Evaluator</a>
+        </div>
+    </main>
+
+    <script src="analytics.js"></script>
+</body>
+</html>
