@@ -266,7 +266,7 @@ const DASHBOARDS = [
 const PRESET_TAGS = [
     "Clean Layout", "Jarring Colors", "Interactive Controls",
     "Confusing Chart", "Incorrect Data", "Very Basic",
-    "Beautiful Map", "Failed to Render", "Rainbow Plots",
+    "Beautiful Map", "Failed to Render", "Poor Contrast",
     "Text Overlap", "Great Colors", "Clear Labels"
 ];
 
