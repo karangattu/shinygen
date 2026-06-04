@@ -188,6 +188,7 @@ function processAndRenderAnalytics() {
     renderSkillsChart(rawDbRows);
     renderFrameworksChart(rawDbRows);
     renderTagsChart(rawDbRows);
+    renderCorrelationMatrix(rawDbRows);
     renderActivityFeed(rawDbRows.slice(0, 20));
     renderInsights(standingsList, totalRatings, totalVoters, avgCost);
 }
@@ -595,6 +596,116 @@ function renderTagsChart(rows) {
                 }
             }
         }
+    });
+}
+
+function renderCorrelationMatrix(rows) {
+    const container = document.getElementById("correlation-matrix");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const tags = [
+        "Clean Layout", "Jarring Colors", "Interactive Controls",
+        "Confusing Chart", "Incorrect Data", "Very Basic",
+        "Beautiful Map", "Failed to Render", "Rainbow Plots",
+        "Text Overlap", "Great Colors", "Clear Labels"
+    ];
+
+    const N = rows.length;
+    if (N === 0) return;
+
+    const vectors = {};
+    tags.forEach(tag => {
+        vectors[tag] = rows.map(r => {
+            if (!r.feedback_words) return 0;
+            return r.feedback_words.split(",").map(w => w.trim()).includes(tag) ? 1 : 0;
+        });
+    });
+
+    const means = {};
+    tags.forEach(tag => {
+        means[tag] = vectors[tag].reduce((sum, val) => sum + val, 0) / N;
+    });
+
+    const correlations = {};
+    tags.forEach(t1 => {
+        correlations[t1] = {};
+        tags.forEach(t2 => {
+            if (t1 === t2) {
+                correlations[t1][t2] = 1.0;
+                return;
+            }
+
+            const x = vectors[t1];
+            const y = vectors[t2];
+            const mx = means[t1];
+            const my = means[t2];
+
+            let cov = 0;
+            let varX = mx * (1.0 - mx);
+            let varY = my * (1.0 - my);
+
+            for (let i = 0; i < N; i++) {
+                cov += (x[i] - mx) * (y[i] - my);
+            }
+            cov /= N;
+
+            const denom = Math.sqrt(varX * varY);
+            correlations[t1][t2] = denom > 0 ? cov / denom : 0.0;
+        });
+    });
+
+    const corner = document.createElement("div");
+    corner.className = "matrix-corner-cell";
+    container.appendChild(corner);
+
+    tags.forEach(tag => {
+        const cell = document.createElement("div");
+        cell.className = "matrix-header-cell";
+        cell.innerText = tag;
+        container.appendChild(cell);
+    });
+
+    tags.forEach(t1 => {
+        const label = document.createElement("div");
+        label.className = "matrix-label-cell";
+        label.innerText = t1;
+        container.appendChild(label);
+
+        tags.forEach(t2 => {
+            const val = correlations[t1][t2];
+            const cell = document.createElement("div");
+            cell.className = "matrix-data-cell";
+            cell.innerText = val === 1.0 ? "1.0" : val.toFixed(2);
+
+            let bg = "rgba(255, 255, 255, 0.02)";
+            let text = "var(--text-dim)";
+            let border = "1px solid rgba(255, 255, 255, 0.02)";
+
+            if (t1 === t2) {
+                bg = "rgba(255, 255, 255, 0.08)";
+                text = "var(--text-main)";
+                border = "1px solid rgba(255, 255, 255, 0.15)";
+            } else if (val > 0.05) {
+                const alpha = Math.min(val * 0.9, 0.85);
+                bg = `rgba(0, 240, 255, ${alpha})`;
+                text = val > 0.4 ? "#070b14" : "var(--primary-neon)";
+                border = `1px solid rgba(0, 240, 255, ${val * 0.4})`;
+            } else if (val < -0.05) {
+                const alpha = Math.min(Math.abs(val) * 0.9, 0.85);
+                bg = `rgba(255, 0, 127, ${alpha})`;
+                text = Math.abs(val) > 0.4 ? "#070b14" : "var(--accent-red)";
+                border = `1px solid rgba(255, 0, 127, ${Math.abs(val) * 0.4})`;
+            }
+
+            cell.style.background = bg;
+            cell.style.color = text;
+            cell.style.border = border;
+
+            const sign = val >= 0 ? "+" : "";
+            cell.setAttribute("data-tooltip", `${t1} x ${t2}: r = ${sign}${val.toFixed(3)}`);
+            container.appendChild(cell);
+        });
     });
 }
 
