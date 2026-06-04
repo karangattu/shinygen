@@ -640,8 +640,9 @@ btnSubmitTiers.addEventListener("click", async () => {
 
 // 7. Results Page Presentation
 function revealResults() {
-    boardView.style.display = "none";
+    boardView.classList.remove("active-view");
     summaryView.classList.add("active-view");
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
     // Clear previous elements
     revealedTiersContainer.innerHTML = "";
