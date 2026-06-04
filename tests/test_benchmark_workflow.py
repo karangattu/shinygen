@@ -65,9 +65,15 @@ def test_benchmark_matrix_can_disable_screenshots_and_judges():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "enable_screenshot:" in workflow
-    assert 'description: "Enable --screenshot (adds visual judging; slower & more expensive)"' in workflow
+    assert (
+        'description: "Enable --screenshot (adds visual judging; slower & more expensive)"'
+        in workflow
+    )
     assert "enable_judges:" in workflow
-    assert 'description: "Run the judge panel (uncheck to skip judging and only solve)"' in workflow
+    assert (
+        'description: "Run the judge panel (uncheck to skip judging and only solve)"'
+        in workflow
+    )
     assert 'if [[ "${{ inputs.enable_judges }}" == "true" ]]; then' in workflow
     assert "needs_anthropic=1" in workflow
     assert 'case "${{ matrix.model.name }}" in' in workflow
@@ -161,6 +167,7 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
         assert f"name: {model}" in matrix_workflow
         assert f"- {model}" in quick_workflow
 
+    assert "- qwen3.7-plus" in quick_workflow
     assert "OPENCODE_GO_API_KEY" in matrix_workflow
     assert "OPENCODE_GO_API_KEY" in quick_workflow
 

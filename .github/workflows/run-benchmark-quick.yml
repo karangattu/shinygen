@@ -41,6 +41,7 @@ on:
           - minimax-m2.7
           - minimax-m3
           - qwen3.7-max
+          - qwen3.7-plus
           - qwen3.6-plus
           - deepseek-v4-pro
           - deepseek-v4-flash
