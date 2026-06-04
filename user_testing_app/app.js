@@ -280,6 +280,7 @@ let assignedTiers = {}; // dashboardId -> 'S'|'A'|'B'|'C'|'D'
 let assignedTags = {};  // dashboardId -> Array of 2 strings
 let tempTargetTier = null;
 let currentLightboxDbId = null;
+let communityRowsCache = []; // cached server rows for instant re-render
 
 // DOM Elements
 const welcomeView = document.getElementById("welcome-view");
@@ -612,17 +613,25 @@ btnSubmitTiers.addEventListener("click", async () => {
             };
         });
 
-    // Optimistic flow: immediately reveal results without blocking UX
+    // Optimistic flow: immediately reveal results without blocking UX.
+    // Merge the user's own records into the cache so the community chart
+    // renders instantly with their vote already counted.
+    communityRowsCache = communityRowsCache.concat(records.map(r => ({
+        model: r.model, arm: r.arm, tier: r.tier, framework: r.framework
+    })));
     revealResults();
 
-    // Insert records in the background
+    // Insert records in the background, then refresh stats from the server.
     supabaseClient
         .from("dashboard_tiered_rankings_python")
         .insert(records)
         .then(({ error }) => {
             if (error) {
                 console.error("Supabase background submission error:", error);
+                return;
             }
+            // Reconcile optimistic chart with authoritative server data.
+            fetchCommunityStats();
         })
         .catch(err => {
             console.error("Supabase background insertion failed:", err);
@@ -698,27 +707,41 @@ function revealResults() {
         revealedTiersContainer.appendChild(block);
     });
 
-    // Populate Community Stats and Subscribe Realtime
+    // Render community chart instantly from cached rows (includes the user's
+    // own optimistic vote) so the section is never blank/spinning.
+    renderCommunityChart(communityRowsCache, { pending: true });
+
+    // Refresh from the server in the background and subscribe to realtime.
     fetchCommunityStats();
     subscribeRealtime();
 }
 
+let fetchStatsInFlight = false;
+
 async function fetchCommunityStats() {
+    // Coalesce overlapping requests (e.g. realtime bursts) to one in-flight call.
+    if (fetchStatsInFlight) return;
+    fetchStatsInFlight = true;
     try {
         const { data, error } = await supabaseClient
             .from("dashboard_tiered_rankings_python")
             .select("model, arm, tier, framework");
 
         if (error) throw error;
-        renderCommunityChart(data);
+        communityRowsCache = data || [];
+        renderCommunityChart(communityRowsCache, { pending: false });
     } catch (err) {
         console.error("Error fetching community stats:", err);
+        // Leave the optimistic chart in place; just clear the pending indicator.
+        if (communityRowsCache.length) renderCommunityChart(communityRowsCache, { pending: false });
+    } finally {
+        fetchStatsInFlight = false;
     }
 }
 
-function renderCommunityChart(rows) {
+function renderCommunityChart(rows, { pending = false } = {}) {
     communityBarsContainer.innerHTML = "";
-    
+
     const scoreMap = {};
     const countMap = {};
 
@@ -764,11 +787,22 @@ function renderCommunityChart(rows) {
         `;
         communityBarsContainer.appendChild(block);
     });
+
+    // Subtle indicator while authoritative server data is still loading.
+    if (pending) {
+        const note = document.createElement("div");
+        note.className = "community-pending-note";
+        note.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Syncing latest community votes…`;
+        communityBarsContainer.appendChild(note);
+    }
 }
 
 // Supabase Realtime channel subscription
+let realtimeChannel = null;
 function subscribeRealtime() {
-    supabaseClient
+    // Subscribe once; avoid stacking duplicate channels on restart/resubmit.
+    if (realtimeChannel) return;
+    realtimeChannel = supabaseClient
         .channel("realtime-tiered-rankings")
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "dashboard_tiered_rankings_python" }, () => {
             fetchCommunityStats();

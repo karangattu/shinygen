@@ -1175,6 +1175,18 @@ body {
     transition: width 1s ease-in-out;
 }
 
+.community-pending-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 4px 0 0 0;
+    opacity: 0.85;
+}
+
+.community-pending-note .fa-spinner {
+    margin-right: 4px;
+}
+
 /* Textarea elements */
 .textarea-wrapper {
     display: flex;
