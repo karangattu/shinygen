@@ -66,6 +66,8 @@ function bindUIEvents() {
     if (exportBtn) {
         exportBtn.addEventListener("click", exportCSV);
     }
+
+    setupAccordion();
 }
 
 async function fetchTelemetryData() {
@@ -303,21 +305,21 @@ function renderRoiChart(standings) {
             datasets: [{
                 label: "Skills Guidelines",
                 data: skillsData,
-                backgroundColor: "rgba(0, 240, 255, 0.7)",
-                borderColor: "#00f0ff",
+                backgroundColor: "rgba(0, 123, 194, 0.7)",
+                borderColor: "#007bc2",
                 borderWidth: 1,
                 pointRadius: 7,
                 pointHoverRadius: 10,
-                pointHoverBackgroundColor: "#00f0ff"
+                pointHoverBackgroundColor: "#007bc2"
             }, {
                 label: "Vanilla Prompting",
                 data: vanillaData,
-                backgroundColor: "rgba(255, 0, 127, 0.7)",
-                borderColor: "#ff007f",
+                backgroundColor: "rgba(100, 116, 139, 0.7)",
+                borderColor: "#64748b",
                 borderWidth: 1,
                 pointRadius: 7,
                 pointHoverRadius: 10,
-                pointHoverBackgroundColor: "#ff007f"
+                pointHoverBackgroundColor: "#64748b"
             }]
         },
         options: {
@@ -325,31 +327,31 @@ function renderRoiChart(standings) {
             maintainAspectRatio: false,
             scales: {
                 x: {
-                    title: { display: true, text: "Cost per Generation ($)", color: "#8896b6", font: { weight: "600", size: 11 } },
-                    grid: { color: "rgba(255, 255, 255, 0.04)" },
-                    ticks: { color: "#4a5578" }
+                    title: { display: true, text: "Cost per Generation ($)", color: "#475569", font: { weight: "600", size: 11 } },
+                    grid: { color: "rgba(0, 0, 0, 0.05)" },
+                    ticks: { color: "#64748b" }
                 },
                 y: {
-                    title: { display: true, text: "Avg Tier Rating", color: "#8896b6", font: { weight: "600", size: 11 } },
-                    grid: { color: "rgba(255, 255, 255, 0.04)" },
-                    ticks: { color: "#4a5578" },
+                    title: { display: true, text: "Avg Tier Rating", color: "#475569", font: { weight: "600", size: 11 } },
+                    grid: { color: "rgba(0, 0, 0, 0.05)" },
+                    ticks: { color: "#64748b" },
                     min: 1, max: 5
                 }
             },
             plugins: {
                 legend: {
                     labels: {
-                        color: "#8896b6",
+                        color: "#475569",
                         font: { family: "Outfit", size: 11 },
                         usePointStyle: true,
                         padding: 16
                     }
                 },
                 tooltip: {
-                    backgroundColor: "rgba(7, 11, 20, 0.9)",
-                    titleColor: "#f1f5f9",
-                    bodyColor: "#8896b6",
-                    borderColor: "rgba(255, 255, 255, 0.08)",
+                    backgroundColor: "rgba(30, 41, 59, 0.95)",
+                    titleColor: "#ffffff",
+                    bodyColor: "#cbd5e1",
+                    borderColor: "#475569",
                     borderWidth: 1,
                     padding: 10,
                     cornerRadius: 8,
@@ -388,10 +390,10 @@ function renderSkillsChart(rows) {
             datasets: [{
                 data: [avgSkills, avgVanilla],
                 backgroundColor: [
-                    "rgba(0, 240, 255, 0.25)",
-                    "rgba(255, 0, 127, 0.25)"
+                    "rgba(0, 123, 194, 0.25)",
+                    "rgba(100, 116, 139, 0.25)"
                 ],
-                borderColor: ["#00f0ff", "#ff007f"],
+                borderColor: ["#007bc2", "#64748b"],
                 borderWidth: 2,
                 borderRadius: 6,
                 barPercentage: 0.5
@@ -402,22 +404,22 @@ function renderSkillsChart(rows) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    grid: { color: "rgba(255, 255, 255, 0.04)" },
-                    ticks: { color: "#4a5578" },
+                    grid: { color: "rgba(0, 0, 0, 0.05)" },
+                    ticks: { color: "#64748b" },
                     min: 0, max: 5
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: "#8896b6", font: { size: 11 } }
+                    ticks: { color: "#475569", font: { size: 11 } }
                 }
             },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: "rgba(7, 11, 20, 0.9)",
-                    titleColor: "#f1f5f9",
-                    bodyColor: "#8896b6",
-                    borderColor: "rgba(255, 255, 255, 0.08)",
+                    backgroundColor: "rgba(30, 41, 59, 0.95)",
+                    titleColor: "#ffffff",
+                    bodyColor: "#cbd5e1",
+                    borderColor: "#475569",
                     borderWidth: 1,
                     padding: 10,
                     cornerRadius: 8,
@@ -435,7 +437,7 @@ function renderSkillsChart(rows) {
                     const val = chart.data.datasets[0].data[idx];
                     const ctx2 = chart.ctx;
                     ctx2.save();
-                    ctx2.fillStyle = "#8896b6";
+                    ctx2.fillStyle = "#475569";
                     ctx2.font = "600 11px Outfit";
                     ctx2.textAlign = "center";
                     ctx2.fillText(val.toFixed(2), bar.x, bar.y - 8);
@@ -481,22 +483,22 @@ function renderFrameworksChart(rows) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    grid: { color: "rgba(255, 255, 255, 0.04)" },
-                    ticks: { color: "#4a5578" },
+                    grid: { color: "rgba(0, 0, 0, 0.05)" },
+                    ticks: { color: "#64748b" },
                     min: 0, max: 5
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: "#8896b6", font: { size: 11 } }
+                    ticks: { color: "#475569", font: { size: 11 } }
                 }
             },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: "rgba(7, 11, 20, 0.9)",
-                    titleColor: "#f1f5f9",
-                    bodyColor: "#8896b6",
-                    borderColor: "rgba(255, 255, 255, 0.08)",
+                    backgroundColor: "rgba(30, 41, 59, 0.95)",
+                    titleColor: "#ffffff",
+                    bodyColor: "#cbd5e1",
+                    borderColor: "#475569",
                     borderWidth: 1,
                     padding: 10,
                     cornerRadius: 8,
@@ -514,7 +516,7 @@ function renderFrameworksChart(rows) {
                     const val = chart.data.datasets[0].data[idx];
                     const ctx2 = chart.ctx;
                     ctx2.save();
-                    ctx2.fillStyle = "#8896b6";
+                    ctx2.fillStyle = "#475569";
                     ctx2.font = "600 11px Outfit";
                     ctx2.textAlign = "center";
                     ctx2.fillText(val.toFixed(2), bar.x, bar.y - 8);
@@ -558,11 +560,11 @@ function renderTagsChart(rows) {
                 data: data,
                 backgroundColor: data.map(v => {
                     const intensity = 0.15 + (v / maxCount) * 0.45;
-                    return `rgba(0, 240, 255, ${intensity})`;
+                    return `rgba(0, 123, 194, ${intensity})`;
                 }),
                 borderColor: data.map(v => {
                     const intensity = 0.3 + (v / maxCount) * 0.7;
-                    return `rgba(0, 240, 255, ${intensity})`;
+                    return `rgba(0, 123, 194, ${intensity})`;
                 }),
                 borderWidth: 2,
                 borderRadius: 4,
@@ -575,21 +577,21 @@ function renderTagsChart(rows) {
             maintainAspectRatio: false,
             scales: {
                 x: {
-                    grid: { color: "rgba(255, 255, 255, 0.04)" },
-                    ticks: { color: "#4a5578", stepSize: 1 }
+                    grid: { color: "rgba(0, 0, 0, 0.05)" },
+                    ticks: { color: "#64748b", stepSize: 1 }
                 },
                 y: {
                     grid: { display: false },
-                    ticks: { color: "#8896b6", font: { size: 10 } }
+                    ticks: { color: "#475569", font: { size: 10 } }
                 }
             },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: "rgba(7, 11, 20, 0.9)",
-                    titleColor: "#f1f5f9",
-                    bodyColor: "#8896b6",
-                    borderColor: "rgba(255, 255, 255, 0.08)",
+                    backgroundColor: "rgba(30, 41, 59, 0.95)",
+                    titleColor: "#ffffff",
+                    bodyColor: "#cbd5e1",
+                    borderColor: "#475569",
                     borderWidth: 1,
                     padding: 10,
                     cornerRadius: 8
@@ -678,24 +680,24 @@ function renderCorrelationMatrix(rows) {
             cell.className = "matrix-data-cell";
             cell.innerText = val === 1.0 ? "1.0" : val.toFixed(2);
 
-            let bg = "rgba(255, 255, 255, 0.02)";
+            let bg = "rgba(0, 0, 0, 0.02)";
             let text = "var(--text-dim)";
-            let border = "1px solid rgba(255, 255, 255, 0.02)";
+            let border = "1px solid rgba(0, 0, 0, 0.02)";
 
             if (t1 === t2) {
-                bg = "rgba(255, 255, 255, 0.08)";
+                bg = "rgba(0, 123, 194, 0.1)";
                 text = "var(--text-main)";
-                border = "1px solid rgba(255, 255, 255, 0.15)";
+                border = "1px solid var(--border-color)";
             } else if (val > 0.05) {
                 const alpha = Math.min(val * 0.9, 0.85);
-                bg = `rgba(0, 240, 255, ${alpha})`;
-                text = val > 0.4 ? "#070b14" : "var(--primary-neon)";
-                border = `1px solid rgba(0, 240, 255, ${val * 0.4})`;
+                bg = `rgba(0, 123, 194, ${alpha})`;
+                text = val > 0.4 ? "#ffffff" : "var(--primary)";
+                border = `1px solid rgba(0, 123, 194, ${val * 0.4})`;
             } else if (val < -0.05) {
                 const alpha = Math.min(Math.abs(val) * 0.9, 0.85);
-                bg = `rgba(255, 0, 127, ${alpha})`;
-                text = Math.abs(val) > 0.4 ? "#070b14" : "var(--accent-red)";
-                border = `1px solid rgba(255, 0, 127, ${Math.abs(val) * 0.4})`;
+                bg = `rgba(217, 83, 79, ${alpha})`;
+                text = Math.abs(val) > 0.4 ? "#ffffff" : "var(--error)";
+                border = `1px solid rgba(217, 83, 79, ${Math.abs(val) * 0.4})`;
             }
 
             cell.style.background = bg;
@@ -801,6 +803,26 @@ function exportCSV() {
     link.download = "analytics-export-" + new Date().toISOString().slice(0, 10) + ".csv";
     link.click();
     URL.revokeObjectURL(link.href);
+}
+
+// Accordion Toggle
+function setupAccordion() {
+    const trigger = document.getElementById("accordion-trigger");
+    const content = document.getElementById("accordion-content");
+    const icon = trigger?.querySelector(".accordion-icon");
+
+    if (trigger && content && icon) {
+        trigger.addEventListener("click", () => {
+            const isCollapsed = content.style.display === "none" || content.style.display === "";
+            if (isCollapsed) {
+                content.style.display = "block";
+                icon.style.transform = "rotate(180deg)";
+            } else {
+                content.style.display = "none";
+                icon.style.transform = "rotate(0deg)";
+            }
+        });
+    }
 }
 
 init();

@@ -13,9 +13,6 @@
     <link rel="stylesheet" href="analytics.css">
 </head>
 <body>
-    <div class="glow-bg glow-blue"></div>
-    <div class="glow-bg glow-purple"></div>
-    <div class="glow-bg glow-accent"></div>
 
     <header class="dashboard-header">
         <div class="header-container">
@@ -118,29 +115,38 @@
                 </div>
             </div>
 
-            <div class="chart-card glass-panel correlation-matrix-card">
-                <h3>Feedback Tag Correlation Matrix</h3>
-                <p class="chart-subtitle">Co-occurrence correlation (Pearson r) between different user-selected design tags across all submissions</p>
-                <div class="correlation-matrix-container">
-                    <div class="correlation-matrix" id="correlation-matrix"></div>
+            <div class="chart-card glass-panel correlation-matrix-card accordion">
+                <div class="accordion-header" id="accordion-trigger" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                    <div>
+                        <h3 style="margin: 0; display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-table-cells"></i> Feedback Tag Correlation Matrix
+                        </h3>
+                        <p class="chart-subtitle" style="margin: 4px 0 0 0;">Co-occurrence correlation (Pearson r) between user feedback tags</p>
+                    </div>
+                    <span class="accordion-icon" style="transition: transform 0.2s ease;"><i class="fa-solid fa-chevron-down"></i></span>
                 </div>
-                <div class="matrix-explanation">
-                    <h4><i class="fa-solid fa-circle-info"></i> How to Read this Matrix</h4>
-                    <p>
-                        Each cell calculates the <strong>Pearson correlation coefficient (r)</strong> between two design feedback tags based on how often they co-occur in the same user submissions.
-                    </p>
-                    <div class="explanation-legend">
-                        <div class="legend-item">
-                            <span class="legend-color positive"></span>
-                            <span><strong>Positive Correlation (+0.05 to +1.00)</strong>: Colored <strong>cyan</strong>. Suggests the tags are frequently selected together on the same dashboards (e.g., related design qualities).</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color negative"></span>
-                            <span><strong>Negative Correlation (-0.05 to -1.00)</strong>: Colored <strong>pink/magenta</strong>. Suggests the tags are mutually exclusive or rarely appear together on the same layouts (e.g., contrasting attributes).</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color neutral"></span>
-                            <span><strong>Zero/Weak Correlation (-0.05 to +0.05)</strong>: Neutral <strong>dark/gray</strong>. Indicates no linear relationship (co-occurrence is random or there are zero occurrences). Hover over any cell to see the exact correlation score.</span>
+                <div class="accordion-content" id="accordion-content" style="display: none; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <div class="correlation-matrix-container">
+                        <div class="correlation-matrix" id="correlation-matrix"></div>
+                    </div>
+                    <div class="matrix-explanation">
+                        <h4><i class="fa-solid fa-circle-info"></i> How to Read this Matrix</h4>
+                        <p>
+                            Each cell calculates the <strong>Pearson correlation coefficient (r)</strong> between two design feedback tags based on how often they co-occur in the same user submissions.
+                        </p>
+                        <div class="explanation-legend">
+                            <div class="legend-item">
+                                <span class="legend-color positive"></span>
+                                <span><strong>Positive Correlation (+0.05 to +1.00)</strong>: Colored <strong>blue</strong>. Suggests the tags are frequently selected together on the same dashboards (e.g., related design qualities).</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color negative"></span>
+                                <span><strong>Negative Correlation (-0.05 to -1.00)</strong>: Colored <strong>red</strong>. Suggests the tags are mutually exclusive or rarely appear together on the same layouts (e.g., contrasting attributes).</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color neutral"></span>
+                                <span><strong>Zero/Weak Correlation (-0.05 to +0.05)</strong>: Neutral <strong>light gray/gray</strong>. Indicates no linear relationship (co-occurrence is random or there are zero occurrences). Hover over any cell to see the exact correlation score.</span>
+                            </div>
                         </div>
                     </div>
                 </div>
