@@ -3,27 +3,27 @@ const SUPABASE_KEY = "sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DASHBOARDS_METADATA = {
-    "py-ds-v4-pro-skills": { name: "Dashboard 1", model: "DeepSeek V4 Pro", arm: "skills", cost: 0.1038, time: 508, framework: "python" },
-    "py-claude-opus-skills": { name: "Dashboard 2", model: "Claude Opus 4-8", arm: "skills", cost: 1.4623, time: 309, framework: "python" },
-    "py-ds-v4-flash-skills": { name: "Dashboard 3", model: "DeepSeek V4 Flash", arm: "skills", cost: 0.0127, time: 270, framework: "python" },
-    "py-gpt-5-5-skills": { name: "Dashboard 4", model: "GPT 5.5", arm: "skills", cost: 0.4274, time: 196, framework: "python" },
-    "py-minimax-m3-skills": { name: "Dashboard 5", model: "Minimax M3", arm: "skills", cost: 0.1037, time: 519, framework: "python" },
-    "py-qwen-max-skills": { name: "Dashboard 6", model: "Qwen 3.7 Max", arm: "skills", cost: 0.5410, time: 261, framework: "python" },
-    "py-ds-v4-pro-vanilla": { name: "Dashboard 7", model: "DeepSeek V4 Pro", arm: "vanilla", cost: 0.0862, time: 570, framework: "python" },
-    "py-claude-opus-vanilla": { name: "Dashboard 8", model: "Claude Opus 4-8", arm: "vanilla", cost: 0.4908, time: 142, framework: "python" },
-    "py-ds-v4-flash-vanilla": { name: "Dashboard 9", model: "DeepSeek V4 Flash", arm: "vanilla", cost: 0.0020, time: 92, framework: "python" },
-    "r-claude-opus-skills": { name: "Dashboard 10", model: "Claude Opus 4-8", arm: "skills", cost: 0.5229, time: 188, framework: "r" },
-    "r-ds-v4-flash-skills": { name: "Dashboard 11", model: "DeepSeek V4 Flash", arm: "skills", cost: 0.0043, time: 133, framework: "r" },
-    "r-ds-v4-pro-skills": { name: "Dashboard 12", model: "DeepSeek V4 Pro", arm: "skills", cost: 0.0467, time: 277, framework: "r" },
-    "r-gpt-5-5-skills": { name: "Dashboard 13", model: "GPT 5.5", arm: "skills", cost: 0.5972, time: 267, framework: "r" },
-    "r-minimax-m3-skills": { name: "Dashboard 14", model: "Minimax M3", arm: "skills", cost: 0.0869, time: 415, framework: "r" },
-    "r-qwen-max-skills": { name: "Dashboard 15", model: "Qwen 3.7 Max", arm: "skills", cost: 0.2984, time: 116, framework: "r" },
-    "r-claude-opus-vanilla": { name: "Dashboard 16", model: "Claude Opus 4-8", arm: "vanilla", cost: 0.4266, time: 123, framework: "r" },
-    "r-ds-v4-flash-vanilla": { name: "Dashboard 17", model: "DeepSeek V4 Flash", arm: "vanilla", cost: 0.0029, time: 129, framework: "r" },
-    "r-ds-v4-pro-vanilla": { name: "Dashboard 18", model: "DeepSeek V4 Pro", arm: "vanilla", cost: 0.0905, time: 603, framework: "r" },
-    "r-gpt-5-5-vanilla": { name: "Dashboard 19", model: "GPT 5.5", arm: "vanilla", cost: 0.4408, time: 203, framework: "r" },
-    "r-minimax-m3-vanilla": { name: "Dashboard 20", model: "Minimax M3", arm: "vanilla", cost: 0.0247, time: 163, framework: "r" },
-    "r-qwen-max-vanilla": { name: "Dashboard 21", model: "Qwen 3.7 Max", arm: "vanilla", cost: 0.1523, time: 103, framework: "r" }
+    "py-ds-v4-pro-skills": { name: "Dashboard 1", model: "DeepSeek V4 Pro", arm: "skills", cost: 0.1038, time: 508, framework: "python", url: "assets/deepseek-v4-pro-skills.png" },
+    "py-claude-opus-skills": { name: "Dashboard 2", model: "Claude Opus 4-8", arm: "skills", cost: 1.4623, time: 309, framework: "python", url: "assets/claude-opus-4-8-skills.png" },
+    "py-ds-v4-flash-skills": { name: "Dashboard 3", model: "DeepSeek V4 Flash", arm: "skills", cost: 0.0127, time: 270, framework: "python", url: "assets/deepseek-v4-flash-skills.png" },
+    "py-gpt-5-5-skills": { name: "Dashboard 4", model: "GPT 5.5", arm: "skills", cost: 0.4274, time: 196, framework: "python", url: "assets/gpt-5.5-skills.png" },
+    "py-minimax-m3-skills": { name: "Dashboard 5", model: "Minimax M3", arm: "skills", cost: 0.1037, time: 519, framework: "python", url: "assets/minimax-m3-skills.png" },
+    "py-qwen-max-skills": { name: "Dashboard 6", model: "Qwen 3.7 Max", arm: "skills", cost: 0.5410, time: 261, framework: "python", url: "assets/qwen3.7-max-skills.png" },
+    "py-ds-v4-pro-vanilla": { name: "Dashboard 7", model: "DeepSeek V4 Pro", arm: "vanilla", cost: 0.0862, time: 570, framework: "python", url: "assets/deepseek-v4-pro-vanilla.png" },
+    "py-claude-opus-vanilla": { name: "Dashboard 8", model: "Claude Opus 4-8", arm: "vanilla", cost: 0.4908, time: 142, framework: "python", url: "assets/claude-opus-4-8-vanilla.png" },
+    "py-ds-v4-flash-vanilla": { name: "Dashboard 9", model: "DeepSeek V4 Flash", arm: "vanilla", cost: 0.0020, time: 92, framework: "python", url: "assets/deepseek-v4-flash-vanilla.png" },
+    "r-claude-opus-skills": { name: "Dashboard 10", model: "Claude Opus 4-8", arm: "skills", cost: 0.5229, time: 188, framework: "r", url: "assets/r-claude-opus-4-8-skills.png" },
+    "r-ds-v4-flash-skills": { name: "Dashboard 11", model: "DeepSeek V4 Flash", arm: "skills", cost: 0.0043, time: 133, framework: "r", url: "assets/r-deepseek-v4-flash-skills.png" },
+    "r-ds-v4-pro-skills": { name: "Dashboard 12", model: "DeepSeek V4 Pro", arm: "skills", cost: 0.0467, time: 277, framework: "r", url: "assets/r-deepseek-v4-pro-skills.png" },
+    "r-gpt-5-5-skills": { name: "Dashboard 13", model: "GPT 5.5", arm: "skills", cost: 0.5972, time: 267, framework: "r", url: "assets/r-gpt-5.5-skills.png" },
+    "r-minimax-m3-skills": { name: "Dashboard 14", model: "Minimax M3", arm: "skills", cost: 0.0869, time: 415, framework: "r", url: "assets/r-minimax-m3-skills.png" },
+    "r-qwen-max-skills": { name: "Dashboard 15", model: "Qwen 3.7 Max", arm: "skills", cost: 0.2984, time: 116, framework: "r", url: "assets/r-qwen3.7-max-skills.png" },
+    "r-claude-opus-vanilla": { name: "Dashboard 16", model: "Claude Opus 4-8", arm: "vanilla", cost: 0.4266, time: 123, framework: "r", url: "assets/r-claude-opus-4-8-vanilla.png" },
+    "r-ds-v4-flash-vanilla": { name: "Dashboard 17", model: "DeepSeek V4 Flash", arm: "vanilla", cost: 0.0029, time: 129, framework: "r", url: "assets/r-deepseek-v4-flash-vanilla.png" },
+    "r-ds-v4-pro-vanilla": { name: "Dashboard 18", model: "DeepSeek V4 Pro", arm: "vanilla", cost: 0.0905, time: 603, framework: "r", url: "assets/r-deepseek-v4-pro-vanilla.png" },
+    "r-gpt-5-5-vanilla": { name: "Dashboard 19", model: "GPT 5.5", arm: "vanilla", cost: 0.4408, time: 203, framework: "r", url: "assets/r-gpt-5.5-vanilla.png" },
+    "r-minimax-m3-vanilla": { name: "Dashboard 20", model: "Minimax M3", arm: "vanilla", cost: 0.0247, time: 163, framework: "r", url: "assets/r-minimax-m3-vanilla.png" },
+    "r-qwen-max-vanilla": { name: "Dashboard 21", model: "Qwen 3.7 Max", arm: "vanilla", cost: 0.1523, time: 103, framework: "r", url: "assets/r-qwen3.7-max-vanilla.png" }
 };
 
 const TIER_SCORES = { "S": 5, "A": 4, "B": 3, "C": 2, "D": 1 };
@@ -68,6 +68,7 @@ function bindUIEvents() {
     }
 
     setupAccordion();
+    setupLeaderboardPreview();
 }
 
 async function fetchTelemetryData() {
@@ -244,6 +245,7 @@ function renderLeaderboardTable(standings) {
                       `#${rank}`;
 
         const tr = document.createElement("tr");
+        tr.setAttribute("data-id", item.id);
         tr.innerHTML = `
             <td style="font-size: 12px;">${medal}</td>
             <td>
@@ -265,6 +267,7 @@ function renderLeaderboardTable(standings) {
 
     inactive.forEach(item => {
         const tr = document.createElement("tr");
+        tr.setAttribute("data-id", item.id);
         tr.style.opacity = "0.35";
         tr.innerHTML = `
             <td style="font-size: 12px; color: var(--text-dim);">—</td>
@@ -284,6 +287,69 @@ function renderLeaderboardTable(standings) {
         `;
         leaderboardBody.appendChild(tr);
     });
+}
+
+function setupLeaderboardPreview() {
+    const previewCard = document.createElement("div");
+    previewCard.id = "leaderboard-preview-card";
+    previewCard.className = "preview-card-floating";
+    document.body.appendChild(previewCard);
+
+    leaderboardBody.addEventListener("mousemove", (e) => {
+        const tr = e.target.closest("tr");
+        if (!tr) {
+            hidePreview();
+            return;
+        }
+
+        const dbId = tr.getAttribute("data-id");
+        if (!dbId || !DASHBOARDS_METADATA[dbId]) {
+            hidePreview();
+            return;
+        }
+
+        const meta = DASHBOARDS_METADATA[dbId];
+
+        previewCard.innerHTML = `
+            <div class="preview-card-img-wrapper">
+                <img src="${meta.url}" alt="${meta.name}">
+            </div>
+            <div class="preview-card-content">
+                <div class="preview-card-title">${meta.model}</div>
+                <div class="preview-card-sub">
+                    <span style="text-transform: uppercase; font-weight: 600; font-family: var(--font-mono); font-size: 10px;">${meta.framework}</span>
+                    <span>·</span>
+                    <span>${meta.arm === 'skills' ? 'Skills Guidelines' : 'Vanilla Prompting'}</span>
+                </div>
+            </div>
+        `;
+
+        previewCard.classList.add("active");
+
+        const cardWidth = 300;
+        const cardHeight = 240;
+
+        let x = e.clientX + 20;
+        let y = e.clientY + 20;
+
+        if (x + cardWidth > window.innerWidth) {
+            x = e.clientX - cardWidth - 20;
+        }
+        if (y + cardHeight > window.innerHeight) {
+            y = e.clientY - cardHeight - 20;
+        }
+
+        previewCard.style.left = `${x}px`;
+        previewCard.style.top = `${y}px`;
+    });
+
+    leaderboardBody.addEventListener("mouseleave", () => {
+        hidePreview();
+    });
+
+    function hidePreview() {
+        previewCard.classList.remove("active");
+    }
 }
 
 function renderRoiChart(standings) {
