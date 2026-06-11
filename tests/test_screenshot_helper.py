@@ -42,3 +42,44 @@ class TestWaitForShinyRender:
         # widget-settle pass for leaflet/plotly.
         _wait_for_shiny_render(page, wait=0.01)
         assert page.wait_for_function.call_count == 3
+
+
+class TestWaitForPort:
+    def test_wait_for_port_success(self):
+        import socket
+        import threading
+        from shinygen.screenshot_helper import wait_for_port
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("localhost", 0))
+        port = s.getsockname()[1]
+        s.listen(1)
+
+        def accept_conn():
+            try:
+                conn, _ = s.accept()
+                conn.close()
+            except Exception:
+                pass
+            finally:
+                s.close()
+
+        t = threading.Thread(target=accept_conn)
+        t.start()
+
+        try:
+            assert wait_for_port(port, timeout=5.0) is True
+        finally:
+            s.close()
+            t.join()
+
+    def test_wait_for_port_failure(self):
+        import socket
+        from shinygen.screenshot_helper import wait_for_port
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("localhost", 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        assert wait_for_port(port, timeout=0.1) is False

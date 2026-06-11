@@ -27,9 +27,22 @@ import argparse
 import os
 import re
 import shutil
+import socket
 import sys
 import time
 from typing import TYPE_CHECKING
+
+
+def wait_for_port(port: int, timeout: float = 30.0) -> bool:
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            with socket.create_connection(("localhost", port), timeout=1):
+                return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(0.5)
+    return False
+
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -145,7 +158,9 @@ def _wait_for_shiny_render(page: "Page", wait: float = DEFAULT_WAIT) -> None:
         pass
 
 
-def _capture_app_views(page: "Page", output_dir: str, prefix: str = "screenshot") -> list[str]:
+def _capture_app_views(
+    page: "Page", output_dir: str, prefix: str = "screenshot"
+) -> list[str]:
     """Capture landing + every visible tab / nav-panel. Returns list of paths."""
     os.makedirs(output_dir, exist_ok=True)
     paths: list[str] = []
@@ -160,7 +175,10 @@ def _capture_app_views(page: "Page", output_dir: str, prefix: str = "screenshot"
             page.screenshot(path=landing, full_page=False, timeout=15000)
             paths.append(landing)
         except Exception as exc2:
-            print(f"ERROR: landing viewport screenshot also failed: {exc2}", file=sys.stderr)
+            print(
+                f"ERROR: landing viewport screenshot also failed: {exc2}",
+                file=sys.stderr,
+            )
             return paths
 
     try:
@@ -215,12 +233,18 @@ def _capture_app_views(page: "Page", output_dir: str, prefix: str = "screenshot"
             paths.append(target)
             print(f"  captured {os.path.basename(target)}")
         except Exception as exc:
-            print(f"WARNING: tab '{label}' full_page screenshot failed: {exc}", file=sys.stderr)
+            print(
+                f"WARNING: tab '{label}' full_page screenshot failed: {exc}",
+                file=sys.stderr,
+            )
             try:
                 page.screenshot(path=target, full_page=False, timeout=15000)
                 paths.append(target)
             except Exception as exc2:
-                print(f"WARNING: tab '{label}' viewport also failed: {exc2}", file=sys.stderr)
+                print(
+                    f"WARNING: tab '{label}' viewport also failed: {exc2}",
+                    file=sys.stderr,
+                )
 
     return paths
 
@@ -236,6 +260,13 @@ def take_screenshot(
     ``output``. For backwards compatibility the landing screenshot is also
     copied to ``output`` itself.
     """
+    if not wait_for_port(port, timeout=30.0):
+        print(
+            f"ERROR: Port {port} did not start listening after 30 seconds",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     from playwright.sync_api import sync_playwright
 
     url = f"http://localhost:{port}"
@@ -270,7 +301,9 @@ def take_screenshot(
         try:
             shutil.copy2(landing, output)
         except Exception as exc:
-            print(f"WARNING: could not copy landing to {output}: {exc}", file=sys.stderr)
+            print(
+                f"WARNING: could not copy landing to {output}: {exc}", file=sys.stderr
+            )
 
     print(f"Captured {len(paths)} screenshot(s):")
     for p in paths:
@@ -278,9 +311,19 @@ def take_screenshot(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Take screenshots of every tab in a running Shiny app")
-    parser.add_argument("--port", type=int, default=8000, help="App port (default: 8000)")
-    parser.add_argument("--output", default="/home/user/project/screenshot.png", help="Backwards-compat landing-screenshot path; per-tab files land alongside it")
-    parser.add_argument("--wait", type=float, default=DEFAULT_WAIT, help="Seconds to wait after load")
+    parser = argparse.ArgumentParser(
+        description="Take screenshots of every tab in a running Shiny app"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="App port (default: 8000)"
+    )
+    parser.add_argument(
+        "--output",
+        default="/home/user/project/screenshot.png",
+        help="Backwards-compat landing-screenshot path; per-tab files land alongside it",
+    )
+    parser.add_argument(
+        "--wait", type=float, default=DEFAULT_WAIT, help="Seconds to wait after load"
+    )
     args = parser.parse_args()
     take_screenshot(port=args.port, output=args.output, wait=args.wait)
