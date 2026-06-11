@@ -15,6 +15,12 @@ QUICK_WORKFLOW_PATH = (
     / "workflows"
     / "run-benchmark-quick.yml"
 )
+MULTI_WORKFLOW_PATH = (
+    Path(__file__).resolve().parents[1]
+    / ".github"
+    / "workflows"
+    / "run-benchmark-multi-model.yml"
+)
 
 BATCH_CONFIG_PATH = Path(__file__).resolve().parents[1] / "batch.json"
 
@@ -195,6 +201,33 @@ def test_benchmark_artifacts_report_generation_timing_and_iteration_usage():
     assert "generation_time_seconds" in workflow
     assert "iteration_usage" in workflow
     assert "| Generation Time |" in workflow
+    assert "| Total Time |" in workflow
+    assert "skills_gen_time" in workflow
+    assert "vanilla_gen_time" in workflow
+    assert "| Skills time |" in workflow
+    assert "| Vanilla time |" in workflow
+
+
+def test_benchmark_quick_artifacts_report_timing():
+    workflow = QUICK_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "generation_time_seconds" in workflow
+    assert "total_time_seconds" in workflow
+    assert "| Gen Time (s) | Total Time (s) |" in workflow
+    assert "skills_gen_time" in workflow
+    assert "vanilla_gen_time" in workflow
+    assert "Skills time:" in workflow
+    assert "Vanilla time:" in workflow
+
+
+def test_benchmark_multi_model_artifacts_report_timing():
+    workflow = MULTI_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "generation_time" in workflow
+    assert "total_time" in workflow
+    assert "| Gen Time (s) | Total Time (s) |" in workflow
+    assert "benchmark_total_time = sum" in workflow
+    assert "Total" in workflow
 
 
 def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():

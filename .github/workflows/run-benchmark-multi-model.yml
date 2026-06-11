@@ -428,6 +428,7 @@ jobs:
                       "total_input_tokens": usage.get("total_input_tokens"),
                       "total_output_tokens": usage.get("total_output_tokens"),
                       "generation_time": usage.get("generation_time_seconds"),
+                      "total_time": usage.get("total_time_seconds"),
                   }
               )
 
@@ -441,21 +442,40 @@ jobs:
               f"Arm: {os.environ['BENCHMARK_ARM']}",
               f"Run ID: {os.environ['GHA_RUN_ID']} (attempt {os.environ['GHA_RUN_ATTEMPT']})",
               "",
-              "| Framework | Model | Passed | Iterations | Gen Time (s) | Total Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Passed | Iterations | Gen Time (s) | Total Time (s) | Total Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
           for r in rows:
               lines.append(
-                  "| {f} | {m} | {p} | {it} | {gt} | {tc} | {itok} | {otok} | {ad} |".format(
+                  "| {f} | {m} | {p} | {it} | {gt} | {tt} | {tc} | {itok} | {otok} | {ad} |".format(
                       f=r.get("framework") or "n/a",
                       m=r.get("model") or "n/a",
                       p="yes" if r.get("passed") else "no",
                       it=r.get("iterations") if r.get("iterations") is not None else "n/a",
-                      gt=f"{r.get('generation_time'):.1f}" if r.get("generation_time") is not None else "n/a",
+                      gt=f"{r.get('generation_time'):.1f}s" if r.get('generation_time') is not None else "n/a",
+                      tt=f"{r.get('total_time'):.1f}s" if r.get('total_time') is not None else "n/a",
                       tc=fmt_cost(r.get("total_cost")),
                       itok=f"{r.get('total_input_tokens'):,}" if r.get("total_input_tokens") is not None else "0",
                       otok=f"{r.get('total_output_tokens'):,}" if r.get("total_output_tokens") is not None else "0",
                       ad=r.get("artifact_dir"),
+                  )
+              )
+
+          # Compute totals across all rows
+          if rows:
+              benchmark_total_cost = sum(r.get("total_cost") or 0 for r in rows)
+              benchmark_gen_time = sum(r.get("generation_time") or 0 for r in rows)
+              benchmark_total_time = sum(r.get("total_time") or 0 for r in rows)
+              benchmark_input_tokens = sum(r.get("total_input_tokens") or 0 for r in rows)
+              benchmark_output_tokens = sum(r.get("total_output_tokens") or 0 for r in rows)
+
+              lines.append(
+                  "| **Total** | | | | **{gen_time:.1f}s** | **{total_time:.1f}s** | **{total_cost}** | **{input_tokens:,}** | **{output_tokens:,}** | |".format(
+                      gen_time=benchmark_gen_time,
+                      total_time=benchmark_total_time,
+                      total_cost=fmt_cost(benchmark_total_cost),
+                      input_tokens=benchmark_input_tokens,
+                      output_tokens=benchmark_output_tokens,
                   )
               )
 

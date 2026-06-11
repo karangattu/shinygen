@@ -640,13 +640,13 @@ jobs:
               f"Run ID: {os.environ['GHA_RUN_ID']}",
               f"Run attempt: {os.environ['GHA_RUN_ATTEMPT']}",
               "",
-              "| Framework | Model | Agent | Arm | Passed | Value Score | Quality Score | Iterations | Screenshots | Generation Time | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Agent | Arm | Passed | Value Score | Quality Score | Iterations | Screenshots | Generation Time | Total Time | Total Cost | Generation Cost | Judge Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
 
           for row in rows:
               lines.append(
-                "| {framework} | {model} | {agent} | {arm} | {passed} | {score} | {quality_score} | {iterations} | {screenshot_count} | {generation_time} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
+                "| {framework} | {model} | {agent} | {arm} | {passed} | {score} | {quality_score} | {iterations} | {screenshot_count} | {generation_time} | {total_time} | {total_cost} | {generation_cost} | {judge_cost} | {input_tokens} | {output_tokens} | {artifact_dir} |".format(
                   framework=row.get("framework") or "n/a",
                       model=row.get("model") or "n/a",
                       agent=row.get("agent") or "n/a",
@@ -659,6 +659,11 @@ jobs:
                       generation_time=(
                           f"{row.get('generation_time_seconds'):.1f}s"
                           if isinstance(row.get("generation_time_seconds"), (int, float))
+                          else "n/a"
+                      ),
+                      total_time=(
+                          f"{row.get('total_time_seconds'):.1f}s"
+                          if isinstance(row.get("total_time_seconds"), (int, float))
                           else "n/a"
                       ),
                       total_cost=fmt_cost(row.get("total_cost")),
@@ -678,8 +683,9 @@ jobs:
           benchmark_output_tokens = sum(r.get("total_output_tokens") or 0 for r in rows)
 
           lines.append(
-              "| **Total** | | | | | | | | | **{generation_time:.1f}s** | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
+              "| **Total** | | | | | | | | | **{generation_time:.1f}s** | **{total_time:.1f}s** | **{total_cost}** | **{generation_cost}** | **{judge_cost}** | **{input_tokens}** | **{output_tokens}** | |".format(
                   generation_time=sum(r.get("generation_time_seconds") or 0 for r in rows),
+                  total_time=sum(r.get("total_time_seconds") or 0 for r in rows),
                   total_cost=fmt_cost(benchmark_total_cost),
                   generation_cost=fmt_cost(benchmark_gen_cost),
                   judge_cost=fmt_cost(benchmark_judge_cost),
@@ -743,6 +749,13 @@ jobs:
                   if skills_cost is not None and vanilla_cost is not None
                   else None
               )
+              skills_gen_time = skills.get("generation_time_seconds")
+              vanilla_gen_time = vanilla.get("generation_time_seconds")
+              time_delta = (
+                  skills_gen_time - vanilla_gen_time
+                  if skills_gen_time is not None and vanilla_gen_time is not None
+                  else None
+              )
               arm_comparison.append(
                   {
                       "framework": framework,
@@ -758,6 +771,9 @@ jobs:
                       "skills_total_cost": skills_cost,
                       "vanilla_total_cost": vanilla_cost,
                       "cost_delta": cost_delta,
+                      "skills_gen_time": skills_gen_time,
+                      "vanilla_gen_time": vanilla_gen_time,
+                      "gen_time_delta": time_delta,
                       "winner": winner,
                   }
               )
@@ -776,8 +792,8 @@ jobs:
                       "",
                       "Positive `Δ score` means the bundled skill helped that model on this benchmark.",
                       "",
-                      "| Framework | Model | Skills score | Vanilla score | Δ score | Δ % | Winner | Δ cost | Skills passed | Vanilla passed |",
-                      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+                      "| Framework | Model | Skills score | Vanilla score | Δ score | Δ % | Winner | Skills time | Vanilla time | Δ time | Δ cost | Skills passed | Vanilla passed |",
+                      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
                   ]
               )
               skills_wins = 0
@@ -794,7 +810,7 @@ jobs:
                   if item["score_delta"] is not None:
                       deltas.append(item["score_delta"])
                   lines.append(
-                      "| {framework} | {model} | {skills_score} | {vanilla_score} | {delta} | {pct} | {winner} | {cost_delta} | {skills_passed} | {vanilla_passed} |".format(
+                      "| {framework} | {model} | {skills_score} | {vanilla_score} | {delta} | {pct} | {winner} | {skills_time} | {vanilla_time} | {time_delta} | {cost_delta} | {skills_passed} | {vanilla_passed} |".format(
                           framework=item["framework"],
                           model=item["model"],
                           skills_score=fmt_score(item["skills_score"]),
@@ -802,6 +818,21 @@ jobs:
                           delta=fmt_delta(item["score_delta"]),
                           pct=fmt_pct(item["score_delta_pct"]),
                           winner=item["winner"],
+                          skills_time=(
+                              f"{item['skills_gen_time']:.1f}s"
+                              if isinstance(item.get("skills_gen_time"), (int, float))
+                              else "n/a"
+                          ),
+                          vanilla_time=(
+                              f"{item['vanilla_gen_time']:.1f}s"
+                              if isinstance(item.get("vanilla_gen_time"), (int, float))
+                              else "n/a"
+                          ),
+                          time_delta=(
+                              f"{item['gen_time_delta']:+.1f}s"
+                              if isinstance(item.get("gen_time_delta"), (int, float))
+                              else "n/a"
+                          ),
                           cost_delta=(
                               fmt_cost(item["cost_delta"])
                               if item["cost_delta"] is not None

@@ -405,6 +405,9 @@ jobs:
                       f"generation_cost_usd: {usage.get('generation_cost')}",
                       f"judge_cost_usd: {usage.get('judge_cost')}",
                       f"total_cost_usd: {usage.get('total_cost')}",
+                      f"generation_time_seconds: {usage.get('generation_time_seconds')}",
+                      f"judge_time_seconds: {usage.get('judge_time_seconds')}",
+                      f"total_time_seconds: {usage.get('total_time_seconds')}",
                       f"input_tokens: {usage.get('total_input_tokens')}",
                       f"output_tokens: {usage.get('total_output_tokens')}",
                       f"cache_write_tokens: {usage.get('total_cache_write_tokens')}",
@@ -507,6 +510,8 @@ jobs:
                       "judge_cost": usage.get("judge_cost"),
                       "total_input_tokens": usage.get("total_input_tokens"),
                       "total_output_tokens": usage.get("total_output_tokens"),
+                      "generation_time_seconds": usage.get("generation_time_seconds"),
+                      "total_time_seconds": usage.get("total_time_seconds"),
                   }
               )
 
@@ -538,18 +543,28 @@ jobs:
               f"Dataset: {os.environ['BENCHMARK_DATASET']}",
               f"Run ID: {os.environ['GHA_RUN_ID']} (attempt {os.environ['GHA_RUN_ATTEMPT']})",
               "",
-              "| Framework | Model | Arm | Passed | Score | Iter | Total $ | Gen $ | Judge $ | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Arm | Passed | Score | Iter | Gen Time (s) | Total Time (s) | Total $ | Gen $ | Judge $ | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
           for r in rows:
               lines.append(
-                  "| {f} | {m} | {a} | {p} | {s} | {it} | {tc} | {gc} | {jc} | {ad} |".format(
+                  "| {f} | {m} | {a} | {p} | {s} | {it} | {gt} | {tt} | {tc} | {gc} | {jc} | {ad} |".format(
                       f=r.get("framework") or "n/a",
                       m=r.get("model") or "n/a",
                       a=r.get("arm") or "n/a",
                       p="yes" if r.get("passed") else "no",
                       s=fmt_score(r.get("score")),
                       it=r.get("iterations") if r.get("iterations") is not None else "n/a",
+                      gt=(
+                          f"{r.get('generation_time_seconds'):.1f}s"
+                          if isinstance(r.get("generation_time_seconds"), (int, float))
+                          else "n/a"
+                      ),
+                      tt=(
+                          f"{r.get('total_time_seconds'):.1f}s"
+                          if isinstance(r.get("total_time_seconds"), (int, float))
+                          else "n/a"
+                      ),
                       tc=fmt_cost(r.get("total_cost")),
                       gc=fmt_cost(r.get("generation_cost")),
                       jc=fmt_cost(r.get("judge_cost")),
@@ -566,6 +581,13 @@ jobs:
               delta = ss - vs if ss is not None and vs is not None else None
               sc, vc = s.get("total_cost"), v.get("total_cost")
               cost_delta = sc - vc if sc is not None and vc is not None else None
+              skills_gen_time = s.get("generation_time_seconds")
+              vanilla_gen_time = v.get("generation_time_seconds")
+              time_delta = (
+                  skills_gen_time - vanilla_gen_time
+                  if skills_gen_time is not None and vanilla_gen_time is not None
+                  else None
+              )
               lines.extend(
                   [
                       "",
@@ -574,6 +596,9 @@ jobs:
                       f"- Skills score: {fmt_score(ss)}",
                       f"- Vanilla score: {fmt_score(vs)}",
                       f"- Δ score (skills - vanilla): {fmt_score(delta)}",
+                      f"- Skills time: {f'{skills_gen_time:.1f}s' if isinstance(skills_gen_time, (int, float)) else 'n/a'}",
+                      f"- Vanilla time: {f'{vanilla_gen_time:.1f}s' if isinstance(vanilla_gen_time, (int, float)) else 'n/a'}",
+                      f"- Δ time (skills - vanilla): {f'{time_delta:+.1f}s' if isinstance(time_delta, (int, float)) else 'n/a'}",
                       f"- Δ cost (skills - vanilla): {fmt_cost(cost_delta)}",
                   ]
               )

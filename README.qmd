@@ -243,12 +243,13 @@ shinygen generate \
 
 ```bash
 # Screenshot-based quality evaluation and iteration
+# Note: --judge-model must start with "anthropic/" or "openai/"
 shinygen generate \
     --prompt "Create a clinical trials dashboard" \
     --model claude-opus \
     --output ./trials-app \
     --screenshot \
-    --judge-model claude-sonnet \
+    --judge-model anthropic/claude-sonnet-4-6 \
     --max-iterations 5
 ```
 
@@ -272,6 +273,18 @@ shinygen generate \
     --skills-dir ./my-skills/ \
     --csv-file ./sales.csv
 ```
+
+::: {.callout-note}
+## Judge Model Requirements
+
+The `--judge-model` flag requires a fully-qualified model ID starting with `anthropic/` or `openai/` (e.g., `anthropic/claude-sonnet-4-6` or `openai/gpt-4`). Unknown providers will raise an error rather than silently defaulting to Anthropic. Judge API calls include automatic retry with exponential backoff for transient failures.
+:::
+
+::: {.callout-tip}
+## Port Validation
+
+The `--port` option validates that the port number is between 1 and 65535, preventing invalid port configurations.
+:::
 
 `web_fetch` is enabled by default. Use `--no-web-fetch` to disable web search.
 
@@ -715,3 +728,17 @@ reqs = pl.DataFrame({
 ## {{< fa scale-balanced >}} License
 
 [MIT](LICENSE)
+
+---
+
+## {{< fa clipboard-check >}} Recent Improvements
+
+### v0.1.0 Quality Enhancements
+
+- **Judge model validation**: Unknown model providers now raise `ValueError` instead of silently defaulting to Anthropic
+- **Automatic retry**: Judge API calls include exponential backoff retry (3 attempts) for transient failures
+- **Port validation**: CLI `--port` option now validates range 1-65535
+- **Framework validation**: Unknown framework names now fail validation instead of silently passing
+- **Improved error logging**: Malformed judge responses are now logged with warnings for easier debugging
+- **Better type safety**: Added missing type annotations across the codebase
+- **Code organization**: Extracted CLI output formatting and consolidated data file reading logic
