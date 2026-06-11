@@ -251,7 +251,7 @@ def is_lmstudio_model(model_id: str) -> bool:
     return "gemma-4-26b-a4b" in model or "qwen3.6-27b" in model
 
 
-def _build_lmstudio_model(model_id: str):
+def _build_lmstudio_model(model_id: str) -> "Model":
     """Construct an Inspect ``Model`` for a local LM Studio model."""
     from inspect_ai.model import get_model
 

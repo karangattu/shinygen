@@ -35,6 +35,8 @@ let chartSkillsInstance = null;
 let chartFrameworkInstance = null;
 let chartTagsInstance = null;
 
+let currentBeeswarmGroup = "model";
+
 const totalVotersEl = document.getElementById("val-total-voters");
 const totalRatingsEl = document.getElementById("val-total-ratings");
 const topModelEl = document.getElementById("val-top-model");
@@ -67,8 +69,8 @@ function bindUIEvents() {
         exportBtn.addEventListener("click", exportCSV);
     }
 
-    setupAccordion();
     setupLeaderboardPreview();
+    setupBeeswarmToggles();
 }
 
 async function fetchTelemetryData() {
@@ -190,8 +192,8 @@ function processAndRenderAnalytics() {
     renderRoiChart(standingsList);
     renderSkillsChart(rawDbRows);
     renderFrameworksChart(rawDbRows);
-    renderTagsChart(rawDbRows);
-    renderCorrelationMatrix(rawDbRows);
+    renderDriversChart(rawDbRows);
+    renderBeeswarm(rawDbRows);
     renderActivityFeed(rawDbRows.slice(0, 20));
     renderInsights(standingsList, totalRatings, totalVoters, avgCost);
 }
@@ -353,84 +355,165 @@ function setupLeaderboardPreview() {
 }
 
 function renderRoiChart(standings) {
-    const ctx = document.getElementById("chart-roi").getContext("2d");
     const activeData = standings.filter(s => s.votes > 0);
+    if (activeData.length === 0) return;
 
-    if (chartRoiInstance) chartRoiInstance.destroy();
+    const svg = d3.select("#chart-roi-svg");
+    svg.selectAll("*").remove();
 
-    const skillsData = activeData.filter(s => s.arm === "skills").map(s => ({
-        x: s.cost, y: s.avg, label: s.modelName + " (" + s.framework.toUpperCase() + ")"
-    }));
-    const vanillaData = activeData.filter(s => s.arm === "vanilla").map(s => ({
-        x: s.cost, y: s.avg, label: s.modelName + " (" + s.framework.toUpperCase() + ")"
-    }));
+    const container = svg.node().parentElement;
+    const width = container.clientWidth || 400;
+    const height = 260;
+    svg.attr("width", width).attr("height", height);
 
-    chartRoiInstance = new Chart(ctx, {
-        type: "scatter",
-        data: {
-            datasets: [{
-                label: "Skills Guidelines",
-                data: skillsData,
-                backgroundColor: "rgba(0, 123, 194, 0.7)",
-                borderColor: "#007bc2",
-                borderWidth: 1,
-                pointRadius: 7,
-                pointHoverRadius: 10,
-                pointHoverBackgroundColor: "#007bc2"
-            }, {
-                label: "Vanilla Prompting",
-                data: vanillaData,
-                backgroundColor: "rgba(100, 116, 139, 0.7)",
-                borderColor: "#64748b",
-                borderWidth: 1,
-                pointRadius: 7,
-                pointHoverRadius: 10,
-                pointHoverBackgroundColor: "#64748b"
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    title: { display: true, text: "Cost per Generation ($)", color: "#475569", font: { weight: "600", size: 11 } },
-                    grid: { color: "rgba(0, 0, 0, 0.05)" },
-                    ticks: { color: "#64748b" }
-                },
-                y: {
-                    title: { display: true, text: "Avg Tier Rating", color: "#475569", font: { weight: "600", size: 11 } },
-                    grid: { color: "rgba(0, 0, 0, 0.05)" },
-                    ticks: { color: "#64748b" },
-                    min: 1, max: 5
-                }
-            },
-            plugins: {
-                legend: {
-                    labels: {
-                        color: "#475569",
-                        font: { family: "Outfit", size: 11 },
-                        usePointStyle: true,
-                        padding: 16
-                    }
-                },
-                tooltip: {
-                    backgroundColor: "rgba(30, 41, 59, 0.95)",
-                    titleColor: "#ffffff",
-                    bodyColor: "#cbd5e1",
-                    borderColor: "#475569",
-                    borderWidth: 1,
-                    padding: 10,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: function(ctx) {
-                            const p = ctx.raw;
-                            return p.label + ": " + p.y.toFixed(2) + " / $" + p.x.toFixed(4);
-                        }
-                    }
-                }
-            }
+    const margin = { top: 20, right: 30, bottom: 40, left: 60 };
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const xScale = d3.scaleLinear()
+        .domain([1.5, 5.0])
+        .range([0, innerWidth]);
+
+    const yScale = d3.scaleLog()
+        .domain([0.001, 2.0])
+        .range([innerHeight, 0]);
+
+    // X axis grid
+    g.append("g")
+        .attr("class", "grid")
+        .attr("transform", `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(xScale).ticks(5).tickSize(-innerHeight).tickFormat(""))
+        .selectAll("line")
+        .attr("stroke", "rgba(0, 0, 0, 0.05)")
+        .attr("stroke-dasharray", "2,2");
+
+    // Y axis grid
+    g.append("g")
+        .attr("class", "grid")
+        .call(d3.axisLeft(yScale).ticks(4).tickSize(-innerWidth).tickFormat(""))
+        .selectAll("line")
+        .attr("stroke", "rgba(0, 0, 0, 0.05)")
+        .attr("stroke-dasharray", "2,2");
+
+    g.append("g")
+        .attr("transform", `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(xScale).ticks(5))
+        .selectAll("text")
+        .attr("fill", "#64748b")
+        .style("font-family", "var(--font-body)")
+        .style("font-size", "10px");
+
+    g.append("g")
+        .call(d3.axisLeft(yScale).ticks(4, "$,.3f"))
+        .selectAll("text")
+        .attr("fill", "#64748b")
+        .style("font-family", "var(--font-body)")
+        .style("font-size", "10px");
+
+    // Calculate Pareto Frontier
+    const activeItems = [...activeData];
+    activeItems.sort((a, b) => a.avg - b.avg);
+
+    const frontier = [];
+    let minCostSoFar = Infinity;
+
+    const sortedDesc = [...activeItems].sort((a, b) => b.avg - a.avg);
+    sortedDesc.forEach(item => {
+        if (item.cost < minCostSoFar) {
+            frontier.push(item);
+            minCostSoFar = item.cost;
         }
     });
+    frontier.sort((a, b) => a.avg - b.avg);
+
+    const line = d3.line()
+        .x(d => xScale(d.avg))
+        .y(d => yScale(d.cost))
+        .curve(d3.curveLinear);
+
+    g.append("path")
+        .datum(frontier)
+        .attr("fill", "none")
+        .attr("stroke", "#10b981")
+        .attr("stroke-width", 2)
+        .attr("stroke-dasharray", "4,4")
+        .attr("d", line);
+
+    if (frontier.length > 0) {
+        const lastFrontierPt = frontier[frontier.length - 1];
+        g.append("text")
+            .attr("x", xScale(lastFrontierPt.avg) - 8)
+            .attr("y", yScale(lastFrontierPt.cost) - 8)
+            .attr("text-anchor", "end")
+            .style("font-family", "var(--font-heading)")
+            .style("font-size", "9px")
+            .style("font-weight", "bold")
+            .style("fill", "#10b981")
+            .text("Efficient Frontier");
+    }
+
+    const dots = g.selectAll(".roi-dot")
+        .data(activeData, d => d.id)
+        .join("circle")
+        .attr("class", "roi-dot")
+        .attr("cx", d => xScale(d.avg))
+        .attr("cy", d => yScale(d.cost))
+        .attr("r", 6)
+        .attr("fill", d => d.arm === "skills" ? "#007bc2" : "#64748b")
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", 1.5)
+        .style("cursor", "pointer");
+
+    let tooltip = d3.select("#beeswarm-tooltip");
+    if (tooltip.empty()) {
+        tooltip = d3.select("body").append("div")
+            .attr("id", "beeswarm-tooltip")
+            .attr("class", "beeswarm-tooltip");
+    }
+
+    dots
+        .on("mouseenter", function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", 9)
+                .attr("stroke", "#1e293b");
+
+            const maxCost = d3.max(activeData, x => x.cost);
+            const savingsPercent = ((maxCost - d.cost) / maxCost * 100).toFixed(0);
+
+            tooltip.style("display", "block")
+                .html(`
+                    <strong>${d.modelName}</strong>
+                    <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">
+                        Framework: <span style="text-transform: uppercase; color: #ffffff;">${d.framework}</span> · 
+                        Approach: <span style="text-transform: capitalize; color: #ffffff;">${d.arm}</span>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 11px;">
+                        Rating: <span style="font-weight: bold; color: #38bdf8;">${d.avg.toFixed(2)} / 5.0</span><br/>
+                        Cost: <span style="font-weight: bold; color: #10b981;">$${d.cost.toFixed(4)}</span>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 9px; color: #a7f3d0; background: rgba(16, 185, 129, 0.15); padding: 4px 6px; border-radius: 4px;">
+                        <i class="fa-solid fa-piggy-bank"></i> ${savingsPercent}% cost savings vs max cost
+                    </div>
+                `);
+        })
+        .on("mousemove", function(event) {
+            tooltip
+                .style("left", (event.pageX + 12) + "px")
+                .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseleave", function() {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", 6)
+                .attr("stroke", "#ffffff");
+            tooltip.style("display", "none");
+        });
 }
 
 function renderSkillsChart(rows) {
@@ -593,188 +676,145 @@ function renderFrameworksChart(rows) {
     });
 }
 
-function renderTagsChart(rows) {
-    const ctx = document.getElementById("chart-tags").getContext("2d");
+function renderDriversChart(rows) {
+    const overallAvg = d3.mean(rows, r => TIER_SCORES[r.tier] || 0) || 0;
 
-    const tagCount = {};
+    const tagScores = {};
+    const tagCounts = {};
     rows.forEach(r => {
         if (r.feedback_words) {
-            r.feedback_words.split(",").forEach(tag => {
-                const cleanTag = tag.trim();
-                if (cleanTag) {
-                    tagCount[cleanTag] = (tagCount[cleanTag] || 0) + 1;
+            const score = TIER_SCORES[r.tier] || 0;
+            r.feedback_words.split(",").forEach(t => {
+                const tag = t.trim();
+                if (tag) {
+                    tagScores[tag] = (tagScores[tag] || 0) + score;
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
                 }
             });
         }
     });
 
-    const sortedTags = Object.keys(tagCount).map(k => ({ tag: k, count: tagCount[k] }));
-    sortedTags.sort((a, b) => b.count - a.count);
-
-    const labels = sortedTags.slice(0, 8).map(s => s.tag);
-    const data = sortedTags.slice(0, 8).map(s => s.count);
-
-    if (chartTagsInstance) chartTagsInstance.destroy();
-
-    const maxCount = Math.max(...data, 1);
-
-    chartTagsInstance = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: data.map(v => {
-                    const intensity = 0.15 + (v / maxCount) * 0.45;
-                    return `rgba(0, 123, 194, ${intensity})`;
-                }),
-                borderColor: data.map(v => {
-                    const intensity = 0.3 + (v / maxCount) * 0.7;
-                    return `rgba(0, 123, 194, ${intensity})`;
-                }),
-                borderWidth: 2,
-                borderRadius: 4,
-                barPercentage: 0.6
-            }]
-        },
-        options: {
-            indexAxis: "y",
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    grid: { color: "rgba(0, 0, 0, 0.05)" },
-                    ticks: { color: "#64748b", stepSize: 1 }
-                },
-                y: {
-                    grid: { display: false },
-                    ticks: { color: "#475569", font: { size: 10 } }
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: "rgba(30, 41, 59, 0.95)",
-                    titleColor: "#ffffff",
-                    bodyColor: "#cbd5e1",
-                    borderColor: "#475569",
-                    borderWidth: 1,
-                    padding: 10,
-                    cornerRadius: 8
-                }
-            }
-        }
+    const driverData = Object.keys(tagScores).map(tag => {
+        const avg = tagScores[tag] / tagCounts[tag];
+        return {
+            tag: tag,
+            deviation: avg - overallAvg,
+            avgScore: avg,
+            count: tagCounts[tag]
+        };
     });
-}
 
-function renderCorrelationMatrix(rows) {
-    const container = document.getElementById("correlation-matrix");
-    if (!container) return;
-    container.innerHTML = "";
+    driverData.sort((a, b) => b.deviation - a.deviation);
+    const data = driverData.slice(0, 10);
 
-    const tags = [
-        "Clean Layout", "Jarring Colors", "Interactive Controls",
-        "Confusing Chart", "Incorrect Data", "Very Basic",
-        "Beautiful Map", "Failed to Render", "Poor Contrast",
-        "Text Overlap", "Great Colors", "Clear Labels"
-    ];
+    const svg = d3.select("#chart-drivers-svg");
+    svg.selectAll("*").remove();
 
-    const N = rows.length;
-    if (N === 0) return;
+    const container = svg.node().parentElement;
+    const width = container.clientWidth || 400;
+    const height = 260;
+    svg.attr("width", width).attr("height", height);
 
-    const vectors = {};
-    tags.forEach(tag => {
-        vectors[tag] = rows.map(r => {
-            if (!r.feedback_words) return 0;
-            return r.feedback_words.split(",").map(w => w.trim()).includes(tag) ? 1 : 0;
+    const margin = { top: 20, right: 30, bottom: 20, left: 110 };
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const maxDev = d3.max(data, d => Math.abs(d.deviation)) || 1.0;
+    const xLimit = Math.max(0.5, Math.min(2.0, maxDev * 1.1));
+    const xScale = d3.scaleLinear()
+        .domain([-xLimit, xLimit])
+        .range([0, innerWidth]);
+
+    const yScale = d3.scaleBand()
+        .domain(data.map(d => d.tag))
+        .range([0, innerHeight])
+        .padding(0.15);
+
+    g.append("line")
+        .attr("x1", xScale(0))
+        .attr("y1", 0)
+        .attr("x2", xScale(0))
+        .attr("y2", innerHeight)
+        .attr("stroke", "#94a3b8")
+        .attr("stroke-width", 1.5)
+        .attr("stroke-dasharray", "3,3");
+
+    g.append("text")
+        .attr("x", xScale(0))
+        .attr("y", -6)
+        .attr("text-anchor", "middle")
+        .style("font-family", "var(--font-heading)")
+        .style("font-size", "9px")
+        .style("font-weight", "bold")
+        .style("fill", "#64748b")
+        .text("Baseline (" + overallAvg.toFixed(2) + ")");
+
+    const bars = g.selectAll(".driver-bar")
+        .data(data, d => d.tag)
+        .join("rect")
+        .attr("class", "driver-bar")
+        .attr("y", d => yScale(d.tag))
+        .attr("x", d => d.deviation < 0 ? xScale(d.deviation) : xScale(0))
+        .attr("width", d => Math.abs(xScale(d.deviation) - xScale(0)))
+        .attr("height", yScale.bandwidth())
+        .attr("fill", d => d.deviation >= 0 ? "#10b981" : "#ef4444")
+        .attr("rx", 3)
+        .style("cursor", "pointer")
+        .style("opacity", 0.85);
+
+    g.append("g")
+        .call(d3.axisLeft(yScale).tickSize(0))
+        .selectAll("text")
+        .attr("fill", "var(--text-main)")
+        .style("font-family", "var(--font-body)")
+        .style("font-size", "10px")
+        .style("font-weight", "500");
+
+    let tooltip = d3.select("#beeswarm-tooltip");
+    if (tooltip.empty()) {
+        tooltip = d3.select("body").append("div")
+            .attr("id", "beeswarm-tooltip")
+            .attr("class", "beeswarm-tooltip");
+    }
+
+    bars
+        .on("mouseenter", function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .style("opacity", 1.0);
+
+            const sign = d.deviation >= 0 ? "+" : "";
+
+            tooltip.style("display", "block")
+                .html(`
+                    <strong>${d.tag}</strong>
+                    <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">
+                        Sample Count: ${d.count} ratings
+                    </div>
+                    <div style="margin-top: 6px; font-size: 11px;">
+                        Average Rating: <span style="font-weight: bold; color: #ffffff;">${d.avgScore.toFixed(2)} / 5.0</span>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 10px; color: ${d.deviation >= 0 ? '#a7f3d0' : '#fca5a5'};">
+                        Shift: <strong>${sign}${d.deviation.toFixed(2)}</strong> from baseline
+                    </div>
+                `);
+        })
+        .on("mousemove", function(event) {
+            tooltip
+                .style("left", (event.pageX + 12) + "px")
+                .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseleave", function() {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .style("opacity", 0.85);
+            tooltip.style("display", "none");
         });
-    });
-
-    const means = {};
-    tags.forEach(tag => {
-        means[tag] = vectors[tag].reduce((sum, val) => sum + val, 0) / N;
-    });
-
-    const correlations = {};
-    tags.forEach(t1 => {
-        correlations[t1] = {};
-        tags.forEach(t2 => {
-            if (t1 === t2) {
-                correlations[t1][t2] = 1.0;
-                return;
-            }
-
-            const x = vectors[t1];
-            const y = vectors[t2];
-            const mx = means[t1];
-            const my = means[t2];
-
-            let cov = 0;
-            let varX = mx * (1.0 - mx);
-            let varY = my * (1.0 - my);
-
-            for (let i = 0; i < N; i++) {
-                cov += (x[i] - mx) * (y[i] - my);
-            }
-            cov /= N;
-
-            const denom = Math.sqrt(varX * varY);
-            correlations[t1][t2] = denom > 0 ? cov / denom : 0.0;
-        });
-    });
-
-    const corner = document.createElement("div");
-    corner.className = "matrix-corner-cell";
-    container.appendChild(corner);
-
-    tags.forEach(tag => {
-        const cell = document.createElement("div");
-        cell.className = "matrix-header-cell";
-        cell.innerText = tag;
-        container.appendChild(cell);
-    });
-
-    tags.forEach(t1 => {
-        const label = document.createElement("div");
-        label.className = "matrix-label-cell";
-        label.innerText = t1;
-        container.appendChild(label);
-
-        tags.forEach(t2 => {
-            const val = correlations[t1][t2];
-            const cell = document.createElement("div");
-            cell.className = "matrix-data-cell";
-            cell.innerText = val === 1.0 ? "1.0" : val.toFixed(2);
-
-            let bg = "rgba(0, 0, 0, 0.02)";
-            let text = "var(--text-dim)";
-            let border = "1px solid rgba(0, 0, 0, 0.02)";
-
-            if (t1 === t2) {
-                bg = "rgba(0, 123, 194, 0.1)";
-                text = "var(--text-main)";
-                border = "1px solid var(--border-color)";
-            } else if (val > 0.05) {
-                const alpha = Math.min(val * 0.9, 0.85);
-                bg = `rgba(0, 123, 194, ${alpha})`;
-                text = val > 0.4 ? "#ffffff" : "var(--primary)";
-                border = `1px solid rgba(0, 123, 194, ${val * 0.4})`;
-            } else if (val < -0.05) {
-                const alpha = Math.min(Math.abs(val) * 0.9, 0.85);
-                bg = `rgba(217, 83, 79, ${alpha})`;
-                text = Math.abs(val) > 0.4 ? "#ffffff" : "var(--error)";
-                border = `1px solid rgba(217, 83, 79, ${Math.abs(val) * 0.4})`;
-            }
-
-            cell.style.background = bg;
-            cell.style.color = text;
-            cell.style.border = border;
-
-            const sign = val >= 0 ? "+" : "";
-            cell.setAttribute("data-tooltip", `${t1} x ${t2}: r = ${sign}${val.toFixed(3)}`);
-            container.appendChild(cell);
-        });
-    });
 }
 
 function renderActivityFeed(rows) {
@@ -858,11 +898,6 @@ function exportCSV() {
         ];
     });
 
-    let csv = headers.join(",") + "\n";
-    rows.forEach(row => {
-        csv += row.join(",") + "\n";
-    });
-
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -871,24 +906,206 @@ function exportCSV() {
     URL.revokeObjectURL(link.href);
 }
 
-// Accordion Toggle
-function setupAccordion() {
-    const trigger = document.getElementById("accordion-trigger");
-    const content = document.getElementById("accordion-content");
-    const icon = trigger?.querySelector(".accordion-icon");
-
-    if (trigger && content && icon) {
-        trigger.addEventListener("click", () => {
-            const isCollapsed = content.style.display === "none" || content.style.display === "";
-            if (isCollapsed) {
-                content.style.display = "block";
-                icon.style.transform = "rotate(180deg)";
-            } else {
-                content.style.display = "none";
-                icon.style.transform = "rotate(0deg)";
-            }
+function setupBeeswarmToggles() {
+    const toggleBtns = document.querySelectorAll(".toggle-btn");
+    toggleBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            toggleBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            currentBeeswarmGroup = btn.getAttribute("data-group");
+            renderBeeswarm(rawDbRows);
         });
+    });
+}
+
+function renderBeeswarm(rows) {
+    if (!rows || rows.length === 0) return;
+
+    const svg = d3.select("#beeswarm-svg");
+    svg.selectAll("*").remove();
+
+    const container = svg.node().parentElement;
+    const width = container.clientWidth || 800;
+    const height = 380;
+    svg.attr("width", width).attr("height", height);
+
+    const tiers = ["S", "A", "B", "C", "D"];
+    const yScale = d3.scalePoint()
+        .domain(tiers)
+        .range([50, height - 50]);
+
+    // Draw horizontal guidelines
+    tiers.forEach(tier => {
+        svg.append("line")
+            .attr("class", "beeswarm-axis-line")
+            .attr("x1", 90)
+            .attr("y1", yScale(tier))
+            .attr("x2", width - 40)
+            .attr("y2", yScale(tier));
+
+        svg.append("text")
+            .attr("class", "beeswarm-axis-label")
+            .attr("x", 45)
+            .attr("y", yScale(tier))
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "middle")
+            .text(tier + " Tier");
+    });
+
+    // Grouping
+    let groups = [];
+    if (currentBeeswarmGroup === "model") {
+        groups = Array.from(new Set(rows.map(r => {
+            const meta = DASHBOARDS_METADATA[r.dashboard_id];
+            return meta ? meta.model : r.model;
+        })));
+        groups.sort();
+    } else if (currentBeeswarmGroup === "arm") {
+        groups = ["skills", "vanilla"];
+    } else if (currentBeeswarmGroup === "framework") {
+        groups = ["python", "r"];
     }
+
+    const xScale = d3.scalePoint()
+        .domain(groups)
+        .range([groups.length > 2 ? 160 : 250, groups.length > 2 ? width - 80 : width - 200]);
+
+    // Draw header labels for each column/group
+    groups.forEach(groupName => {
+        let label = groupName;
+        if (groupName === "skills") label = "Skills Guidelines";
+        else if (groupName === "vanilla") label = "Vanilla Prompting";
+        else if (groupName === "python") label = "Python Shiny";
+        else if (groupName === "r") label = "R Shiny";
+
+        svg.append("text")
+            .attr("x", xScale(groupName))
+            .attr("y", 24)
+            .attr("text-anchor", "middle")
+            .style("font-family", "var(--font-heading)")
+            .style("font-size", "11px")
+            .style("font-weight", "800")
+            .style("fill", "var(--text-main)")
+            .text(label);
+    });
+
+    // Create node objects
+    const nodes = rows.map((r, i) => {
+        const meta = DASHBOARDS_METADATA[r.dashboard_id];
+        const modelName = meta ? meta.model : r.model;
+        const approach = meta ? meta.arm : r.arm;
+        const framework = meta ? meta.framework : r.framework;
+
+        let groupVal = "";
+        if (currentBeeswarmGroup === "model") {
+            groupVal = modelName;
+        } else if (currentBeeswarmGroup === "arm") {
+            groupVal = approach;
+        } else if (currentBeeswarmGroup === "framework") {
+            groupVal = framework;
+        }
+
+        return {
+            id: i,
+            tier: r.tier,
+            model: modelName,
+            approach: approach,
+            framework: framework,
+            feedback: r.feedback_words || "",
+            topReason: r.top_reason || "",
+            bottomReason: r.bottom_reason || "",
+            targetX: xScale(groupVal) || (width / 2),
+            targetY: yScale(r.tier) || (height / 2),
+            x: xScale(groupVal) + (Math.random() - 0.5) * 10,
+            y: yScale(r.tier) + (Math.random() - 0.5) * 10
+        };
+    });
+
+    // Run force simulation statically
+    const simulation = d3.forceSimulation(nodes)
+        .force("x", d3.forceX(d => d.targetX).strength(0.85))
+        .force("y", d3.forceY(d => d.targetY).strength(0.85))
+        .force("collide", d3.forceCollide(7))
+        .stop();
+
+    for (let i = 0; i < 120; ++i) simulation.tick();
+
+    // Color mapper matching standard Tier colors
+    const colors = {
+        "S": "#ff8b94",
+        "A": "#ffcaa6",
+        "B": "#ffdca3",
+        "C": "#d8f8a8",
+        "D": "#a8f8b4"
+    };
+
+    // Tooltip
+    let tooltip = d3.select("#beeswarm-tooltip");
+    if (tooltip.empty()) {
+        tooltip = d3.select("body").append("div")
+            .attr("id", "beeswarm-tooltip")
+            .attr("class", "beeswarm-tooltip");
+    }
+
+    const circles = svg.selectAll("circle")
+        .data(nodes, d => d.id)
+        .join("circle")
+        .attr("class", "beeswarm-node")
+        .attr("r", 6)
+        .attr("fill", d => colors[d.tier] || "#94a3b8")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+
+    // Dynamic hover behaviors
+    circles
+        .on("mouseenter", function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", 9)
+                .style("stroke-width", "2px");
+
+            let commentHtml = "";
+            let comment = "";
+            if (d.tier === "S" || d.tier === "A") comment = d.topReason;
+            else if (d.tier === "D" || d.tier === "C") comment = d.bottomReason;
+
+            if (comment) {
+                commentHtml = `<div style="font-style: italic; margin-top: 6px; border-left: 2px solid #38bdf8; padding-left: 6px; color: #cbd5e1;">"${comment}"</div>`;
+            }
+
+            let tagsHtml = "";
+            if (d.feedback) {
+                tagsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">${
+                    d.feedback.split(",").map(t => `<span style="font-size: 8px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 5px; border-radius: 4px;">${t.trim()}</span>`).join("")
+                }</div>`;
+            }
+
+            tooltip.style("display", "block")
+                .html(`
+                    <strong>${d.model}</strong>
+                    <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">
+                        Tier: <span style="font-weight: bold; color: #ffffff;">${d.tier}</span> · 
+                        Approach: <span style="text-transform: capitalize;">${d.approach}</span> · 
+                        Framework: <span style="text-transform: uppercase;">${d.framework}</span>
+                    </div>
+                    ${tagsHtml}
+                    ${commentHtml}
+                `);
+        })
+        .on("mousemove", function(event) {
+            tooltip
+                .style("left", (event.pageX + 12) + "px")
+                .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseleave", function() {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", 6)
+                .style("stroke-width", "1px");
+            tooltip.style("display", "none");
+        });
 }
 
 init();

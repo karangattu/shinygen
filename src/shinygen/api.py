@@ -11,6 +11,43 @@ from typing import Sequence
 from .iterate import GenerationResult, generate_and_refine
 
 
+def read_data_files(
+    data_files: dict[str, str] | None = None,
+    data_file_paths: Sequence[str | Path] | None = None,
+    data_csv: str | Path | None = None,
+) -> dict[str, str] | None:
+    """Read and merge data files from various sources.
+
+    Args:
+        data_files: Dict mapping filenames to content strings.
+        data_file_paths: Optional sequence of file paths to read.
+        data_csv: Optional path to a CSV file (added by basename, overrides
+            any same-named file from data_file_paths).
+
+    Returns:
+        Merged dict of filename -> content, or None if no files provided.
+    """
+    merged: dict[str, str] | None = None
+
+    if data_files:
+        merged = dict(data_files)
+
+    if data_file_paths:
+        if merged is None:
+            merged = {}
+        for fp in data_file_paths:
+            p = Path(fp)
+            merged[p.name] = p.read_text(encoding="utf-8")
+
+    if data_csv:
+        csv_path = Path(data_csv)
+        if merged is None:
+            merged = {}
+        merged[csv_path.name] = csv_path.read_text(encoding="utf-8")
+
+    return merged
+
+
 def generate(
     prompt: str,
     *,
@@ -67,7 +104,8 @@ def generate(
             (and any ``skills_dir``) into the agent context. Set to False to
             run a vanilla baseline with no skills loaded — used to compare
             skill gains against the un-augmented model in benchmarks.
-        port: Port for running the app during screenshots.        verbose: If True, enable debug logging.
+        port: Port for running the app during screenshots.
+        verbose: If True, enable debug logging.
 
     Returns:
         A GenerationResult containing the app path, source code,
@@ -105,15 +143,10 @@ def generate(
                 framework="shiny_r",
             )
     """
-    merged_data_files: dict[str, str] | None = None
-    if data_files:
-        merged_data_files = dict(data_files)
-
-    if data_csv:
-        csv_path = Path(data_csv)
-        if merged_data_files is None:
-            merged_data_files = {}
-        merged_data_files[csv_path.name] = csv_path.read_text(encoding="utf-8")
+    merged_data_files = read_data_files(
+        data_files=data_files,
+        data_csv=data_csv,
+    )
 
     return generate_and_refine(
         prompt=prompt,

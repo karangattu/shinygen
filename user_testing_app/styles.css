@@ -1337,3 +1337,73 @@ textarea:focus {
 .neon-c-tier { color: #d8f8a8; border-color: #d8f8a8; box-shadow: 0 0 45px rgba(216, 248, 168, 0.6), inset 0 0 15px rgba(216, 248, 168, 0.2); }
 .neon-d-tier { color: #a8f8b4; border-color: #a8f8b4; box-shadow: 0 0 45px rgba(168, 248, 180, 0.6), inset 0 0 15px rgba(168, 248, 180, 0.2); }
 
+/* Onboarding Evaluation Criteria */
+.evaluation-criteria {
+    margin: 20px 36px 0 36px;
+    padding: 16px 20px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-align: left;
+}
+
+.evaluation-criteria h3 {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.criteria-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.criteria-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.criteria-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.criteria-item strong {
+    display: block;
+    font-size: 12px;
+    color: var(--text-main);
+    margin-bottom: 2px;
+}
+
+.criteria-item p {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+@media (max-width: 600px) {
+    .evaluation-criteria {
+        margin: 16px 20px 0 20px;
+        padding: 14px;
+    }
+    .criteria-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+

@@ -9,9 +9,15 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +47,12 @@ class JudgeResult:
 
     @property
     def passed(self) -> bool:
+        """Whether the composite score meets the default 7.0 threshold.
+
+        Note: This uses a hardcoded default threshold for convenience.
+        The actual pass/fail decision in the pipeline uses the configurable
+        ``quality_threshold`` parameter, which may differ from this value.
+        """
         return self.composite >= 7.0
 
     def feedback_dict(self) -> dict[str, dict[str, str | float]]:
@@ -324,11 +336,13 @@ def parse_judge_response(raw: str) -> JudgeResult:
 
     json_match = re.search(r"\{[\s\S]*\}", raw)
     if not json_match:
+        logger.warning("Judge response contained no JSON object: %s", raw[:200])
         return result
 
     try:
         parsed = json.loads(json_match.group())
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        logger.warning("Failed to parse judge response as JSON: %s", exc)
         return result
 
     for criterion in CRITERIA:
@@ -373,9 +387,9 @@ def judge_app_with_api(
             code, judge_model, screenshot_paths if has_images else None, user_prompt
         )
     else:
-        # Try anthropic by default
-        return _judge_with_anthropic(
-            code, judge_model, screenshot_paths if has_images else None, user_prompt
+        raise ValueError(
+            f"Unknown judge model provider: {judge_model!r}. "
+            "Model ID must start with 'anthropic/' or 'openai/'."
         )
 
 
@@ -458,6 +472,35 @@ def judge_app_with_models(
     return merged
 
 
+def _retry_with_backoff(
+    func: Callable[[], Any],
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+) -> Any:
+    """Retry a function with exponential backoff on transient failures."""
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as exc:
+            last_exception = exc
+            exc_name = type(exc).__name__
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(
+                    "Judge API call failed (%s: %s), retrying in %.1fs "
+                    "(attempt %d/%d)",
+                    exc_name, exc, delay, attempt + 1, max_retries,
+                )
+                time.sleep(delay)
+            else:
+                logger.error(
+                    "Judge API call failed after %d attempts: %s: %s",
+                    max_retries, exc_name, exc,
+                )
+    raise last_exception
+
+
 def _judge_with_anthropic(
     code: str,
     model: str,
@@ -475,12 +518,15 @@ def _judge_with_anthropic(
     else:
         content = _build_judge_message(code, None, user_prompt)
 
-    response = client.messages.create(
-        model=model_name,
-        max_tokens=2048,
-        system=JUDGE_SYSTEM,
-        messages=[{"role": "user", "content": content}],
-    )
+    def _call_api():
+        return client.messages.create(
+            model=model_name,
+            max_tokens=2048,
+            system=JUDGE_SYSTEM,
+            messages=[{"role": "user", "content": content}],
+        )
+
+    response = _retry_with_backoff(_call_api)
 
     raw = response.content[0].text if response.content else ""
     result = parse_judge_response(raw)
@@ -525,14 +571,17 @@ def _judge_with_openai(
     else:
         content = user_text
 
-    response = client.chat.completions.create(
-        model=model_name,
-        **token_limit_arg,
-        messages=[
-            {"role": "system", "content": JUDGE_SYSTEM},
-            {"role": "user", "content": content},
-        ],
-    )
+    def _call_api():
+        return client.chat.completions.create(
+            model=model_name,
+            **token_limit_arg,
+            messages=[
+                {"role": "system", "content": JUDGE_SYSTEM},
+                {"role": "user", "content": content},
+            ],
+        )
+
+    response = _retry_with_backoff(_call_api)
 
     raw = response.choices[0].message.content or ""
     result = parse_judge_response(raw)

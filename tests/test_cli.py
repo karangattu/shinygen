@@ -168,3 +168,51 @@ def test_batch_cli_rejects_non_array(tmp_path):
     assert result.exit_code != 0
     assert "JSON array" in result.output
 
+
+def test_generate_cli_rejects_invalid_port(tmp_path, monkeypatch):
+    def fake_generate(**kwargs):
+        return GenerationResult(app_dir=Path("output"), score=5.0, iterations=1, passed=True)
+
+    monkeypatch.setattr(api, "generate", fake_generate)
+
+    runner = CliRunner()
+
+    result = runner.invoke(
+        main,
+        ["generate", "--prompt", "build app", "--port", "0"],
+    )
+    assert result.exit_code != 0
+    assert "0 is not in the range" in result.output or "Invalid value" in result.output
+
+    result = runner.invoke(
+        main,
+        ["generate", "--prompt", "build app", "--port", "70000"],
+    )
+    assert result.exit_code != 0
+    assert "70000 is not in the range" in result.output or "Invalid value" in result.output
+
+    result = runner.invoke(
+        main,
+        ["generate", "--prompt", "build app", "--port", "-1"],
+    )
+    assert result.exit_code != 0
+
+
+def test_generate_cli_accepts_valid_port(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_generate(**kwargs):
+        captured.update(kwargs)
+        return GenerationResult(app_dir=Path("output"), score=5.0, iterations=1, passed=True)
+
+    monkeypatch.setattr(api, "generate", fake_generate)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["generate", "--prompt", "build app", "--port", "8080"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["port"] == 8080
+

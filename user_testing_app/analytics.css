@@ -937,3 +937,74 @@ td:first-child {
     align-items: center;
     gap: 6px;
 }
+
+/* Beeswarm Chart Styles */
+.beeswarm-card {
+    grid-column: span 2;
+}
+
+.beeswarm-container {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.toggle-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    color: var(--text-muted);
+}
+
+.toggle-btn.active {
+    background: #ffffff !important;
+    color: var(--primary) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.beeswarm-node {
+    stroke: #ffffff;
+    stroke-width: 1px;
+    cursor: pointer;
+    transition: r 0.15s ease, stroke-width 0.15s ease;
+}
+
+.beeswarm-node:hover {
+    stroke: var(--text-main);
+    stroke-width: 2px;
+}
+
+.beeswarm-tooltip {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1100;
+    width: 250px;
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid var(--border-color);
+    color: #ffffff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    line-height: 1.4;
+    display: none;
+    font-family: var(--font-body);
+}
+
+.beeswarm-tooltip strong {
+    color: #38bdf8;
+    display: block;
+    margin-bottom: 3px;
+    font-family: var(--font-heading);
+}
+
+.beeswarm-axis-line {
+    stroke: var(--border-color);
+    stroke-dasharray: 3,3;
+}
+
+.beeswarm-axis-label {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--text-muted);
+}

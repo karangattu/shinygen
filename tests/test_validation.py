@@ -160,3 +160,16 @@ print(x)
 """
         valid, reason = validate_framework_artifact("shiny_r", "app.R", code)
         assert not valid
+
+
+class TestUnknownFramework:
+    def test_unknown_framework_returns_failure(self):
+        valid, reason = validate_framework_artifact("unknown_framework", "app.py", "code")
+        assert not valid
+        assert "unknown framework" in reason.lower()
+        assert "unknown_framework" in reason
+
+    def test_typo_in_framework_name_returns_failure(self):
+        valid, reason = validate_framework_artifact("shiny_pyhton", "app.py", "code")
+        assert not valid
+        assert "unknown framework" in reason.lower()

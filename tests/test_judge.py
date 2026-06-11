@@ -4,12 +4,16 @@ import json
 import sys
 import types
 
+import pytest
+
 from shinygen.judge import (
     CRITERIA,
     JUDGE_SYSTEM,
     JudgeResult,
     _build_judge_message,
     _judge_with_openai,
+    _retry_with_backoff,
+    judge_app_with_api,
     parse_judge_response,
 )
 
@@ -158,3 +162,112 @@ class TestOpenAIJudgeRequest:
         assert captured["model"] == "gpt-5.4-mini-2026-03-17"
         assert captured["max_completion_tokens"] == 2048
         assert "max_tokens" not in captured
+
+
+class TestJudgeAppWithApi:
+    def test_unknown_model_provider_raises_value_error(self):
+        with pytest.raises(ValueError) as exc_info:
+            judge_app_with_api("print('hello')", "unknown/model-id", None, "")
+        assert "Unknown judge model provider" in str(exc_info.value)
+        assert "unknown/model-id" in str(exc_info.value)
+
+    def test_anthropic_prefix_accepted(self, monkeypatch):
+        class FakeAnthropicClient:
+            class Messages:
+                def create(self, **kwargs):
+                    class FakeContent:
+                        text = json.dumps({
+                            "requirement_fidelity": {"score": 7, "rationale": "Good"},
+                            "code_maintainability": {"score": 7, "rationale": "Clean"},
+                            "visual_ux_quality": {"score": 7, "rationale": "Solid"},
+                            "code_robustness": {"score": 7, "rationale": "Robust"},
+                        })
+                    class FakeResponse:
+                        content = [FakeContent()]
+                        usage = None
+                    return FakeResponse()
+            messages = Messages()
+
+        fake_anthropic = types.SimpleNamespace(Anthropic=lambda: FakeAnthropicClient())
+        monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
+
+        result = judge_app_with_api("print('hello')", "anthropic/claude-sonnet-4-6", None, "")
+        assert result.composite == 7.0
+
+    def test_openai_prefix_accepted(self, monkeypatch):
+        class FakeUsage:
+            prompt_tokens = 100
+            completion_tokens = 50
+
+        class FakeMessage:
+            content = json.dumps({
+                "requirement_fidelity": {"score": 8, "rationale": "Good"},
+                "code_maintainability": {"score": 8, "rationale": "Clean"},
+                "visual_ux_quality": {"score": 8, "rationale": "Solid"},
+                "code_robustness": {"score": 8, "rationale": "Robust"},
+            })
+
+        class FakeChoice:
+            message = FakeMessage()
+
+        class FakeResponse:
+            choices = [FakeChoice()]
+            usage = FakeUsage()
+
+        class FakeCompletions:
+            def create(self, **kwargs):
+                return FakeResponse()
+
+        class FakeChat:
+            completions = FakeCompletions()
+
+        class FakeOpenAIClient:
+            def __init__(self):
+                self.chat = FakeChat()
+
+        fake_openai_module = types.SimpleNamespace(OpenAI=FakeOpenAIClient)
+        monkeypatch.setitem(sys.modules, "openai", fake_openai_module)
+
+        result = judge_app_with_api("print('hello')", "openai/gpt-4", None, "")
+        assert result.composite == 8.0
+
+
+class TestRetryWithBackoff:
+    def test_succeeds_on_first_attempt(self):
+        call_count = 0
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            return "success"
+
+        result = _retry_with_backoff(func, max_retries=3, base_delay=0.01)
+        assert result == "success"
+        assert call_count == 1
+
+    def test_retries_on_failure_then_succeeds(self):
+        call_count = 0
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise RuntimeError("transient error")
+            return "success"
+
+        result = _retry_with_backoff(func, max_retries=3, base_delay=0.01)
+        assert result == "success"
+        assert call_count == 3
+
+    def test_raises_after_max_retries(self):
+        call_count = 0
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            raise RuntimeError("persistent error")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            _retry_with_backoff(func, max_retries=3, base_delay=0.01)
+        assert "persistent error" in str(exc_info.value)
+        assert call_count == 3

@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <link rel="stylesheet" href="analytics.css">
 </head>
 <body>
@@ -85,9 +86,9 @@
         <div class="charts-container">
             <div class="chart-card glass-panel">
                 <h3>Quality vs. Cost ROI</h3>
-                <p class="chart-subtitle">Average tier rating plotted against generation cost</p>
+                <p class="chart-subtitle">Average score vs. generation cost (log scale) with Pareto Frontier</p>
                 <div class="chart-wrapper">
-                    <canvas id="chart-roi"></canvas>
+                    <svg id="chart-roi-svg" style="width: 100%; height: 260px; display: block;"></svg>
                 </div>
             </div>
 
@@ -108,46 +109,50 @@
             </div>
 
             <div class="chart-card glass-panel">
-                <h3>Top Feedback Tags</h3>
-                <p class="chart-subtitle">Most frequent user feedback characteristics</p>
+                <h3>Design Quality Drivers</h3>
+                <p class="chart-subtitle">Average score deviation from overall baseline when tag is present</p>
                 <div class="chart-wrapper">
-                    <canvas id="chart-tags"></canvas>
+                    <svg id="chart-drivers-svg" style="width: 100%; height: 260px; display: block;"></svg>
                 </div>
             </div>
 
-            <div class="chart-card glass-panel correlation-matrix-card accordion">
-                <div class="accordion-header" id="accordion-trigger" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+            <div class="chart-card glass-panel beeswarm-card" style="grid-column: span 2;">
+                <div class="beeswarm-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
                     <div>
                         <h3 style="margin: 0; display: inline-flex; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-table-cells"></i> Feedback Tag Correlation Matrix
+                            <i class="fa-solid fa-circle-nodes"></i> Human Preference Beeswarm
                         </h3>
-                        <p class="chart-subtitle" style="margin: 4px 0 0 0;">Co-occurrence correlation (Pearson r) between user feedback tags</p>
+                        <p class="chart-subtitle" style="margin: 4px 0 0 0;">Distribution of individual user ratings (S to D Tier) across categories. Hover over dots to read comments.</p>
                     </div>
-                    <span class="accordion-icon" style="transition: transform 0.2s ease;"><i class="fa-solid fa-chevron-down"></i></span>
+                    <div class="toggle-group" style="display: flex; gap: 6px; background: var(--bg-app); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <button class="toggle-btn active" data-group="model" style="padding: 6px 12px; font-size: 11px; font-weight: 600; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: var(--transition);">Model</button>
+                        <button class="toggle-btn" data-group="arm" style="padding: 6px 12px; font-size: 11px; font-weight: 600; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: var(--transition);">Approach</button>
+                        <button class="toggle-btn" data-group="framework" style="padding: 6px 12px; font-size: 11px; font-weight: 600; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: var(--transition);">Framework</button>
+                    </div>
                 </div>
-                <div class="accordion-content" id="accordion-content" style="display: none; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-                    <div class="correlation-matrix-container">
-                        <div class="correlation-matrix" id="correlation-matrix"></div>
+                
+                <div class="beeswarm-container" style="position: relative; width: 100%; min-height: 380px; overflow-x: auto; background: #fafafa; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <svg id="beeswarm-svg" style="width: 100%; height: 380px; display: block;"></svg>
+                </div>
+
+                <div class="deductions-container" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                    <div>
+                        <h4 style="font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-lightbulb" style="color: var(--warning);"></i> Thought-Provoking Insights
+                        </h4>
+                        <ul style="font-size: 12px; color: var(--text-muted); line-height: 1.5; padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 6px;">
+                            <li><strong>Do Guidelines Eliminate Bad Output?</strong> Switch to <em>Approach</em>. Check if the "Skills" guidelines completely shield models from D-tier ratings, or if it just compresses the spread compared to "Vanilla".</li>
+                            <li><strong>The Cost-Quality Paradox:</strong> Look at the ratings for expensive models (Claude Opus) versus extremely cheap ones (DeepSeek Flash). Does paying 100x more per generation lead to human S-tier preferences?</li>
+                        </ul>
                     </div>
-                    <div class="matrix-explanation">
-                        <h4><i class="fa-solid fa-circle-info"></i> How to Read this Matrix</h4>
-                        <p>
-                            Each cell calculates the <strong>Pearson correlation coefficient (r)</strong> between two design feedback tags based on how often they co-occur in the same user submissions.
-                        </p>
-                        <div class="explanation-legend">
-                            <div class="legend-item">
-                                <span class="legend-color positive"></span>
-                                <span><strong>Positive Correlation (+0.05 to +1.00)</strong>: Colored <strong>blue</strong>. Suggests the tags are frequently selected together on the same dashboards (e.g., related design qualities).</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color negative"></span>
-                                <span><strong>Negative Correlation (-0.05 to -1.00)</strong>: Colored <strong>red</strong>. Suggests the tags are mutually exclusive or rarely appear together on the same layouts (e.g., contrasting attributes).</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color neutral"></span>
-                                <span><strong>Zero/Weak Correlation (-0.05 to +0.05)</strong>: Neutral <strong>light gray/gray</strong>. Indicates no linear relationship (co-occurrence is random or there are zero occurrences). Hover over any cell to see the exact correlation score.</span>
-                            </div>
-                        </div>
+                    <div>
+                        <h4 style="font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-circle-question" style="color: var(--primary);"></i> Questions to Ponder
+                        </h4>
+                        <ul style="font-size: 12px; color: var(--text-muted); line-height: 1.5; padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 6px;">
+                            <li>Are certain models highly polarized (having lots of S and D ratings with few B's) while others are safely mediocre?</li>
+                            <li>Does Python Shiny or R Shiny have a tighter distribution of positive reviews? Switch to <em>Framework</em> to investigate.</li>
+                        </ul>
                     </div>
                 </div>
             </div>

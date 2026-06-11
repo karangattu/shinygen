@@ -16,7 +16,7 @@ BUNDLED_SKILLS_DIR = PACKAGE_DIR / "skills"
 
 def load_skill_files(
     skill_dir: Path,
-)-> list[Skill]:
+) -> list[Skill]:
     """Load agent skills from a skill directory.
 
     The skill directory must contain a valid SKILL.md and may also contain
@@ -36,7 +36,7 @@ def load_skill_files(
 
 def load_default_skills(
     framework_key: str,
-)-> list[Skill]:
+) -> list[Skill]:
     """Load the bundled default skills for a framework.
 
     Args:

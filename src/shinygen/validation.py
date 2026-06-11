@@ -370,4 +370,7 @@ def validate_framework_artifact(
 
         return True, "valid Shiny for R artifact"
 
-    return True, "no framework validation available"
+    return (
+        False,
+        f"unknown framework {framework!r}; expected 'shiny_python' or 'shiny_r'",
+    )

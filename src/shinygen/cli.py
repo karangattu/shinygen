@@ -5,8 +5,12 @@ CLI entry point for shinygen.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
+
+if TYPE_CHECKING:
+    from .iterate import GenerationResult
 
 
 @click.group()
@@ -120,7 +124,7 @@ def main() -> None:
 @click.option(
     "--port",
     default=None,
-    type=int,
+    type=click.IntRange(min=1, max=65535),
     help="Port for running the app during screenshots.",
 )
 @click.option(
@@ -149,19 +153,12 @@ def generate(
 ) -> None:
     """Generate a Shiny app from a natural language prompt."""
     from .api import generate as api_generate
+    from .api import read_data_files
 
-    # Read data files
-    data_files: dict[str, str] | None = None
-    if data_file:
-        data_files = {}
-        for fp in data_file:
-            p = Path(fp)
-            data_files[p.name] = p.read_text(encoding="utf-8")
-    if csv_file:
-        if data_files is None:
-            data_files = {}
-        csv_path = Path(csv_file)
-        data_files[csv_path.name] = csv_path.read_text(encoding="utf-8")
+    data_files = read_data_files(
+        data_file_paths=data_file if data_file else None,
+        data_csv=csv_file,
+    )
 
     from .config import APIKeyMissingError, DockerNotAvailableError
 
@@ -190,6 +187,11 @@ def generate(
         click.secho(f"Error: {result.error}", fg="red", err=True)
         raise SystemExit(1)
 
+    _print_generation_result(result)
+
+
+def _print_generation_result(result: GenerationResult) -> None:
+    """Print a formatted summary of a generation result."""
     click.secho(f"App generated successfully!", fg="green")
     click.echo(f"  Output:     {result.app_dir}")
     click.echo(f"  Score:      {result.score:.2f}")
@@ -208,7 +210,6 @@ def generate(
     click.echo(f"  Iterations: {result.iterations}")
     click.echo(f"  Passed:     {result.passed}")
 
-    # Usage stats
     usage = result.usage
     click.echo(f"  Time:       {usage.total_time_seconds:.1f}s"
                f" (generate: {usage.generation_time_seconds:.1f}s,"
@@ -224,11 +225,9 @@ def generate(
             token_parts.append(f"{usage.total_cache_read_tokens:,} cache-read")
         click.echo(f"  Tokens:     {', '.join(token_parts)}")
 
-    # Per-iteration cost & token breakdown
     if usage.details:
         click.echo("  Cost breakdown:")
 
-        # Aggregate by iteration and stage.
         iter_generate: dict[int, float] = {}
         iter_judge: dict[int, float] = {}
         iter_tokens: dict[int, dict[str, int]] = {}
@@ -240,7 +239,6 @@ def generate(
                 iter_generate[it] = iter_generate.get(it, 0.0) + c
             elif stage == "judge":
                 iter_judge[it] = iter_judge.get(it, 0.0) + c
-            # Accumulate tokens per iteration
             if it not in iter_tokens:
                 iter_tokens[it] = {
                     "input": 0, "output": 0,
@@ -264,7 +262,6 @@ def generate(
                 f"judge: ${judge_cost:.4f}, subtotal: ${subtotal:.4f}, "
                 f"cumulative: ${cumulative:.4f}"
             )
-            # Token details per iteration
             toks = iter_tokens.get(it)
             if toks and (toks["input"] or toks["output"]):
                 tok_parts = [
@@ -306,7 +303,7 @@ def generate(
             click.echo(f"    - {sp}")
 
 
-def _print_result_summary(result, label: str | None = None) -> None:
+def _print_result_summary(result: GenerationResult, label: str | None = None) -> None:
     """Print a compact summary line for one generation result."""
     prefix = f"  [{label}] " if label else "  "
     if result.error:
@@ -379,8 +376,8 @@ def batch(config: str, verbose: bool) -> None:
           },
           {
             "prompt": "Sales dashboard",
-                        "model": "gpt55",
-                        "output_dir": "./run-gpt55",
+            "model": "gpt55",
+            "output_dir": "./run-gpt55",
             "screenshot": true
           }
         ]
