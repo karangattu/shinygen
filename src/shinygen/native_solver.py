@@ -57,6 +57,10 @@ from .validation import validate_framework_artifact
 _TOOL_TIMEOUT = 180
 _DATA_CONTEXT_CHAR_LIMIT = 12_000
 _DIRECT_ARTIFACT_ATTEMPTS = 2
+# Kimi and other direct-artifact models easily exceed Inspect's 2048-token
+# default for a complete Shiny app. Set a generous ceiling so the code block
+# is never truncated mid-generation.
+_DIRECT_ARTIFACT_MAX_TOKENS = 16_384
 _SERVER_VALIDATION_TIMEOUT = 45
 
 
@@ -352,7 +356,9 @@ def native_direct_artifact_solver(
             )
 
         for attempt in range(1, _DIRECT_ARTIFACT_ATTEMPTS + 1):
-            state = await generate(state, tool_calls="none")
+            state = await generate(
+                state, tool_calls="none", max_tokens=_DIRECT_ARTIFACT_MAX_TOKENS
+            )
             code = _extract_direct_artifact_code(
                 state.output.completion,
                 framework=framework,
