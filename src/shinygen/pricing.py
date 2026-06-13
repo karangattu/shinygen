@@ -162,8 +162,9 @@ _PRICING: dict[str, tuple[float, float]] = {
     "glm-5.1": (1.40, 4.40),
     "glm-5": (1.00, 3.20),
     "mimo-v2.5-pro": (1.74, 3.48),
+    "kimi-k2.7-code": (0.95, 4.00),
     "kimi-k2.6": (0.95, 4.00),
-    "kimi-k2.5": (0.60, 3.00),
+
     "minimax-m3": (0.60, 2.40),
     "minimax-m2.7": (0.30, 1.20),
     "minimax-m2.5": (0.30, 1.20),
@@ -196,8 +197,9 @@ _CACHE_READ_PRICE_OVERRIDES: dict[str, float] = {
     "glm-5.1": 0.26,
     "glm-5": 0.20,
     "mimo-v2.5-pro": 0.0145,
+    "kimi-k2.7-code": 0.19,
     "kimi-k2.6": 0.16,
-    "kimi-k2.5": 0.10,
+
     "minimax-m3": 0.12,
     "minimax-m2.7": 0.06,
     "minimax-m2.5": 0.06,

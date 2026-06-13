@@ -75,8 +75,8 @@ env:
     gpt-5.5
     glm-5
     glm-5.1
-    kimi-k2.5
     kimi-k2.6
+    kimi-k2.7-code
     mimo-v2.5
     mimo-v2.5-pro
     minimax-m2.5
@@ -200,10 +200,10 @@ jobs:
             name: glm-5
           - idx: "09"
             name: glm-5.1
-          - idx: "10"
-            name: kimi-k2.5
           - idx: "11"
             name: kimi-k2.6
+          - idx: "22"
+            name: kimi-k2.7-code
           - idx: "12"
             name: mimo-v2.5
           - idx: "13"

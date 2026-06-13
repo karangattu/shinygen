@@ -10,7 +10,7 @@ Why a separate solver?
 1. ``mini_swe_agent`` wraps Inspect's model API with
    ``inspect_swe._mini_swe_agent._model_without_responses_api`` which strips
    provider-specific reasoning fields between turns. Moonshot's Kimi models
-   (``kimi-k2.5``, ``kimi-k2.6``) **require** ``reasoning_content`` to be
+   (``kimi-k2.6``, ``kimi-k2.7-code``) **require** ``reasoning_content`` to be
    echoed back inside subsequent assistant tool-call messages or they
    reject the request with HTTP 400.
 

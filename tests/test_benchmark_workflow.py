@@ -159,8 +159,9 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
     for model in [
         "glm-5",
         "glm-5.1",
-        "kimi-k2.5",
+
         "kimi-k2.6",
+        "kimi-k2.7-code",
         "mimo-v2.5",
         "mimo-v2.5-pro",
         "minimax-m2.5",

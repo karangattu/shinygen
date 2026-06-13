@@ -408,8 +408,9 @@ class TestOpenCodeGoPricing:
         priced_models = {
             "glm-5.1",
             "glm-5",
-            "kimi-k2.5",
+
             "kimi-k2.6",
+            "kimi-k2.7-code",
             "deepseek-v4-pro",
             "deepseek-v4-flash",
             "mimo-v2.5-pro",
