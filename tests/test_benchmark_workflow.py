@@ -61,6 +61,13 @@ def test_benchmark_workflow_accepts_generic_dispatch_inputs():
     assert "type: choice" in workflow
     assert "- airbnb-asheville-short.csv" in workflow
     assert "- air_quality.csv" in workflow
+    assert "- bike_share_stations.csv" in workflow
+    assert "- library_usage.csv" in workflow
+    assert "- health_inspection_scores.csv" in workflow
+    assert "employee_retention.csv" not in workflow
+    assert "e_commerce_sales.csv" not in workflow
+    assert "marketing_campaigns.csv" not in workflow
+    assert "supply_chain.csv" not in workflow
     assert "challenge:" in workflow
     assert "benchmark_prompt:" in workflow
     assert "quality_threshold:" in workflow

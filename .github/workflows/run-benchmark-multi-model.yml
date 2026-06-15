@@ -31,12 +31,11 @@ on:
         options:
           - airbnb-asheville-short.csv
           - air_quality.csv
-          - e_commerce_sales.csv
+          - bike_share_stations.csv
           - ed_operations.csv
-          - employee_retention.csv
           - ev_charging_stations.csv
-          - marketing_campaigns.csv
-          - supply_chain.csv
+          - health_inspection_scores.csv
+          - library_usage.csv
           - trials_short_50.csv
       challenge:
         description: "Optional short benchmark label used in artifact names and summaries"
