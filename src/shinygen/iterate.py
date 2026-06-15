@@ -1151,14 +1151,28 @@ def generate_and_refine(
             # No judge — use local startup logs as the refinement signal.
 
             best_code = code
-            best_runtime_valid = True
+            best_runtime_valid = runtime_valid
             best_runtime_logs = runtime_logs
-            best_score = 10.0
+            best_score = 10.0 if runtime_valid else 0.0
             best_quality_score = best_score
             result.screenshot_paths = screenshot_paths
 
-            logger.info("Runtime validation passed! Accepting app early.")
-            result.passed = True
+            if iteration < max_iterations:
+                from .prompts import build_runtime_refinement_prompt
+
+                current_prompt = build_runtime_refinement_prompt(
+                    prompt,
+                    previous_code=code,
+                    runtime_logs=runtime_logs,
+                    validation_passed=runtime_valid,
+                    iteration=iteration,
+                )
+                logger.info(
+                    "Preparing runtime-log refinement prompt for next iteration"
+                )
+                continue
+
+            result.passed = runtime_valid
             result.score = best_score
             result.quality_score = best_quality_score
             result.value_score = best_score

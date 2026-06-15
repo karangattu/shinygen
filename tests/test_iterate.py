@@ -104,6 +104,46 @@ class TestRuntimeLogFailureDetection:
 
 
 class TestNoJudgeRuntimeRefinement:
+    def test_no_judge_run_feeds_logs_even_when_first_iteration_starts_clean(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        prompts_seen: list[str] = []
+        generated = [
+            "from shiny import App, ui\napp = App(ui.page_fluid('first'), lambda input, output, session: None)",
+            "from shiny import App, ui\napp = App(ui.page_fluid('second'), lambda input, output, session: None)",
+        ]
+
+        def fake_run_generation(prompt, *args, **kwargs):
+            prompts_seen.append(prompt)
+            return generated[len(prompts_seen) - 1], [], False
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_generation)
+        monkeypatch.setattr(
+            "shinygen.iterate._validate_generated_app_runtime",
+            lambda *a, **k: (True, "Listening on http://127.0.0.1:8000"),
+        )
+
+        result = generate_and_refine(
+            prompt="Build an ED operations dashboard",
+            model="gpt-5.4",
+            framework="shiny_python",
+            output_dir=tmp_path,
+            judge_model=None,
+            screenshot=False,
+            max_iterations=2,
+        )
+
+        assert result.source_code == generated[1]
+        assert result.iterations == 2
+        assert result.passed is True
+        assert len(prompts_seen) == 2
+        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
+        assert "Listening on http://127.0.0.1:8000" in prompts_seen[1]
+        assert "first" in prompts_seen[1]
+
     def test_judged_run_retries_runtime_failure_even_with_passing_judge_score(
         self,
         tmp_path,
@@ -228,7 +268,7 @@ class TestNoJudgeRuntimeRefinement:
         assert "Listening on http://127.0.0.1:8000" in prompts_seen[1]
         assert "first" in prompts_seen[1]
 
-    def test_no_judge_run_stops_early_on_success(
+    def test_no_judge_run_keeps_refining_on_success(
         self,
         tmp_path,
         monkeypatch,
@@ -236,6 +276,8 @@ class TestNoJudgeRuntimeRefinement:
         prompts_seen: list[str] = []
         generated = [
             "from shiny import App, ui\napp = App(ui.page_fluid('first'), lambda input, output, session: None)",
+            "from shiny import App, ui\napp = App(ui.page_fluid('second'), lambda input, output, session: None)",
+            "from shiny import App, ui\napp = App(ui.page_fluid('third'), lambda input, output, session: None)",
         ]
 
         def fake_run_generation(prompt, *args, **kwargs):
@@ -259,10 +301,12 @@ class TestNoJudgeRuntimeRefinement:
             max_iterations=3,
         )
 
-        assert result.source_code == generated[0]
-        assert result.iterations == 1
+        assert result.source_code == generated[2]
+        assert result.iterations == 3
         assert result.passed is True
-        assert len(prompts_seen) == 1
+        assert len(prompts_seen) == 3
+        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
+        assert "RUNTIME LOG REVIEW" in prompts_seen[2]
 
     def test_refinement_no_code_falls_back_without_inner_retries(
         self,
