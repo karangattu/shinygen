@@ -15,6 +15,7 @@ from shinygen.iterate import (
     _generation_extra_config,
     _recover_code_from_eval_logs,
     _resolve_judge_screenshot_paths,
+    _runtime_logs_indicate_failure,
     _write_run_summary,
     generate_and_refine,
 )
@@ -90,7 +91,94 @@ class TestGenerationExtraConfig:
         assert _generation_extra_config("codex_cli") == {}
 
 
+class TestRuntimeLogFailureDetection:
+    def test_detects_exception_signatures(self):
+        assert _runtime_logs_indicate_failure(
+            "Startup validation: process is still running.\nTypeError: bad sidebar"
+        )
+
+    def test_allows_normal_startup_logs(self):
+        assert not _runtime_logs_indicate_failure(
+            "Listening on http://127.0.0.1:8000\nPress Ctrl+C to stop"
+        )
+
+
 class TestNoJudgeRuntimeRefinement:
+    def test_judged_run_retries_runtime_failure_even_with_passing_judge_score(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        from shinygen.judge import JudgeResult
+
+        prompts_seen: list[str] = []
+        generated = [
+            "from shiny import App, ui\napp = App(ui.page_fluid('broken'), lambda input, output, session: None)",
+            "from shiny import App, ui\napp = App(ui.page_fluid('fixed'), lambda input, output, session: None)",
+        ]
+
+        def fake_run_generation(prompt, *args, **kwargs):
+            prompts_seen.append(prompt)
+            return generated[len(prompts_seen) - 1], [], False
+
+        validation_calls = 0
+
+        def fake_validate(*args, **kwargs):
+            nonlocal validation_calls
+            validation_calls += 1
+            if validation_calls == 1:
+                return (
+                    False,
+                    "TypeError: `sidebar=` is not a `Sidebar` instance. "
+                    "Use `ui.sidebar(...)` to create one.",
+                )
+            return True, "Listening on http://127.0.0.1:8000"
+
+        judge_calls = 0
+
+        def fake_judge_app_with_models(*args, **kwargs):
+            nonlocal judge_calls
+            judge_calls += 1
+            return JudgeResult(
+                scores={
+                    "requirement_fidelity": 8.0,
+                    "code_maintainability": 8.0,
+                    "visual_ux_quality": 8.0,
+                    "code_robustness": 8.0,
+                },
+                composite=8.0,
+            )
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_generation)
+        monkeypatch.setattr(
+            "shinygen.iterate._validate_generated_app_runtime",
+            fake_validate,
+        )
+        monkeypatch.setattr(
+            "shinygen.judge.judge_app_with_models",
+            fake_judge_app_with_models,
+        )
+
+        result = generate_and_refine(
+            prompt="Build an ED operations dashboard",
+            model="gpt-5.4",
+            framework="shiny_python",
+            output_dir=tmp_path,
+            judge_model="anthropic/claude-opus-4-7",
+            screenshot=False,
+            max_iterations=2,
+            quality_threshold=5.0,
+        )
+
+        assert result.source_code == generated[1]
+        assert result.iterations == 2
+        assert result.passed is True
+        assert len(prompts_seen) == 2
+        assert judge_calls == 1
+        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
+        assert "TypeError: `sidebar=` is not a `Sidebar` instance" in prompts_seen[1]
+
     def test_no_judge_run_uses_server_logs_for_one_refinement_pass(
         self,
         tmp_path,
@@ -229,6 +317,8 @@ class TestWriteRunSummary:
             value_score=8.7,
             iterations=2,
             passed=True,
+            runtime_valid=True,
+            runtime_logs="Startup validation: process is still running.",
             judge_feedback={"summary": "Strong dashboard structure."},
             screenshot_paths=[screenshot_path],
             score_breakdown={
@@ -290,6 +380,11 @@ class TestWriteRunSummary:
         assert summary["iterations"] == 2
         assert summary["data_files"] == ["airbnb-asheville-short.csv"]
         assert summary["screenshots"] == ["overview.png"]
+        assert summary["runtime_validation"]["passed"] is True
+        assert (
+            summary["runtime_validation"]["logs_tail"]
+            == "Startup validation: process is still running."
+        )
         assert summary["usage"]["generation_cost"] == result.usage.generation_cost
         assert summary["usage"]["judge_cost"] == result.usage.judge_cost
         assert summary["usage"]["total_cost"] == result.usage.total_cost

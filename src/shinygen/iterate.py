@@ -44,10 +44,19 @@ logger = logging.getLogger(__name__)
 AGENT_LAST_SCREENSHOT_NAME = "agent_last_screenshot.png"
 RUNTIME_VALIDATION_STARTUP_WAIT = 6
 RUNTIME_VALIDATION_TIMEOUT = 45
+RUNTIME_LOG_SUMMARY_LIMIT = 8_000
 
 
 def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").lower() in ("1", "true", "yes")
+
+
+def _trim_runtime_logs(logs: str, limit: int = RUNTIME_LOG_SUMMARY_LIMIT) -> str:
+    """Return the tail of startup logs for prompts and run summaries."""
+    stripped = logs.strip()
+    if len(stripped) <= limit:
+        return stripped
+    return stripped[-limit:]
 
 
 @dataclass
@@ -64,6 +73,8 @@ class GenerationResult:
     judge_feedback: dict | None = None
     score_breakdown: dict | None = None
     screenshot_paths: list[Path] = field(default_factory=list)
+    runtime_valid: bool | None = None
+    runtime_logs: str = ""
     error: str | None = None
     usage: UsageStats = field(default_factory=UsageStats)
 
@@ -107,6 +118,10 @@ def _write_run_summary(
         "error": result.error,
         "data_files": sorted(data_file_names),
         "screenshots": [path.name for path in result.screenshot_paths],
+        "runtime_validation": {
+            "passed": result.runtime_valid,
+            "logs_tail": _trim_runtime_logs(result.runtime_logs),
+        },
         "judge_feedback": result.judge_feedback,
         "usage": result.usage.to_dict(),
     }
@@ -200,6 +215,22 @@ exit "$status"
 """.strip()
 
 
+def _runtime_logs_indicate_failure(logs: str) -> bool:
+    """Return True when startup logs contain a Python/R exception signature."""
+    failure_markers = (
+        "Traceback (most recent call last):",
+        "TypeError:",
+        "ValueError:",
+        "NameError:",
+        "ImportError:",
+        "ModuleNotFoundError:",
+        "SyntaxError:",
+        "Error in ",
+        "Execution halted",
+    )
+    return any(marker in logs for marker in failure_markers)
+
+
 def _validate_generated_app_runtime(
     app_dir: Path,
     framework_key: str,
@@ -239,7 +270,11 @@ def _validate_generated_app_runtime(
             output = "\n".join(
                 part for part in (completed.stdout, completed.stderr) if part
             ).strip()
-            return completed.returncode == 0, output
+            return (
+                completed.returncode == 0
+                and not _runtime_logs_indicate_failure(output),
+                output,
+            )
         except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
             logger.warning(
                 "Docker runtime validation failed (%s); falling back to host",
@@ -275,7 +310,10 @@ def _validate_generated_app_runtime(
     output = "\n".join(
         part for part in (completed.stdout, completed.stderr) if part
     ).strip()
-    return completed.returncode == 0, output
+    return (
+        completed.returncode == 0 and not _runtime_logs_indicate_failure(output),
+        output,
+    )
 
 
 def _generation_extra_config(agent: str) -> dict[str, object]:
@@ -766,6 +804,7 @@ def generate_and_refine(
     best_feedback: dict | None = None
     best_score_breakdown: dict | None = None
     best_runtime_valid: bool | None = None
+    best_runtime_logs: str = ""
 
     for iteration in range(1, max_iterations + 1):
         logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
@@ -879,7 +918,60 @@ def generate_and_refine(
             for fname, content in data_files.items():
                 (eval_dir / fname).write_text(content, encoding="utf-8")
 
-        # --- Step 3: Screenshots (host-side, for external judge) ---
+        # --- Step 3: Runtime Validation ---
+        runtime_valid, runtime_logs = _validate_generated_app_runtime(
+            eval_dir,
+            framework_key,
+            artifact_name,
+            effective_port,
+        )
+        result.runtime_valid = runtime_valid
+        result.runtime_logs = runtime_logs
+        if runtime_valid:
+            logger.info(
+                "Iteration %d: Runtime validation passed; captured startup logs",
+                iteration,
+            )
+        else:
+            logger.warning(
+                "Iteration %d: Runtime validation failed; captured startup logs:\n%s",
+                iteration,
+                runtime_logs,
+            )
+
+        if not runtime_valid:
+            if best_runtime_valid is not True:
+                best_code = code
+                best_runtime_valid = False
+                best_runtime_logs = runtime_logs
+                best_score = 0.0
+                best_quality_score = 0.0
+
+            if iteration < max_iterations:
+                from .prompts import build_runtime_refinement_prompt
+
+                current_prompt = build_runtime_refinement_prompt(
+                    prompt,
+                    previous_code=code,
+                    runtime_logs=runtime_logs,
+                    validation_passed=runtime_valid,
+                    iteration=iteration,
+                )
+                logger.info(
+                    "Preparing runtime-log refinement prompt for next iteration"
+                )
+                continue
+
+            if best_runtime_valid is not True:
+                result.error = (
+                    "Failed runtime validation after "
+                    f"{iteration} iteration(s). See runtime_validation.logs_tail "
+                    "in run_summary.json for startup logs."
+                )
+            result.passed = False
+            break
+
+        # --- Step 3.5: Screenshots (host-side, for external judge) ---
         screenshot_paths: list[Path] = []
         if screenshot:
             try:
@@ -905,6 +997,8 @@ def generate_and_refine(
                     result.error = str(exc)
                     if best_code is None:
                         best_code = code
+                        best_runtime_valid = True
+                        best_runtime_logs = runtime_logs
                         best_score = 0.0
                         best_quality_score = 0.0
                     break
@@ -934,25 +1028,6 @@ def generate_and_refine(
                         "successfully run the screenshot tool before finishing."
                     )
                     continue
-
-        # --- Step 3.5: Runtime Validation ---
-        runtime_valid, runtime_logs = _validate_generated_app_runtime(
-            eval_dir,
-            framework_key,
-            artifact_name,
-            effective_port,
-        )
-        if runtime_valid:
-            logger.info(
-                "Iteration %d: Runtime validation passed; captured startup logs",
-                iteration,
-            )
-        else:
-            logger.warning(
-                "Iteration %d: Runtime validation failed; captured startup logs:\n%s",
-                iteration,
-                runtime_logs,
-            )
 
         # --- Step 4: Judge ---
         if judge_models:
@@ -1035,6 +1110,8 @@ def generate_and_refine(
                     best_code = code
                     best_feedback = judge_result.feedback_dict()
                     best_score_breakdown = value_score.to_dict()
+                    best_runtime_valid = True
+                    best_runtime_logs = runtime_logs
                     result.screenshot_paths = screenshot_paths
 
                 if score >= quality_threshold:
@@ -1044,6 +1121,8 @@ def generate_and_refine(
                     result.value_score = score
                     result.score_breakdown = value_score.to_dict()
                     result.judge_feedback = judge_result.feedback_dict()
+                    result.runtime_valid = True
+                    result.runtime_logs = runtime_logs
                     result.passed = True
                     break
 
@@ -1064,41 +1143,22 @@ def generate_and_refine(
             except Exception as exc:
                 logger.warning("Judge failed: %s", exc)
                 best_code = code
+                best_runtime_valid = True
+                best_runtime_logs = runtime_logs
                 best_score = 0.0
                 best_quality_score = 0.0
         else:
             # No judge — use local startup logs as the refinement signal.
 
             best_code = code
-            best_runtime_valid = runtime_valid
-            best_score = 10.0 if runtime_valid else 0.0
+            best_runtime_valid = True
+            best_runtime_logs = runtime_logs
+            best_score = 10.0
             best_quality_score = best_score
             result.screenshot_paths = screenshot_paths
 
-            if runtime_valid:
-                logger.info("Runtime validation passed! Accepting app early.")
-                result.passed = True
-                result.score = best_score
-                result.quality_score = best_quality_score
-                result.value_score = best_score
-                break
-
-            if iteration < max_iterations:
-                from .prompts import build_runtime_refinement_prompt
-
-                current_prompt = build_runtime_refinement_prompt(
-                    prompt,
-                    previous_code=code,
-                    runtime_logs=runtime_logs,
-                    validation_passed=runtime_valid,
-                    iteration=iteration,
-                )
-                logger.info(
-                    "Preparing runtime-log refinement prompt for next iteration"
-                )
-                continue
-
-            result.passed = runtime_valid
+            logger.info("Runtime validation passed! Accepting app early.")
+            result.passed = True
             result.score = best_score
             result.quality_score = best_quality_score
             result.value_score = best_score
@@ -1122,6 +1182,9 @@ def generate_and_refine(
 
         result.app_dir = output_path
         result.source_code = best_code
+        if best_runtime_valid is not None:
+            result.runtime_valid = best_runtime_valid
+            result.runtime_logs = best_runtime_logs
         if not judge_models and best_runtime_valid is not None:
             result.passed = best_runtime_valid
             result.score = best_score

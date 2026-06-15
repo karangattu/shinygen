@@ -166,7 +166,6 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
     for model in [
         "glm-5",
         "glm-5.1",
-
         "kimi-k2.6",
         "kimi-k2.7-code",
         "mimo-v2.5",
@@ -194,6 +193,14 @@ def test_benchmark_aggregate_validates_expected_matrix_cells():
     assert "BENCHMARK_EXPECTED_ARMS" in workflow
     assert "missing_matrix_cells" in workflow
     assert "benchmark_validation_failed.txt" in workflow
+
+
+def test_benchmark_aggregate_expected_models_match_run_matrix():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "name: kimi-k2.7-code" in workflow
+    assert "kimi-k2.7-code" in workflow
+    assert "kimi-k2.5" not in workflow
 
 
 def test_benchmark_aggregate_reports_screenshot_counts():
