@@ -566,8 +566,10 @@ def _resolve_judge_screenshot_paths(
     eval_dir: Path,
     framework_key: str,
     port: int,
+    *,
+    allow_host_fallback: bool | None = None,
 ) -> list[Path]:
-    """Return screenshots for judging.
+    """Return screenshots for judging / artifact capture.
 
     Preference order:
     1. Sandbox-captured per-tab series (``screenshot_01_landing.png``,
@@ -580,8 +582,15 @@ def _resolve_judge_screenshot_paths(
      4. Raise ``RuntimeError`` so the caller can decide whether to retry or
        proceed with code-only judging.
 
-    Set ``SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1`` to disable the host-side
-     fallback and use only sandbox screenshots.
+    ``allow_host_fallback`` controls step 2:
+      - ``None`` (default): honour ``SHINYGEN_STRICT_SANDBOX_SCREENSHOT`` —
+        when set, the host-side fallback is disabled so a judge never
+        scores a host-rendered image instead of the agent's own.
+      - ``True``: always attempt host-side capture, ignoring the strict
+        flag. Use this when the screenshot is an artifact rather than a
+        judge input (i.e. ``--screenshot`` with no judge), where producing
+        *any* screenshot is better than none.
+      - ``False``: never attempt host-side capture.
 
     Multi-image judging matters because multi-tab dashboards used to be
     judged on the landing page only, biasing visual_ux_quality scores
@@ -599,8 +608,9 @@ def _resolve_judge_screenshot_paths(
 
     legacy = _gather_legacy_screenshots(output_path)
 
-    strict = _env_truthy("SHINYGEN_STRICT_SANDBOX_SCREENSHOT")
-    if not strict:
+    if allow_host_fallback is None:
+        allow_host_fallback = not _env_truthy("SHINYGEN_STRICT_SANDBOX_SCREENSHOT")
+    if allow_host_fallback:
         try:
             from . import screenshot as host_screenshot
 
@@ -973,12 +983,20 @@ def generate_and_refine(
         # --- Step 3.5: Screenshots (host-side, for external judge) ---
         screenshot_paths: list[Path] = []
         if screenshot:
+            # When a judge is configured, honour SHINYGEN_STRICT_SANDBOX_SCREENSHOT
+            # so the judge never scores a host-rendered image. When there is no
+            # judge, the screenshot is an artifact for the user, not a judge
+            # input — so always allow the host-side fallback to produce one
+            # from the extracted code (e.g. when the agent was SIGTERM'd
+            # before it could take its own screenshot).
+            host_fallback = True if not judge_models else None
             try:
                 screenshot_paths = _resolve_judge_screenshot_paths(
                     output_path,
                     eval_dir,
                     framework_key,
                     effective_port,
+                    allow_host_fallback=host_fallback,
                 )
                 logger.info(
                     "Iteration %d: Captured %d screenshots",
@@ -986,7 +1004,13 @@ def generate_and_refine(
                     len(screenshot_paths),
                 )
             except RuntimeError as exc:
-                if _env_truthy("SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE"):
+                # Screenshots are only consumed by the judge. When there are
+                # no judges, a missing screenshot (e.g. the agent was
+                # SIGTERM'd before taking one) must not fail an otherwise
+                # successful run — the generated app is still usable.
+                if judge_models and _env_truthy(
+                    "SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE"
+                ):
                     logger.error(
                         "Iteration %d: %s Screenshot-backed judging is required; "
                         "stopping without code-only judging.",
@@ -1001,7 +1025,17 @@ def generate_and_refine(
                         best_score = 0.0
                         best_quality_score = 0.0
                     break
-                if iteration == max_iterations:
+                if not judge_models:
+                    # No judging configured: the screenshot is cosmetic.
+                    # Don't retry, don't fail — just record it and move on.
+                    logger.warning(
+                        "Iteration %d: %s No judge configured, so the "
+                        "missing screenshot is non-fatal; proceeding.",
+                        iteration,
+                        exc,
+                    )
+                    screenshot_paths = []
+                elif iteration == max_iterations:
                     # Final iteration: don't hard-fail the whole run just
                     # because the screenshot pipeline broke. Proceed with
                     # code-only judging so we still get a usable result.

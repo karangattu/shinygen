@@ -728,6 +728,44 @@ class TestResolveJudgeScreenshotPaths:
                 18888,
             )
 
+    def test_strict_mode_yields_to_host_fallback_when_allowed(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        # No-judge artifact path: even with SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1,
+        # allow_host_fallback=True must capture a screenshot for the user
+        # instead of raising.
+        output_path = tmp_path / "output"
+        output_path.mkdir()
+        eval_dir = tmp_path / "eval"
+        eval_dir.mkdir()
+        host_screenshot = eval_dir / "screenshot.png"
+        host_screenshot.write_bytes(b"host")
+
+        monkeypatch.setenv("SHINYGEN_STRICT_SANDBOX_SCREENSHOT", "1")
+
+        def fake_take_screenshots(app_dir, framework_key, port):
+            return host_screenshot
+
+        monkeypatch.setattr(
+            "shinygen.screenshot.take_screenshots", fake_take_screenshots
+        )
+
+        screenshot_paths = _resolve_judge_screenshot_paths(
+            output_path,
+            eval_dir,
+            "shiny_r",
+            18888,
+            allow_host_fallback=True,
+        )
+
+        copied = output_path / "screenshot.png"
+        legacy_alias = output_path / "agent_last_screenshot.png"
+        assert screenshot_paths == [copied]
+        assert copied.read_bytes() == b"host"
+        assert legacy_alias.read_bytes() == b"host"
+
     def test_raises_when_sandbox_missing_and_host_fallback_fails(
         self,
         tmp_path,
