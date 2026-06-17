@@ -33,14 +33,15 @@ ui <- page_sidebar(
 **Example with cards:**
 ```r
 ui <- page_sidebar(
-  title = "Penguins Dashboard",
+  title = "Listings Dashboard",
   sidebar = sidebar(
-    selectInput("species", "Species", choices = unique(penguins$species))
+    selectInput("neighbourhood", "Neighbourhood",
+                choices = sort(unique(na.omit(df$neighbourhood))))
   ),
   card(
     full_screen = TRUE,
-    card_header("Bill Length"),
-    plotOutput("bill_length")
+    card_header("Price Distribution"),
+    plotOutput("price_hist")
   ),
   card(
     card_header("Summary Statistics"),
@@ -48,6 +49,7 @@ ui <- page_sidebar(
   )
 )
 ```
+`df` is the CSV read at the top of `app.R` with `read.csv("<filename>.csv")`. Use the column names from that CSV, not a built-in dataset.
 
 **Key parameters:**
 - `title`: App title displayed at the top

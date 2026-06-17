@@ -4,7 +4,14 @@ System and user prompt templates for Shiny app generation.
 
 from __future__ import annotations
 
+import csv
+import io
+
 from .config import FRAMEWORKS
+
+_DATASET_CONTEXT_PREVIEW_ROWS = 5
+_DATASET_CONTEXT_COL_PREVIEW = 60
+_DATASET_CONTEXT_CHAR_LIMIT = 4_000
 
 # ---------------------------------------------------------------------------
 # System prompts — enforce strict language/framework rules
@@ -162,9 +169,92 @@ def build_system_prompt(
     return prompt
 
 
+def build_dataset_context(data_files: dict[str, str] | None) -> str | None:
+    """Build a compact, host-side dataset context block from file contents.
+
+    For each CSV in ``data_files`` (filename -> content), emit the exact
+    filename, its columns, row count, and a small preview. This gives the
+    agent the real dataset shape without sandbox tool calls and pins it to
+    the exact filename so it does not substitute a built-in/example dataset.
+
+    Non-CSV files are listed by name only. Returns ``None`` when
+    ``data_files`` is empty.
+    """
+    if not data_files:
+        return None
+
+    blocks: list[str] = []
+    for filename, content in data_files.items():
+        if not filename.lower().endswith(".csv"):
+            blocks.append(
+                f"- `{filename}` (non-CSV file, present in /home/user/project/)"
+            )
+            continue
+        if content is None:
+            blocks.append(
+                f"- `{filename}` (CSV present in /home/user/project/, content unavailable)"
+            )
+            continue
+        try:
+            reader = csv.reader(io.StringIO(content))
+            rows: list[list[str]] = []
+            total = -1
+            for index, row in enumerate(reader):
+                total = index
+                if index < _DATASET_CONTEXT_PREVIEW_ROWS:
+                    rows.append(row)
+            row_count = max(total, 0)
+        except csv.Error:
+            blocks.append(
+                f"- `{filename}` (CSV present in /home/user/project/, unparseable)"
+            )
+            continue
+
+        if not rows:
+            blocks.append(f"- `{filename}` (empty CSV present in /home/user/project/)")
+            continue
+
+        columns = rows[0]
+        col_line = ", ".join(col[:_DATASET_CONTEXT_COL_PREVIEW] for col in columns)
+        preview_lines: list[str] = []
+        for row in rows[1:]:
+            padded = row + [""] * (len(columns) - len(row))
+            preview_lines.append(
+                ", ".join(
+                    (val or "")[:_DATASET_CONTEXT_COL_PREVIEW]
+                    for val in padded[: len(columns)]
+                )
+            )
+        preview = "\n".join(preview_lines)
+
+        block = (
+            f"- `{filename}` — {len(columns)} columns, {row_count} data row(s)\n"
+            f"  columns: {col_line}\n"
+            f"  preview (first {len(preview_lines)} row(s)):\n{preview}"
+        )
+        blocks.append(block)
+
+    if not blocks:
+        return None
+
+    body = "\n".join(blocks)
+    if len(body) > _DATASET_CONTEXT_CHAR_LIMIT:
+        body = body[:_DATASET_CONTEXT_CHAR_LIMIT] + "\n... [truncated]"
+
+    return (
+        "DATASET(S) YOU MUST USE (already present in /home/user/project/):\n"
+        f"{body}\n\n"
+        "Read these exact files by the names above. Do NOT substitute "
+        "`data.csv`, `economics.csv`, `mtcars`, `penguins`, `iris`, "
+        "`diamonds`, or any other built-in or example dataset — use only "
+        "the file(s) listed here."
+    )
+
+
 def build_user_prompt(
     user_prompt: str,
     framework_key: str,
+    data_files: dict[str, str] | None = None,
 ) -> str:
     """Build the full user prompt combining the user's request with
     framework-specific instructions.
@@ -172,18 +262,30 @@ def build_user_prompt(
     Args:
         user_prompt: The user's natural-language description of the app.
         framework_key: "shiny_python" or "shiny_r"
+        data_files: Optional mapping of filename -> content for data files
+            staged in the sandbox. When provided, a dataset-context block
+            naming each CSV and its columns/preview is appended so the agent
+            reads the exact file instead of substituting a built-in dataset.
     """
     fw = FRAMEWORKS[framework_key]
     artifact = fw["primary_artifact"]
     language = fw["language"]
     label = fw["label"]
 
-    return (
-        f"{user_prompt}\n\n"
+    parts = [
+        user_prompt,
+        "\n\n",
         f"IMPORTANT: Build this using {label}. "
         f"Write {language} code and save it as `{artifact}`. "
-        f"The app must be runnable with: {fw['run_command'].format(port=8000)}"
-    )
+        f"The app must be runnable with: {fw['run_command'].format(port=8000)}",
+    ]
+
+    dataset_context = build_dataset_context(data_files)
+    if dataset_context:
+        parts.append("\n\n")
+        parts.append(dataset_context)
+
+    return "".join(parts)
 
 
 def build_truncation_retry_prompt(

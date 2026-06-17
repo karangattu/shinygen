@@ -403,3 +403,51 @@ class TestBuildGenerationTask:
         assert task.solver is sentinel_solver
         assert task.time_limit == expected_limit
         assert task.working_limit == expected_limit
+
+
+class TestDatasetContextInjection:
+    """The agent's user message must name the exact CSV + columns so it
+    does not substitute a built-in/example dataset (notably for Claude R)."""
+
+    @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
+    @pytest.mark.parametrize("use_skills", [True, False])
+    def test_dataset_context_in_user_message_for_claude_and_codex(
+        self, tmp_path, monkeypatch, agent, use_skills
+    ):
+        sentinel_solver = object()
+        monkeypatch.setattr(f"shinygen.generate.{agent}", lambda **kw: sentinel_solver)
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard for the selected dataset",
+            agent=agent,
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+            data_files={
+                "airbnb-asheville-short.csv": "neighbourhood,price\nA,100\nB,200\n"
+            },
+            skills=load_default_skills("shiny_python"),
+            use_skills=use_skills,
+        )
+
+        user_msgs = [m for m in task.dataset.samples[0].input if m.role == "user"]
+        assert user_msgs, "expected at least one user message in the sample input"
+        user_content = user_msgs[-1].content
+        # Exact filename, columns, and anti-swap directive must reach the
+        # agent in both the skills and vanilla arms.
+        assert "airbnb-asheville-short.csv" in user_content
+        assert "neighbourhood, price" in user_content
+        assert "Do NOT substitute" in user_content
+
+    def test_no_dataset_context_when_no_data_files(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("shinygen.generate.claude_code", lambda **kw: object())
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="claude_code",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+        )
+
+        user_msgs = [m for m in task.dataset.samples[0].input if m.role == "user"]
+        user_content = user_msgs[-1].content
+        assert "DATASET(S) YOU MUST USE" not in user_content

@@ -1,6 +1,7 @@
 """Tests for shinygen.prompts"""
 
 from shinygen.prompts import (
+    build_dataset_context,
     build_refinement_prompt,
     build_runtime_refinement_prompt,
     build_system_prompt,
@@ -73,6 +74,63 @@ class TestBuildUserPrompt:
         prompt = build_user_prompt("Make a chart", "shiny_python")
         assert "Shiny for Python" in prompt
 
+    def test_appends_dataset_context_when_data_files_provided(self):
+        prompt = build_user_prompt(
+            "Build a dashboard",
+            "shiny_python",
+            data_files={"sales.csv": "city,revenue\nAsheville,100\n"},
+        )
+        assert "DATASET(S) YOU MUST USE" in prompt
+        assert "`sales.csv`" in prompt
+        assert "city, revenue" in prompt
+        assert "sales.csv" in prompt
+
+    def test_omits_dataset_context_when_no_data_files(self):
+        prompt = build_user_prompt("Build a dashboard", "shiny_python")
+        assert "DATASET(S) YOU MUST USE" not in prompt
+
+
+class TestBuildDatasetContext:
+    def test_returns_none_for_empty_or_none(self):
+        assert build_dataset_context(None) is None
+        assert build_dataset_context({}) is None
+
+    def test_names_exact_csv_filename_columns_and_row_count(self):
+        ctx = build_dataset_context(
+            {
+                "airbnb-asheville-short.csv": "neighbourhood,price,room_type\nA,100,Entire\nB,200,Private\n"
+            }
+        )
+        assert ctx is not None
+        assert "`airbnb-asheville-short.csv`" in ctx
+        assert "neighbourhood, price, room_type" in ctx
+        assert "2 data row(s)" in ctx
+
+    def test_includes_anti_swap_directive(self):
+        ctx = build_dataset_context({"sales.csv": "a,b\n1,2\n"})
+        assert "Do NOT substitute" in ctx
+        assert "mtcars" in ctx
+        assert "penguins" in ctx
+        assert "data.csv" in ctx
+
+    def test_lists_non_csv_files_by_name_only(self):
+        ctx = build_dataset_context({"meta.json": '{"k":"v"}'})
+        assert ctx is not None
+        assert "`meta.json`" in ctx
+        assert "non-CSV file" in ctx
+
+    def test_handles_empty_csv(self):
+        ctx = build_dataset_context({"empty.csv": ""})
+        assert ctx is not None
+        assert "`empty.csv`" in ctx
+        assert "empty CSV" in ctx
+
+    def test_truncates_oversized_context(self):
+        big_row = ",".join(f"column_name_{i}_padding" for i in range(500))
+        ctx = build_dataset_context({"big.csv": big_row + "\n"})
+        assert ctx is not None
+        assert "[truncated]" in ctx
+
 
 class TestBuildTruncationRetryPrompt:
     def test_focuses_retry_on_direct_artifact_write(self):
@@ -104,7 +162,9 @@ class TestBuildRefinementPrompt:
             "requirement_fidelity": {"score": 5, "rationale": "OK"},
         }
         code = "from shiny import App\napp = App(None, None)"
-        prompt = build_refinement_prompt("Build a dashboard", feedback, 2, previous_code=code)
+        prompt = build_refinement_prompt(
+            "Build a dashboard", feedback, 2, previous_code=code
+        )
         assert "from shiny import App" in prompt
         assert "previous version" in prompt.lower()
         assert "```" in prompt
@@ -121,7 +181,9 @@ class TestBuildRefinementPrompt:
         feedback = {
             "requirement_fidelity": {"score": 5, "rationale": "OK"},
         }
-        prompt_none = build_refinement_prompt("Build a dashboard", feedback, 1, previous_code=None)
+        prompt_none = build_refinement_prompt(
+            "Build a dashboard", feedback, 1, previous_code=None
+        )
         prompt_omit = build_refinement_prompt("Build a dashboard", feedback, 1)
         assert prompt_none == prompt_omit
 

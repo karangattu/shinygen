@@ -474,7 +474,7 @@ def build_generation_task(
         data_file_names,
         screenshot=screenshot,
     )
-    full_user_prompt = build_user_prompt(user_prompt, framework_key)
+    full_user_prompt = build_user_prompt(user_prompt, framework_key, data_files)
     resolved_skills = list(skills or []) if use_skills else []
 
     # Merge sample files

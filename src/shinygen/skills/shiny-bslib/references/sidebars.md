@@ -64,13 +64,16 @@ page_sidebar(
   title = "My Dashboard",
   sidebar = sidebar(
     title = "Filters",
-    selectInput("species", "Species", choices = unique(penguins$species)),
-    selectInput("island", "Island", choices = unique(penguins$island))
+    selectInput("neighbourhood", "Neighbourhood",
+                choices = sort(unique(na.omit(df$neighbourhood)))),
+    selectInput("room_type", "Room type",
+                choices = sort(unique(na.omit(df$room_type))))
   ),
   card(full_screen = TRUE, card_header("Plot"), plotOutput("scatter")),
   card(card_header("Summary"), verbatimTextOutput("summary"))
 )
 ```
+`df` is the CSV read at the top of `app.R` with `read.csv("<filename>.csv")`. Use the column names from that CSV, not a built-in dataset.
 
 ### page_navbar() with Sidebar
 

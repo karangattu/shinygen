@@ -13,39 +13,44 @@ Build professional Shiny dashboards using bslib's Bootstrap 5 components and lay
 
 ## Quick Start
 
-**Single-page dashboard:**
+**Single-page dashboard** (reads the CSV file named in your task — never a built-in dataset):
 ```r
 library(shiny)
 library(bslib)
+
+df <- read.csv("airbnb-asheville-short.csv", stringsAsFactors = FALSE)
 
 ui <- page_sidebar(
   title = "My Dashboard",
   theme = bs_theme(version = 5),  # "shiny" preset by default
   sidebar = sidebar(
-    selectInput("variable", "Variable", choices = names(mtcars))
+    selectInput("neighbourhood", "Neighbourhood",
+                choices = sort(unique(na.omit(df$neighbourhood))))
   ),
   layout_column_wrap(
     width = 1/3,
     fill = FALSE,
-    value_box(title = "Users", value = "1,234", theme = "primary"),
-    value_box(title = "Revenue", value = "$56K", theme = "success"),
-    value_box(title = "Growth", value = "+18%", theme = "info")
+    value_box(title = "Listings", value = format(nrow(df), big.mark = ","), theme = "primary"),
+    value_box(title = "Avg Price", value = sprintf("$%.0f", mean(df$price, na.rm = TRUE)), theme = "success"),
+    value_box(title = "Avg Rating", value = sprintf("%.1f", mean(df$review_scores_rating, na.rm = TRUE)), theme = "info")
   ),
   card(
     full_screen = TRUE,
-    card_header("Plot"),
+    card_header("Price by Neighbourhood"),
     plotOutput("plot")
   )
 )
 
 server <- function(input, output, session) {
   output$plot <- renderPlot({
-    hist(mtcars[[input$variable]], main = input$variable)
+    filtered <- df[df$neighbourhood == input$neighbourhood, ]
+    hist(filtered$price, main = input$neighbourhood, xlab = "price")
   })
 }
 
 shinyApp(ui, server)
 ```
+Replace `airbnb-asheville-short.csv` and the column names above with the exact filename and columns from your task.
 
 **Multi-page dashboard:**
 ```r
@@ -207,14 +212,14 @@ See [migration.md](references/migration.md) for a complete mapping of legacy pat
 7. **Use responsive widths** like `width = "250px"` in `layout_column_wrap()` for auto-adjusting columns
 8. **Group sidebar inputs** with `accordion()` when sidebars have many controls
 9. **See [migration.md](references/migration.md)** for mapping legacy Shiny patterns to modern bslib equivalents
-10. **Load CSV datasets dynamically** from the working directory (e.g. `read.csv("data.csv")` or finding `.csv` files). **NEVER** use default/built-in datasets (like `ggplot2::diamonds` or `mtcars`) when custom datasets are provided in the environment.
+10. **Read the exact CSV named in your task** from the working directory with `read.csv("<filename>.csv", stringsAsFactors = FALSE)`. **NEVER** substitute a built-in dataset (`ggplot2::diamonds`, `mtcars`, `iris`, `penguins`) — R tutorials lean on those, but your task provides a real CSV file. If the filename is unknown, your task prompt or system prompt names it; do not guess with `list.files()[1]`.
 
 ## Avoid Common Errors
 
 1. Avoid directly nesting `card()` containers. `navset_card_*()` functions are already cards; `nav_panel()` content goes directly inside them without wrapping in `card()`
 2. Only use `layout_columns()` and `layout_column_wrap()` for laying out multiple elements. Single children should be passed directly to their container functions.
 3. Never nest `page_*()` functions. Only use one top-level page function per app.
-4. Never hardcode built-in datasets like `diamonds` or `mtcars` when a local CSV file is available. Always load the CSV file using `read.csv` or similar.
+4. Never hardcode built-in datasets like `diamonds`, `mtcars`, `iris`, or `penguins` when a local CSV file is provided. Always `read.csv()` the exact CSV named in your task.
 
 ## Reference Files
 

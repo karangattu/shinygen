@@ -126,20 +126,15 @@ page_sidebar(
 
 ## Data Loading
 
-Load local dataset CSV files once at the top of the script (global scope). Do not use built-in R datasets like `ggplot2::diamonds`, `mtcars`, or `iris` if a CSV dataset is provided in the workspace.
+Load the CSV dataset named in your task once at the top of the script (global scope). Do not use built-in R datasets like `ggplot2::diamonds`, `mtcars`, `iris`, or `penguins` — your task provides a real CSV file. Do not guess the filename with `list.files()[1]`; your task prompt or system prompt names the exact file.
 
-To load the CSV dataset robustly, read it from the local directory:
-
-```r
-df <- read.csv("data.csv", stringsAsFactors = FALSE)
-```
-
-If multiple CSV files are present or the name is dynamic, detect the file:
+Read the exact CSV file from the local directory:
 
 ```r
-csv_files <- list.files(pattern = "\\.csv$")
-df <- read.csv(csv_files[1], stringsAsFactors = FALSE)
+df <- read.csv("airbnb-asheville-short.csv", stringsAsFactors = FALSE)
 ```
+
+Replace `airbnb-asheville-short.csv` with the exact filename named in your task. If the task names more than one CSV, read each by its exact name rather than picking the first match.
 
 ### Preprocessing and Normalizing Data
 
