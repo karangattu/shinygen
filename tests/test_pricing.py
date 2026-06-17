@@ -406,8 +406,8 @@ class TestOpenCodeGoPricing:
         # (mimo-v2-pro / mimo-v2-omni are advertised but not in the public
         # OpenCode Go pricing table, so they are excluded here).
         priced_models = {
+            "glm-5.2",
             "glm-5.1",
-            "glm-5",
 
             "kimi-k2.6",
             "kimi-k2.7-code",

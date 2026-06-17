@@ -281,26 +281,18 @@ def build_runtime_refinement_prompt(
     *,
     previous_code: str,
     runtime_logs: str,
-    validation_passed: bool,
     iteration: int,
 ) -> str:
-    """Build a no-judge refinement prompt from startup/server logs."""
+    """Build a refinement prompt from startup/server logs for a broken app."""
     trimmed_logs = runtime_logs.strip() or "(no server output captured)"
     if len(trimmed_logs) > 8_000:
         trimmed_logs = trimmed_logs[-8_000:]
 
-    status = (
-        "The app started successfully, but this no-judge benchmark still "
-        "requires one log-informed cleanup pass before final submission."
-        if validation_passed
-        else "The app did not pass startup validation. Fix the errors shown "
-        "in the logs before final submission."
-    )
-
     return (
         f"{original_prompt}\n\n"
         f"--- RUNTIME LOG REVIEW (iteration {iteration}) ---\n"
-        f"{status}\n\n"
+        "The app did not pass startup validation. Fix the errors shown "
+        "in the logs before final submission.\n\n"
         "Here is the previous version of the app that was run:\n\n"
         f"```\n{previous_code}\n```\n\n"
         "Server/startup logs from that run:\n\n"

@@ -954,7 +954,6 @@ def generate_and_refine(
                     prompt,
                     previous_code=code,
                     runtime_logs=runtime_logs,
-                    validation_passed=runtime_valid,
                     iteration=iteration,
                 )
                 logger.info(
@@ -1148,8 +1147,9 @@ def generate_and_refine(
                 best_score = 0.0
                 best_quality_score = 0.0
         else:
-            # No judge — use local startup logs as the refinement signal.
-
+            # No judge — accept the app as soon as it runs cleanly. The
+            # no-judge arm only iterates again when the app is actually
+            # broken, using the captured server logs as the fix signal.
             best_code = code
             best_runtime_valid = runtime_valid
             best_runtime_logs = runtime_logs
@@ -1157,6 +1157,14 @@ def generate_and_refine(
             best_quality_score = best_score
             result.screenshot_paths = screenshot_paths
 
+            if runtime_valid:
+                result.passed = True
+                result.score = best_score
+                result.quality_score = best_quality_score
+                result.value_score = best_score
+                break
+
+            # App is broken — refine against the server logs if budget remains.
             if iteration < max_iterations:
                 from .prompts import build_runtime_refinement_prompt
 
@@ -1164,7 +1172,6 @@ def generate_and_refine(
                     prompt,
                     previous_code=code,
                     runtime_logs=runtime_logs,
-                    validation_passed=runtime_valid,
                     iteration=iteration,
                 )
                 logger.info(
@@ -1172,7 +1179,7 @@ def generate_and_refine(
                 )
                 continue
 
-            result.passed = runtime_valid
+            result.passed = False
             result.score = best_score
             result.quality_score = best_quality_score
             result.value_score = best_score

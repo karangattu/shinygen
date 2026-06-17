@@ -72,8 +72,8 @@ env:
     gpt-5.4-mini
     gpt-5.4-nano
     gpt-5.5
-    glm-5
     glm-5.1
+    glm-5.2
     kimi-k2.6
     kimi-k2.7-code
     mimo-v2.5
@@ -196,9 +196,9 @@ jobs:
           - idx: "07"
             name: gpt-5.5
           - idx: "08"
-            name: glm-5
-          - idx: "09"
             name: glm-5.1
+          - idx: "09"
+            name: glm-5.2
           - idx: "11"
             name: kimi-k2.6
           - idx: "22"
@@ -479,8 +479,8 @@ jobs:
         gpt-5.4-mini
         gpt-5.4-nano
         gpt-5.5
-        glm-5
         glm-5.1
+        glm-5.2
         kimi-k2.6
         kimi-k2.7-code
         mimo-v2.5

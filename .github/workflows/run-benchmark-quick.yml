@@ -31,7 +31,7 @@ on:
           - gpt-5.4
           - gpt-5.4-mini
           - gpt-5.4-nano
-          - glm-5
+          - glm-5.2
           - glm-5.1
 
           - kimi-k2.6

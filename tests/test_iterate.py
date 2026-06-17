@@ -104,7 +104,7 @@ class TestRuntimeLogFailureDetection:
 
 
 class TestNoJudgeRuntimeRefinement:
-    def test_no_judge_run_feeds_logs_even_when_first_iteration_starts_clean(
+    def test_no_judge_run_accepts_clean_first_iteration_without_refining(
         self,
         tmp_path,
         monkeypatch,
@@ -136,13 +136,13 @@ class TestNoJudgeRuntimeRefinement:
             max_iterations=2,
         )
 
-        assert result.source_code == generated[1]
-        assert result.iterations == 2
+        # A clean-running first iteration is accepted immediately — the
+        # no-judge arm only iterates again when the app is actually broken.
+        assert result.source_code == generated[0]
+        assert result.iterations == 1
         assert result.passed is True
-        assert len(prompts_seen) == 2
-        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
-        assert "Listening on http://127.0.0.1:8000" in prompts_seen[1]
-        assert "first" in prompts_seen[1]
+        assert len(prompts_seen) == 1
+        assert "RUNTIME LOG REVIEW" not in prompts_seen[0]
 
     def test_judged_run_retries_runtime_failure_even_with_passing_judge_score(
         self,
@@ -268,7 +268,7 @@ class TestNoJudgeRuntimeRefinement:
         assert "Listening on http://127.0.0.1:8000" in prompts_seen[1]
         assert "first" in prompts_seen[1]
 
-    def test_no_judge_run_keeps_refining_on_success(
+    def test_no_judge_run_stops_after_first_clean_iteration(
         self,
         tmp_path,
         monkeypatch,
@@ -301,12 +301,12 @@ class TestNoJudgeRuntimeRefinement:
             max_iterations=3,
         )
 
-        assert result.source_code == generated[2]
-        assert result.iterations == 3
+        # Even with max_iterations=3, a clean first iteration is accepted
+        # without further "cleanup" passes.
+        assert result.source_code == generated[0]
+        assert result.iterations == 1
         assert result.passed is True
-        assert len(prompts_seen) == 3
-        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
-        assert "RUNTIME LOG REVIEW" in prompts_seen[2]
+        assert len(prompts_seen) == 1
 
     def test_refinement_no_code_falls_back_without_inner_retries(
         self,

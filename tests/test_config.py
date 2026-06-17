@@ -112,7 +112,7 @@ class TestResolveModel:
     @pytest.mark.parametrize(
         "alias",
         [
-            "glm-5",
+            "glm-5.2",
             "glm-5.1",
 
             "kimi-k2.6",

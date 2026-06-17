@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **GLM-5.2 model support**: Register `glm-5.2` (OpenCode Go) in `src/shinygen/config.py` and pricing table (`$1.40` input, `$4.40` output, `$0.26` cached read, per 1M tokens). The new model is exposed in the benchmark matrix, quick benchmark, and multi-model benchmark workflows alongside `glm-5.1`.
 - **Pre-built sandbox images on GHCR**: New `.github/workflows/build-sandbox-images.yml` builds and publishes `ghcr.io/<owner>/shinygen-sandbox-python` and `ghcr.io/<owner>/shinygen-sandbox-r` with `claude` and `codex` standalone binaries baked in. Compose files default to pulling these (`pull_policy: missing`) and fall back to local build when missing. Switches `CODEX_CLI_VERSION` to `"auto"` so `inspect_swe` reuses the in-image binary instead of re-downloading per sample.
 - **Benchmark workflows pre-pull sandbox image**: `run-benchmark-matrix.yml`, `run-shinygen.yml`, and `run-shinygen-multi.yml` log into GHCR and `docker pull` the framework-appropriate image before running, eliminating the ~10 min Dockerfile build (R) and per-sample CLI downloads. Override the image tag via `SHINYGEN_SANDBOX_PYTHON_IMAGE` / `SHINYGEN_SANDBOX_R_IMAGE`.
 - **Benchmark screenshot enforcement**: Benchmark workflows now set `SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE=1`, so screenshot-enabled benchmark rows fail instead of being accepted through code-only judging when both sandbox and host-side capture fail.
@@ -21,3 +22,5 @@ All notable changes to this project will be documented in this file.
 - Lower Claude `reasoning_effort` from `high` to `medium` to reduce run duration while maintaining adaptive thinking
 - Append `EXECUTION PRIORITY` directive to all system prompts, instructing the agent to write the primary artifact early and avoid excessive reconnaissance
 - Ignore benchmark aggregate directories in `.gitignore`
+- **Deprecate GLM-5**: Remove `glm-5` from `OPENCODE_GO_OPENAI_COMPATIBLE_MODELS`, the pricing table, and every benchmark workflow option set. Use `glm-5.1` (kept) or the new `glm-5.2` instead.
+- **No-judge runs stop as soon as the app runs cleanly**: Previously, runs without `--judge-model` always burned all `max_iterations` doing log-informed "cleanup passes" even when the first app started successfully. Now the no-judge arm accepts the first runtime-valid app and only iterates again when startup validation fails, matching the with-judge path's runtime-failure handling. `build_runtime_refinement_prompt` no longer takes a `validation_passed` flag (it was always `False` in practice).

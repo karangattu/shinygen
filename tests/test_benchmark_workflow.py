@@ -164,7 +164,7 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
     quick_workflow = QUICK_WORKFLOW_PATH.read_text(encoding="utf-8")
 
     for model in [
-        "glm-5",
+        "glm-5.2",
         "glm-5.1",
         "kimi-k2.6",
         "kimi-k2.7-code",

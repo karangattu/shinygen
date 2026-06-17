@@ -132,7 +132,6 @@ class TestBuildRuntimeRefinementPrompt:
             "Build an ED operations dashboard",
             previous_code="from shiny import App\napp = App(None, None)",
             runtime_logs="Listening on http://127.0.0.1:8000\nTraceback: bad column",
-            validation_passed=False,
             iteration=1,
         )
 

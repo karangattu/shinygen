@@ -42,8 +42,8 @@ OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 
 # OpenCode Go models that expose OpenAI-compatible chat completions endpoints.
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
+    "glm-5.2",
     "glm-5.1",
-    "glm-5",
 
     "kimi-k2.6",
     "kimi-k2.7-code",

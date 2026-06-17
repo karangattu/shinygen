@@ -101,7 +101,7 @@ def test_web_browser_tools_are_flattened_into_tools_list():
 
         from shinygen.native_solver import native_react_solver
         native_react_solver(
-            model_id="openai-api/opencode-go/glm-5",
+            model_id="openai-api/opencode-go/glm-5.2",
             cwd="/home/user/project",
             framework="shiny_python",
             artifact="app.py",

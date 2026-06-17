@@ -521,7 +521,7 @@ shinygen generate \
         --judge-model anthropic/claude-opus-4-7
 ```
 
-The alias `opencode-go/kimi-k2.6` resolves to `openai-api/opencode-go/kimi-k2.6`, and shinygen automatically sets `OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1`. MiniMax aliases resolve to an Anthropic-compatible OpenCode Go route. Supported aliases include `glm-5.1`, `glm-5`, `kimi-k2.5`, `kimi-k2.6`, `mimo-v2.5`, `mimo-v2.5-pro`, `minimax-m2.5`, `minimax-m2.7`, `minimax-m3`, `qwen3.7-max`, `qwen3.7-plus`, `qwen3.6-plus`, `deepseek-v4-pro`, and `deepseek-v4-flash`.
+The alias `opencode-go/kimi-k2.6` resolves to `openai-api/opencode-go/kimi-k2.6`, and shinygen automatically sets `OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1`. MiniMax aliases resolve to an Anthropic-compatible OpenCode Go route. Supported aliases include `glm-5.2`, `glm-5.1`, `kimi-k2.5`, `kimi-k2.6`, `mimo-v2.5`, `mimo-v2.5-pro`, `minimax-m2.5`, `minimax-m2.7`, `minimax-m3`, `qwen3.7-max`, `qwen3.7-plus`, `qwen3.6-plus`, `deepseek-v4-pro`, and `deepseek-v4-flash`.
 
 For a local value benchmark template that compares frontier US models and OpenCode Go models across both `skills` and `vanilla` arms, start from `batch-opencode-go.json`.
 
