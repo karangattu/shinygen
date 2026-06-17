@@ -25,13 +25,13 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
 ]
 dependencies = [
-    "click>=8.0",
-    "inspect-ai>=0.3.129",
-    "inspect-swe>=0.2.47",
-    "anthropic>=0.34.0",
-    "openai>=1.0.0",
-    "httpx>=0.27",
-    "zstandard>=0.23",
+    "click>=8.4.1",
+    "inspect-ai>=0.3.240",
+    "inspect-swe>=0.2.63",
+    "anthropic>=0.109.2",
+    "openai>=2.42.0",
+    "httpx>=0.28.1",
+    "zstandard>=0.25.0",
 ]
 
 [project.urls]
@@ -41,16 +41,16 @@ Repository = "https://github.com/karangathani/shinygen"
 
 [project.optional-dependencies]
 screenshot = [
-    "playwright>=1.48.0",
-    "Pillow>=10.0",
+    "playwright>=1.60.0",
+    "Pillow>=12.2.0",
 ]
 dev = [
-    "pytest>=7.0",
-    "pyright>=1.1.350",
-    "black>=24.0",
-    "isort>=5.10",
-    "playwright>=1.48.0",
-    "Pillow>=10.0",
+    "pytest>=9.1.0",
+    "pyright>=1.1.410",
+    "black>=26.5.1",
+    "isort>=8.0.1",
+    "playwright>=1.60.0",
+    "Pillow>=12.2.0",
 ]
 
 [project.scripts]
