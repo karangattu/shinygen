@@ -114,7 +114,6 @@ class TestResolveModel:
         [
             "glm-5.2",
             "glm-5.1",
-
             "kimi-k2.6",
             "kimi-k2.7-code",
             "mimo-v2.5",
@@ -145,6 +144,7 @@ class TestResolveModel:
 
     def test_lmstudio_model_resolution(self):
         from shinygen.config import is_lmstudio_model
+
         agent, model_id = resolve_model("gemma-4-26b-a4b")
         assert agent == "native_react_solver"
         assert model_id == "openai/gemma-4-26b-a4b"
@@ -156,6 +156,14 @@ class TestResolveModel:
         assert is_lmstudio_model(model_id2)
 
         assert not is_lmstudio_model("openai/gpt-5.4")
+
+    def test_any_explicit_lmstudio_model_uses_native_solver(self):
+        from shinygen.config import is_lmstudio_model
+
+        agent, model_id = resolve_model("lmstudio/qwen3.5-9b")
+        assert agent == "native_react_solver"
+        assert model_id == "lmstudio/qwen3.5-9b"
+        assert is_lmstudio_model(model_id)
 
 
 class TestResolveFramework:
@@ -228,7 +236,9 @@ class TestCheckDocker:
     def test_docker_not_running(self):
         import subprocess
 
-        with patch("shinygen.config.shutil.which", return_value="/usr/local/bin/docker"):
+        with patch(
+            "shinygen.config.shutil.which", return_value="/usr/local/bin/docker"
+        ):
             with patch(
                 "shinygen.config.subprocess.run",
                 side_effect=subprocess.CalledProcessError(1, "docker info"),
@@ -239,7 +249,9 @@ class TestCheckDocker:
     def test_docker_timeout(self):
         import subprocess
 
-        with patch("shinygen.config.shutil.which", return_value="/usr/local/bin/docker"):
+        with patch(
+            "shinygen.config.shutil.which", return_value="/usr/local/bin/docker"
+        ):
             with patch(
                 "shinygen.config.subprocess.run",
                 side_effect=subprocess.TimeoutExpired("docker info", 15),
@@ -288,12 +300,15 @@ class TestCheckAPIKey:
 
     def test_build_lmstudio_model(self):
         from shinygen.config import _build_lmstudio_model
+        from inspect_ai.model import GenerateConfig
+
         with patch("inspect_ai.model.get_model") as mock_get_model:
             _build_lmstudio_model("openai/gemma-4-26b-a4b")
             mock_get_model.assert_called_once_with(
                 "openai/gemma-4-26b-a4b",
                 base_url="http://localhost:1234/v1",
                 api_key="lm-studio",
+                config=GenerateConfig(reasoning_effort="none"),
                 memoize=False,
             )
 

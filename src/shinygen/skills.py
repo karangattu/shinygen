@@ -57,6 +57,8 @@ def load_default_skills(
 
 def load_skill_context_text(
     framework_key: str,
+    *,
+    include_references: bool = True,
 ) -> str:
     """Load bundled skills as a single text block for prompt injection.
 
@@ -79,7 +81,7 @@ def load_skill_context_text(
         parts.append(f"# Skill: {label} Dashboard\n\n" + skill_md.read_text())
 
     refs_dir = skill_dir / "references"
-    if refs_dir.exists():
+    if include_references and refs_dir.exists():
         for ref in sorted(refs_dir.glob("*.md")):
             parts.append(f"\n\n# Reference: {ref.stem}\n\n" + ref.read_text())
 

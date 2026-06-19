@@ -42,6 +42,7 @@ class TestGetPricing:
         assert get_pricing("openai/gemma-4-26b-a4b") == (0.0, 0.0)
         assert get_pricing("openai/qwen3.6-27b") == (0.0, 0.0)
         assert calculate_cost("openai/gemma-4-26b-a4b", 1_000_000, 1_000_000) == 0.0
+        assert get_pricing("lmstudio/qwen3.5-9b") == (0.0, 0.0)
 
 
 class TestCalculateCost:
@@ -408,7 +409,6 @@ class TestOpenCodeGoPricing:
         priced_models = {
             "glm-5.2",
             "glm-5.1",
-
             "kimi-k2.6",
             "kimi-k2.7-code",
             "deepseek-v4-pro",

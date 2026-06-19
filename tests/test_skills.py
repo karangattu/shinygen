@@ -232,6 +232,26 @@ class TestBuildGenerationTask:
         assert task.solver is sentinel_agent
         assert captured["model_id"] == ("anthropic/opencode-go/minimax-m2.7")
 
+    def test_lmstudio_model_gets_local_generation_time_limit(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(
+            "shinygen.native_solver.native_react_solver", lambda **kwargs: object()
+        )
+
+        task = build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="native_react_solver",
+            model_id="lmstudio/qwen3.5-9b",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+        )
+
+        assert task.time_limit == 1200
+        assert task.working_limit == 1200
+
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     def test_use_skills_false_runs_vanilla_baseline(
         self,

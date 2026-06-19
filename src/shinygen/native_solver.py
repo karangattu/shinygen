@@ -133,7 +133,10 @@ def _build_direct_artifact_instructions(
         "- Do NOT wrap the answer in extra Markdown headings or quoting.\n\n"
         "The code must be complete, runnable, and robust to the provided CSV "
         "data. Prefer a working dashboard with clear KPIs, charts, filters, "
-        "and a table over a complex app that may fail at startup."
+        "and a table over a complex app that may fail at startup. "
+        "For Shiny for Python Plotly charts, use shinywidgets.output_widget "
+        "with shinywidgets.render_plotly; ui.output_plotly and render.plotly "
+        "do not exist."
     )
 
     if extra_instructions and extra_instructions.strip():
@@ -441,7 +444,7 @@ def native_react_solver(
 ) -> Solver:
     """Return an Inspect ``Solver`` driven by the native ``react()`` agent."""
     lower_id = model_id.lower()
-    if "kimi" in lower_id or "minimax" in lower_id:
+    if "kimi" in lower_id or "minimax" in lower_id or is_lmstudio_model(model_id):
         return native_direct_artifact_solver(
             cwd=cwd,
             framework=framework,

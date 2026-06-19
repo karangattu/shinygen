@@ -611,6 +611,16 @@ Then run the batch:
 shinygen batch --config batch_local.json
 ```
 
+### 4. Run the Generated App Locally
+Each generation writes a standalone `app.py` plus the CSV it used into the output directory. To open the app after a local LM Studio run:
+
+```bash
+cd ./local-bench/skills
+python -m shiny run app.py
+```
+
+If you generated into a different folder, run `python -m shiny run app.py` from that output directory so the app can read its CSV next to `app.py`.
+
 ---
 
 ## {{< fa microchip >}} Supported Models

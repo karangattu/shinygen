@@ -269,6 +269,8 @@ def _detect_provider(model_id: str) -> str | None:
 
 def get_pricing(model_id: str) -> tuple[float, float] | None:
     """Return (input_price_per_mtok, output_price_per_mtok) or None if unknown."""
+    if model_id.lower().strip().startswith("lmstudio/"):
+        return (0.0, 0.0)
     return _PRICING.get(_normalize_model_name(model_id))
 
 

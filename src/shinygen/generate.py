@@ -30,6 +30,7 @@ from .config import (
     OPENCODE_GO_TIME_LIMIT,
     SANDBOX_IMAGE_ENV_DEFAULTS,
     SANDBOX_WORK_DIR,
+    is_lmstudio_model,
     is_opencode_go_model,
     sandbox_time_limit_for_framework,
 )
@@ -557,7 +558,12 @@ def build_generation_task(
         if use_skills:
             from .skills import load_skill_context_text
 
-            skill_context = load_skill_context_text(framework_key).strip()
+            # ponytail: local models get the actionable skill overview without
+            # 100KB of references; restore them if local prompt speed improves.
+            skill_context = load_skill_context_text(
+                framework_key,
+                include_references=not is_lmstudio_model(model_id or ""),
+            ).strip()
             if skill_context:
                 extra_instructions = (
                     "Use these additional shinygen dashboard "
@@ -576,10 +582,18 @@ def build_generation_task(
         # burned wall-clock on stalled providers without producing
         # better apps. 10 minutes is plenty for a single dashboard
         # when the harness isn't sleeping on a slow proxy.
-        time_limit = min(
-            sandbox_time_limit_for_framework(framework_key),
-            OPENCODE_GO_TIME_LIMIT,
-        )
+        if is_lmstudio_model(model_id or ""):
+            # ponytail: local 27B models can emit ~5 tokens/sec; 20 minutes
+            # covers one complete app plus the existing validation repair.
+            time_limit = max(
+                sandbox_time_limit_for_framework(framework_key),
+                20 * 60,
+            )
+        else:
+            time_limit = min(
+                sandbox_time_limit_for_framework(framework_key),
+                OPENCODE_GO_TIME_LIMIT,
+            )
         return Task(
             dataset=dataset,
             solver=solver,

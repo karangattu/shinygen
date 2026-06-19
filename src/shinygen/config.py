@@ -44,7 +44,6 @@ OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "glm-5.2",
     "glm-5.1",
-
     "kimi-k2.6",
     "kimi-k2.7-code",
     "deepseek-v4-pro",
@@ -102,8 +101,7 @@ FRAMEWORKS: dict[str, dict[str, str]] = {
         "primary_artifact": "app.py",
         "run_command": "shiny run app.py --port {port}",
         "install_command": (
-            "pip install shiny shinywidgets plotly faicons pandas "
-            "matplotlib seaborn"
+            "pip install shiny shinywidgets plotly faicons pandas " "matplotlib seaborn"
         ),
         "skill_dir": "shiny-python-dashboard",
     },
@@ -225,6 +223,8 @@ def resolve_model(alias: str) -> tuple[str, str]:
     key = alias.lower().strip()
     if key in MODEL_ALIASES:
         return MODEL_ALIASES[key]
+    if key.startswith("lmstudio/") and key != "lmstudio/":
+        return ("native_react_solver", key)
     # Allow passing a full model ID directly — infer agent from prefix
     if key.startswith("anthropic/"):
         return ("claude_code", alias)
@@ -249,19 +249,29 @@ def is_opencode_go_model(model_id: str) -> bool:
 def is_lmstudio_model(model_id: str) -> bool:
     """Return True when a resolved Inspect model points to LM Studio."""
     model = model_id.lower().strip()
-    return "gemma-4-26b-a4b" in model or "qwen3.6-27b" in model
+    return (
+        model.startswith("lmstudio/")
+        or "gemma-4-26b-a4b" in model
+        or "qwen3.6-27b" in model
+    )
 
 
 def _build_lmstudio_model(model_id: str) -> "Model":
     """Construct an Inspect ``Model`` for a local LM Studio model."""
-    from inspect_ai.model import get_model
+    from inspect_ai.model import GenerateConfig, get_model
 
     base_url = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
     api_key = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
+    inspect_model_id = (
+        f"openai/{model_id.split('/', 1)[1]}"
+        if model_id.lower().startswith("lmstudio/")
+        else model_id
+    )
     return get_model(
-        model_id,
+        inspect_model_id,
         base_url=base_url,
         api_key=api_key,
+        config=GenerateConfig(reasoning_effort="none"),
         memoize=False,
     )
 
