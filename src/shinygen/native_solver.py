@@ -32,11 +32,19 @@ repeated 500s on the second tool-turn.
 
 from __future__ import annotations
 
+import logging
 import os
 import shlex
+from pathlib import Path
 
 from inspect_ai.agent import AgentPrompt, react
-from inspect_ai.model import ChatMessageSystem, ChatMessageUser, Model, get_model
+from inspect_ai.model import (
+    ChatMessageSystem,
+    ChatMessageUser,
+    GenerateConfig,
+    Model,
+    get_model,
+)
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.tool import bash, text_editor, python, tool, Tool
 from inspect_ai.util import sandbox
@@ -44,7 +52,6 @@ from inspect_ai.util import sandbox
 from .config import (
     OPENCODE_GO_BASE_URL,
     is_lmstudio_model,
-    _build_lmstudio_model,
     is_opencode_go_anthropic_model,
     is_opencode_go_model,
     opencode_go_anthropic_model_name,
@@ -62,6 +69,8 @@ _DIRECT_ARTIFACT_ATTEMPTS = 2
 # is never truncated mid-generation.
 _DIRECT_ARTIFACT_MAX_TOKENS = 16_384
 _SERVER_VALIDATION_TIMEOUT = 45
+
+logger = logging.getLogger(__name__)
 
 
 _REACT_INSTRUCTIONS_TEMPLATE = (
@@ -320,6 +329,302 @@ done
     return output
 
 
+def _csv_preview_text(path: Path) -> str:
+    """Return a compact column/row preview for a single CSV file (pure Python)."""
+    import csv
+
+    try:
+        with path.open(newline="", encoding="utf-8", errors="replace") as handle:
+            reader = csv.reader(handle)
+            rows: list[list[str]] = []
+            for index, row in enumerate(reader):
+                if index < 8:
+                    rows.append(row)
+                elif index > 2000:
+                    break
+            handle.seek(0)
+            total_rows = max(sum(1 for _ in handle) - 1, 0)
+    except OSError:
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = [
+        f"columns: {', '.join(rows[0])}",
+        f"data_rows: {total_rows}",
+        "preview_csv:",
+    ]
+    lines.extend(",".join(row) for row in rows)
+    return "\n".join(lines)
+
+
+def _collect_host_data_context(work_dir: Path) -> str:
+    """Collect a compact data preview from the host working directory.
+
+    Mirrors :func:`_collect_sandbox_data_context` but reads files directly
+    on the host instead of shelling into a Docker sandbox — used for the
+    Docker-free LM Studio generation path.
+    """
+    if not work_dir.is_dir():
+        return ""
+
+    parts: list[str] = ["Files in working directory:"]
+    file_names = sorted(
+        p.name for p in work_dir.iterdir() if p.is_file()
+    )
+    parts.extend(file_names)
+
+    for csv_path in sorted(work_dir.glob("*.csv")):
+        preview = _csv_preview_text(csv_path)
+        if not preview:
+            continue
+        parts.append("")
+        parts.append(f"### {csv_path.name}")
+        parts.append(preview)
+
+    output = "\n".join(parts).strip()
+    if len(output) > _DATA_CONTEXT_CHAR_LIMIT:
+        return output[:_DATA_CONTEXT_CHAR_LIMIT] + "\n... [truncated]"
+    return output
+
+
+def _host_validation_command(
+    *,
+    framework: str,
+    artifact: str,
+    cwd: Path,
+    port: int,
+    python_executable: str,
+) -> str:
+    """Return a shell command that starts the app on the host and prints logs.
+
+    Host-side counterpart of :func:`_server_validation_command`. Uses the
+    project Python (``sys.executable``) instead of the sandbox ``python3``.
+    """
+    quoted_cwd = shlex.quote(str(cwd))
+    quoted_artifact = shlex.quote(artifact)
+    log_path = "/tmp/shinygen_app_validation.log"
+
+    if framework == "shiny_r":
+        start_cmd = (
+            f"Rscript -e \"shiny::runApp('{artifact}', port={port}, "
+            'launch.browser=FALSE)"'
+        )
+        process_pattern = "Rscript"
+    else:
+        start_cmd = (
+            f"{shlex.quote(python_executable)} -m shiny run {quoted_artifact} "
+            f"--port {port}"
+        )
+        process_pattern = "shiny run"
+
+    return f"""
+set +e
+cd {quoted_cwd} || exit 1
+rm -f {log_path}
+({start_cmd}) > {log_path} 2>&1 &
+app_pid=$!
+sleep 6
+if kill -0 "$app_pid" 2>/dev/null; then
+  tail -n 120 {log_path} || true
+  pkill -f {shlex.quote(process_pattern)} || kill "$app_pid" 2>/dev/null || true
+  exit 0
+fi
+wait "$app_pid"
+status=$?
+tail -n 120 {log_path} || true
+exit "$status"
+""".strip()
+
+
+def _validate_artifact_on_host(
+    *,
+    work_dir: Path,
+    framework: str,
+    artifact: str,
+    port: int,
+    python_executable: str,
+) -> tuple[bool, str]:
+    """Start the generated app on the host and return (startup_ok, logs)."""
+    import subprocess
+
+    command = _host_validation_command(
+        framework=framework,
+        artifact=artifact,
+        cwd=work_dir,
+        port=port,
+        python_executable=python_executable,
+    )
+    try:
+        completed = subprocess.run(
+            ["sh", "-lc", command],
+            text=True,
+            capture_output=True,
+            timeout=_SERVER_VALIDATION_TIMEOUT,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        return False, str(exc)
+
+    output = "\n".join(
+        part for part in (completed.stdout, completed.stderr) if part
+    ).strip()
+    return completed.returncode == 0, output
+
+
+async def generate_artifact_on_host(
+    *,
+    model: "Model",
+    framework: str,
+    artifact: str,
+    work_dir: Path,
+    system_prompt: str,
+    user_prompt: str,
+    extra_instructions: str | None = None,
+    data_context: str | None = None,
+    port: int,
+    python_executable: str,
+) -> tuple[str | None, list[dict[str, object]], bool]:
+    """Generate a Shiny artifact on the host via LM Studio (no Docker).
+
+    This is the Docker-free counterpart of the Inspect-Task generation path
+    for local LM Studio models. Model inference already happens on the host
+    (HTTP calls to ``localhost:1234``), and the project venv provides the
+    full Shiny runtime, so no sandbox is required.
+
+    The flow reuses the direct-artifact contract from
+    :func:`native_direct_artifact_solver`: ask for one complete code block,
+    write it to ``work_dir/<artifact>``, validate by starting the app on the
+    host, and give the model one no-tool repair attempt if startup fails.
+
+    Args:
+        model: Inspect ``Model`` pointed at the local LM Studio server.
+        framework: ``"shiny_python"`` or ``"shiny_r"``.
+        artifact: Target file name (``app.py`` / ``app.R``).
+        work_dir: Host directory containing the CSV and where the artifact
+            will be written.
+        system_prompt: Framework system prompt (from ``build_system_prompt``).
+        user_prompt: Full user prompt (from ``build_user_prompt``).
+        extra_instructions: Optional skill context text appended to the
+            direct-artifact instructions.
+        data_context: Optional pre-collected CSV preview text. When
+            ``None`` it is gathered from ``work_dir`` on the host.
+        port: Free TCP port for host-side app validation.
+        python_executable: Python interpreter for running the app
+            (typically ``sys.executable``).
+
+    Returns:
+        ``(code, usage_rows, hit_token_limit)`` mirroring
+        :func:`shinygen.iterate._run_generation`.
+    """
+    from inspect_ai.model import (
+        ChatMessageAssistant,
+        ChatMessageSystem,
+        ChatMessageUser,
+    )
+
+    instructions = _build_direct_artifact_instructions(
+        framework=framework,
+        artifact=artifact,
+        cwd=str(work_dir),
+        extra_instructions=extra_instructions,
+    )
+
+    messages: list = [
+        ChatMessageSystem(content=instructions),
+        ChatMessageSystem(content=system_prompt),
+        ChatMessageUser(content=user_prompt),
+    ]
+
+    if data_context is None:
+        data_context = _collect_host_data_context(work_dir)
+    if data_context:
+        messages.append(
+            ChatMessageUser(
+                content=(
+                    "Dataset context gathered from the working directory. "
+                    "Use these columns and preview rows when writing the "
+                    f"app:\n\n{data_context}"
+                )
+            )
+        )
+
+    usage_rows: list[dict[str, object]] = []
+    code: str | None = None
+
+    for attempt in range(1, _DIRECT_ARTIFACT_ATTEMPTS + 1):
+        try:
+            output = await model.generate(
+                messages,
+                config=GenerateConfig(max_tokens=_DIRECT_ARTIFACT_MAX_TOKENS),
+            )
+        except Exception as exc:
+            logger.warning("Host generation attempt %d failed: %s", attempt, exc)
+            if attempt < _DIRECT_ARTIFACT_ATTEMPTS:
+                continue
+            return None, usage_rows, False
+
+        usage = getattr(output, "usage", None)
+        if usage is not None:
+            usage_rows.append(
+                {
+                    "model": getattr(output, "model", "") or str(model),
+                    "input_tokens": int(getattr(usage, "input_tokens", 0) or 0),
+                    "output_tokens": int(getattr(usage, "output_tokens", 0) or 0),
+                    "cache_write_tokens": int(
+                        getattr(usage, "input_tokens_cache_write", 0) or 0
+                    ),
+                    "cache_read_tokens": int(
+                        getattr(usage, "input_tokens_cache_read", 0) or 0
+                    ),
+                    "cost_override": getattr(usage, "total_cost", None),
+                }
+            )
+
+        completion = getattr(output, "completion", "") or ""
+        hit_token_limit = getattr(output, "stop_reason", "") in ("max_tokens", "length")
+
+        candidate = _extract_direct_artifact_code(
+            completion, framework=framework, artifact=artifact
+        )
+        if not candidate:
+            if attempt < _DIRECT_ARTIFACT_ATTEMPTS:
+                messages.append(ChatMessageAssistant(content=completion))
+                messages.append(
+                    ChatMessageUser(
+                        content=_build_invalid_code_retry_prompt(
+                            artifact=artifact, previous_output=completion
+                        )
+                    )
+                )
+            continue
+
+        code = candidate
+        artifact_path = work_dir / artifact
+        artifact_path.write_text(code, encoding="utf-8")
+
+        valid, validation_output = _validate_artifact_on_host(
+            work_dir=work_dir,
+            framework=framework,
+            artifact=artifact,
+            port=port,
+            python_executable=python_executable,
+        )
+        if valid or attempt >= _DIRECT_ARTIFACT_ATTEMPTS:
+            break
+
+        messages.append(ChatMessageAssistant(content=completion))
+        messages.append(
+            ChatMessageUser(
+                content=_build_direct_repair_prompt(
+                    artifact=artifact, validation_output=validation_output
+                )
+            )
+        )
+
+    return code, usage_rows, bool(usage_rows and hit_token_limit)
+
+
 @solver
 def native_direct_artifact_solver(
     *,
@@ -451,9 +756,7 @@ def native_react_solver(
             artifact=artifact,
             extra_instructions=extra_instructions,
         )
-    if is_lmstudio_model(model_id):
-        model = _build_lmstudio_model(model_id)
-    elif is_opencode_go_model(model_id):
+    if is_opencode_go_model(model_id):
         model = _build_opencode_go_model(model_id)
     else:
         # Allow the native solver to be used for non-OpenCode-Go models too;

@@ -236,17 +236,26 @@ def _validate_generated_app_runtime(
     framework_key: str,
     artifact_name: str,
     port: int,
+    *,
+    model_id: str | None = None,
 ) -> tuple[bool, str]:
-    """Start a generated app in the sandbox image and return (startup_ok, logs)."""
+    """Start a generated app and return (startup_ok, logs).
+
+    By default the app is started inside the pre-built sandbox Docker image
+    (matching the generation environment). For LM Studio models the Docker
+    step is skipped and validation runs directly on the host with the
+    project venv, since those models never use a sandbox.
+    """
     command = _runtime_validation_command(
         framework_key=framework_key,
         artifact_name=artifact_name,
         port=port,
     )
 
+    use_docker = not (model_id and is_lmstudio_model(model_id))
     env_var, default_image = SANDBOX_IMAGE_ENV_DEFAULTS.get(framework_key, ("", ""))
     image = os.environ.get(env_var, default_image) if env_var else ""
-    if image:
+    if use_docker and image:
         docker_cmd = [
             "docker",
             "run",
@@ -934,6 +943,7 @@ def generate_and_refine(
             framework_key,
             artifact_name,
             effective_port,
+            model_id=model_id,
         )
         result.runtime_valid = runtime_valid
         result.runtime_logs = runtime_logs
@@ -1280,6 +1290,129 @@ def generate_and_refine(
     return result
 
 
+def _run_local_generation(
+    *,
+    prompt: str,
+    model_id: str,
+    framework_key: str,
+    data_files: dict[str, str] | None,
+    iteration: int,
+    output_path: Path | None = None,
+    use_skills: bool = True,
+) -> tuple[str | None, list[dict[str, object]], bool]:
+    """Generate a Shiny artifact on the host via LM Studio (no Docker).
+
+    Host-side counterpart of :func:`_run_generation` for local LM Studio
+    models. Reuses the same prompt builders, skill context loader, model
+    builder, and direct-artifact generation logic, but stages files in a
+    host temp directory and validates the app with the project venv instead
+    of a Docker sandbox.
+
+    Returns the same ``(code, usage_rows, hit_token_limit)`` shape as
+    :func:`_run_generation` so the :func:`generate_and_refine` loop is
+    unchanged.
+    """
+    import asyncio
+    import sys
+    import tempfile
+
+    from .config import find_free_port
+    from .native_solver import generate_artifact_on_host
+    from .prompts import build_system_prompt, build_user_prompt
+    from .skills import load_skill_context_text
+
+    fw = FRAMEWORKS[framework_key]
+    artifact_name = fw["primary_artifact"]
+
+    work_dir = Path(tempfile.mkdtemp(prefix=f"shinygen_local_{iteration}_"))
+    try:
+        # Stage data files into the host working directory so the model's
+        # data context preview and the generated app can read them.
+        if data_files:
+            for fname, content in data_files.items():
+                (work_dir / fname).write_text(content, encoding="utf-8")
+
+        system_prompt = build_system_prompt(
+            framework_key,
+            data_files=list(data_files.keys()) if data_files else None,
+        )
+        user_prompt = build_user_prompt(prompt, framework_key, data_files)
+
+        extra_instructions: str | None = None
+        if use_skills:
+            # Local models get the actionable skill overview without the
+            # 100KB references bundle (matches the Docker path policy).
+            skill_context = load_skill_context_text(
+                framework_key, include_references=False
+            ).strip()
+            if skill_context:
+                extra_instructions = (
+                    "Use these additional shinygen dashboard "
+                    "generation guidelines when planning and editing "
+                    f"files:\n\n{skill_context}"
+                )
+
+        model = _build_lmstudio_model(model_id)
+        port = find_free_port()
+
+        try:
+            code, usage_rows, hit_token_limit = asyncio.run(
+                generate_artifact_on_host(
+                    model=model,
+                    framework=framework_key,
+                    artifact=artifact_name,
+                    work_dir=work_dir,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    extra_instructions=extra_instructions,
+                    port=port,
+                    python_executable=sys.executable,
+                )
+            )
+        except RuntimeError as exc:
+            # asyncio.run raises RuntimeError if an event loop is already
+            # running (Inspect runs inside one). Fall back to a fresh loop.
+            logger.warning(
+                "Iteration %d: asyncio.run blocked (%s); using new loop",
+                iteration,
+                exc,
+            )
+            loop = asyncio.new_event_loop()
+            try:
+                code, usage_rows, hit_token_limit = loop.run_until_complete(
+                    generate_artifact_on_host(
+                        model=model,
+                        framework=framework_key,
+                        artifact=artifact_name,
+                        work_dir=work_dir,
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        extra_instructions=extra_instructions,
+                        port=port,
+                        python_executable=sys.executable,
+                    )
+                )
+            finally:
+                loop.close()
+
+        if code and output_path is not None:
+            # Mirror the Docker path: copy the generated artifact + data
+            # files into the user-facing output directory so the app is
+            # runnable directly from there.
+            output_path.mkdir(parents=True, exist_ok=True)
+            (output_path / artifact_name).write_text(code, encoding="utf-8")
+            if data_files:
+                for fname, content in data_files.items():
+                    (output_path / fname).write_text(content, encoding="utf-8")
+
+        return code, usage_rows, hit_token_limit
+    except Exception as exc:
+        logger.error("Local generation failed in iteration %d: %s", iteration, exc)
+        return None, [], False
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
 def _run_generation(
     prompt: str,
     agent: str,
@@ -1294,7 +1427,24 @@ def _run_generation(
     *,
     use_skills: bool = True,
 ) -> tuple[str | None, list[dict[str, object]], bool]:
-    """Run a single generation via Inspect AI and extract the code."""
+    """Run a single generation via Inspect AI and extract the code.
+
+    LM Studio models bypass the Docker/Inspect-Task path entirely and run
+    on the host (see :func:`_run_local_generation`), since model inference
+    already targets ``localhost:1234`` and the project venv provides the
+    full Shiny runtime needed for validation.
+    """
+    if is_lmstudio_model(model_id):
+        return _run_local_generation(
+            prompt=prompt,
+            model_id=model_id,
+            framework_key=framework_key,
+            data_files=data_files,
+            iteration=iteration,
+            output_path=output_path,
+            use_skills=use_skills,
+        )
+
     from inspect_ai import eval as inspect_eval
 
     from .extract import extract_from_log

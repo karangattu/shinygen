@@ -396,6 +396,11 @@ def preflight_checks(agent: str, model_id: str | None = None) -> None:
     """Run all pre-flight checks before starting generation.
 
     Raises DockerNotAvailableError or APIKeyMissingError on failure.
+
+    LM Studio models run entirely on the host (model inference against the
+    local LM Studio server and app validation via the project venv), so the
+    Docker daemon check is skipped for them.
     """
-    check_docker()
+    if not (model_id and is_lmstudio_model(model_id)):
+        check_docker()
     check_api_key(agent, model_id)

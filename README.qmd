@@ -537,6 +537,8 @@ OpenCode's TypeScript SDK controls an OpenCode server/session, which is useful f
 
 shinygen supports running evaluations locally with **gemma-4-26b-a4b** and **qwen3.6-27b** through a local [LM Studio](https://lmstudio.ai/) server. This is extremely useful for running unmetered/free local evaluations in both `skills` (treatment) and `vanilla` (control) configurations.
 
+Local LM Studio runs execute **entirely on the host** — no Docker is required. Model inference targets `localhost:1234` directly, and app validation uses the project venv (which already bundles the full Shiny stack). Cloud models (Claude Code, Codex CLI, OpenCode Go) continue to use isolated Docker sandboxes.
+
 ### 1. Start the LM Studio Server
 - Open LM Studio, search for and download your desired model (`gemma-4-26b-a4b` or `qwen3.6-27b`).
 - Load the model and start the local server. By default, LM Studio runs on port `1234` (making the endpoint `http://localhost:1234/v1`).
@@ -548,6 +550,7 @@ shinygen supports running evaluations locally with **gemma-4-26b-a4b** and **qwe
 ### 2. Resolution & Zero Pricing
 - The aliases `gemma-4-26b-a4b` and `qwen3.6-27b` resolve automatically to standard `openai/` identifiers driven by the modern `native_react_solver` agent.
 - API key verification is bypassed since these models run locally.
+- The Docker pre-flight check is skipped for LM Studio models, so Docker Desktop does not need to be running.
 - Pricing is hardcoded to `$0.00` per million tokens inside `pricing.py` to ensure local evaluations are not penalized in the final value-adjusted score.
 
 ### 3. Running a Local Comparison

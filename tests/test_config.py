@@ -319,3 +319,10 @@ class TestPreflightChecks:
         with patch("shinygen.config.shutil.which", return_value=None):
             with pytest.raises(DockerNotAvailableError):
                 preflight_checks("claude_code")
+
+    def test_preflight_checks_skips_docker_for_lmstudio(self):
+        """LM Studio models run on the host and must not require Docker."""
+        with patch("shinygen.config.check_docker") as mock_docker:
+            # No API key required for LM Studio, so this should pass cleanly.
+            preflight_checks("native_react_solver", "openai/gemma-4-26b-a4b")
+        mock_docker.assert_not_called()
