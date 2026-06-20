@@ -147,12 +147,12 @@ class TestResolveModel:
 
         agent, model_id = resolve_model("gemma-4-26b-a4b")
         assert agent == "native_react_solver"
-        assert model_id == "openai/gemma-4-26b-a4b"
+        assert model_id == "openai/google/gemma-4-26b-a4b-qat"
         assert is_lmstudio_model(model_id)
 
         agent2, model_id2 = resolve_model("qwen3.6-27b")
         assert agent2 == "native_react_solver"
-        assert model_id2 == "openai/qwen3.6-27b"
+        assert model_id2 == "openai/qwen/qwen3.6-27b"
         assert is_lmstudio_model(model_id2)
 
         assert not is_lmstudio_model("openai/gpt-5.4")
@@ -295,17 +295,17 @@ class TestCheckAPIKey:
 
     def test_lmstudio_key_not_required(self):
         with patch.dict("os.environ", {}, clear=True):
-            check_api_key("native_react_solver", "openai/gemma-4-26b-a4b")
-            check_api_key("native_react_solver", "openai/qwen3.6-27b")
+            check_api_key("native_react_solver", "openai/google/gemma-4-26b-a4b-qat")
+            check_api_key("native_react_solver", "openai/qwen/qwen3.6-27b")
 
     def test_build_lmstudio_model(self):
         from shinygen.config import _build_lmstudio_model
         from inspect_ai.model import GenerateConfig
 
         with patch("inspect_ai.model.get_model") as mock_get_model:
-            _build_lmstudio_model("openai/gemma-4-26b-a4b")
+            _build_lmstudio_model("openai/google/gemma-4-26b-a4b-qat")
             mock_get_model.assert_called_once_with(
-                "openai/gemma-4-26b-a4b",
+                "openai/google/gemma-4-26b-a4b-qat",
                 base_url="http://localhost:1234/v1",
                 api_key="lm-studio",
                 config=GenerateConfig(reasoning_effort="none"),
@@ -324,5 +324,5 @@ class TestPreflightChecks:
         """LM Studio models run on the host and must not require Docker."""
         with patch("shinygen.config.check_docker") as mock_docker:
             # No API key required for LM Studio, so this should pass cleanly.
-            preflight_checks("native_react_solver", "openai/gemma-4-26b-a4b")
+            preflight_checks("native_react_solver", "openai/google/gemma-4-26b-a4b-qat")
         mock_docker.assert_not_called()

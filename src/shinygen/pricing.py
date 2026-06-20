@@ -175,6 +175,11 @@ _PRICING: dict[str, tuple[float, float]] = {
     "mimo-v2.5": (0.14, 0.28),
     "gemma-4-26b-a4b": (0.0, 0.0),
     "qwen3.6-27b": (0.0, 0.0),
+    "qwen/qwen3.6-27b": (0.0, 0.0),
+    "google/gemma-4-26b-a4b-qat": (0.0, 0.0),
+    "google/gemma-4-e4b": (0.0, 0.0),
+    "qwen/qwen3.6-35b-a3b": (0.0, 0.0),
+    "gemma-4-12b-it-qat": (0.0, 0.0),
 }
 
 # Cache multipliers (write, read) relative to base input price per provider
