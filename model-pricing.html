@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Model Pricing Guide</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232563eb'/%3E%3Cpath d='M4 11h8M4 8h8M4 5h8' stroke='white' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --panel: #fff;
+      --ink: #172033;
+      --muted: #5f6b7a;
+      --line: #dce3ec;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #0f8a5f;
+      --green-soft: #e9f8f1;
+      --amber: #a75d00;
+      --amber-soft: #fff4df;
+      --shadow: 0 14px 40px rgba(23, 32, 51, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 58%, #0f766e 100%);
+      color: #fff;
+      padding: 56px 24px 44px;
+    }
+
+    .wrap {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      color: #bfdbfe;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      margin: 0 0 10px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1;
+      letter-spacing: 0;
+      margin: 0;
+      max-width: 840px;
+    }
+
+    .lede {
+      color: #dbeafe;
+      font-size: 18px;
+      margin: 18px 0 0;
+      max-width: 720px;
+    }
+
+    main { padding: 28px 0 48px; }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: -58px;
+    }
+
+    .metric, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .metric { padding: 18px; }
+
+    .metric span {
+      color: var(--muted);
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+
+    .metric small {
+      color: var(--muted);
+      display: block;
+      margin-top: 6px;
+    }
+
+    .toolbar {
+      align-items: center;
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      margin: 22px 0 14px;
+    }
+
+    .search {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      flex: 1;
+      font: inherit;
+      max-width: 420px;
+      padding: 12px 14px;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .filter {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 9px 13px;
+    }
+
+    .filter.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    .panel { overflow: hidden; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 14px 16px;
+      text-align: right;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f9fbfd;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      letter-spacing: .04em;
+      position: sticky;
+      text-transform: uppercase;
+      top: 0;
+      z-index: 1;
+    }
+
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fbfdff; }
+
+    .model {
+      color: var(--ink);
+      display: block;
+      font-weight: 800;
+    }
+
+    .note {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .tag {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 5px 9px;
+    }
+
+    .tag.openai { background: var(--blue-soft); color: #1d4ed8; }
+    .tag.anthropic { background: var(--amber-soft); color: var(--amber); }
+    .tag.opensource { background: var(--green-soft); color: var(--green); }
+
+    .money { font-variant-numeric: tabular-nums; }
+    .free { color: var(--green); font-weight: 800; }
+
+    .help {
+      color: var(--muted);
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr 1fr 1fr;
+      margin-top: 16px;
+    }
+
+    .help div {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .help strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    footer {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 18px 0 0;
+    }
+
+    a { color: var(--blue); }
+
+    @media (max-width: 860px) {
+      header { padding-top: 40px; }
+      .summary, .help { grid-template-columns: 1fr 1fr; }
+      .toolbar { align-items: stretch; flex-direction: column; }
+      .search { max-width: none; width: 100%; }
+      .filters { justify-content: flex-start; }
+      .panel { overflow-x: auto; }
+      table { min-width: 860px; }
+    }
+
+    @media (max-width: 560px) {
+      .summary, .help { grid-template-columns: 1fr; }
+      .metric strong { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Pricing guide</p>
+      <h1>AI model prices, sorted for quick decisions.</h1>
+      <p class="lede">Compare input, cached input, and output costs per 1M tokens across the models used in Shinygen-style dashboard generation.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="summary" aria-label="Pricing summary">
+      <div class="metric">
+        <span>Cheapest paid</span>
+        <strong>DeepSeek V4 Flash</strong>
+        <small>$0.14 in / $0.28 out</small>
+      </div>
+      <div class="metric">
+        <span>Cheapest OpenAI</span>
+        <strong>GPT-5.4 nano</strong>
+        <small>$0.20 in / $1.25 out</small>
+      </div>
+      <div class="metric">
+        <span>Cheapest Claude</span>
+        <strong>Claude Haiku 3</strong>
+        <small>$0.25 in / $1.25 out</small>
+      </div>
+      <div class="metric">
+        <span>Best cache read</span>
+        <strong>Open models</strong>
+        <small>As low as $0.0028 / 1M</small>
+      </div>
+    </section>
+
+    <section class="toolbar" aria-label="Table tools">
+      <input class="search" id="search" type="search" placeholder="Search models or providers" aria-label="Search models or providers">
+      <div class="filters" aria-label="Provider filters">
+        <button class="filter active" data-provider="all" type="button">All</button>
+        <button class="filter" data-provider="OpenAI" type="button">OpenAI</button>
+        <button class="filter" data-provider="Anthropic" type="button">Anthropic</button>
+        <button class="filter" data-provider="Open models" type="button">Open models</button>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Model pricing table">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="model">Model</th>
+            <th data-key="provider">Provider</th>
+            <th data-key="input">Input</th>
+            <th data-key="cached">Cached input</th>
+            <th data-key="output">Output</th>
+            <th data-key="roundtrip">1M in + 1M out</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+
+    <section class="help" aria-label="How to read this table">
+      <div><strong>Input</strong>What you pay for prompt, uploaded context, and tool result tokens.</div>
+      <div><strong>Cached input</strong>Discounted repeated context. Useful for agents that resend the same files or instructions.</div>
+      <div><strong>Output</strong>What you pay for the model response. Output-heavy tasks get expensive fastest.</div>
+    </section>
+
+    <footer>
+      Prices are USD per 1M tokens. OpenAI and Anthropic rows were checked against their official pricing pages on June 23, 2026; open-model rows follow this repo's static pricing table. Batch, regional processing, long-context surcharges, subscriptions, and taxes are not included.
+      Sources: <a href="https://openai.com/api/pricing/">OpenAI pricing</a>, <a href="https://platform.claude.com/docs/en/about-claude/models/overview">Claude model pricing</a>, <a href="https://docs.fireworks.ai/serverless/pricing">Fireworks serverless pricing</a>.
+    </footer>
+  </main>
+
+  <script>
+    const models = [
+      ["gpt-5.5", "OpenAI", 5, .5, 30, "Flagship coding and professional work"],
+      ["gpt-5.4", "OpenAI", 2.5, .25, 15, "Lower-cost flagship"],
+      ["gpt-5.4 pro", "OpenAI", 30, 3, 180, "Premium high-capability tier"],
+      ["gpt-5.4 mini", "OpenAI", .75, .075, 4.5, "Strong mini model"],
+      ["gpt-5.4 nano", "OpenAI", .2, .02, 1.25, "Lowest-cost OpenAI option here"],
+      ["gpt-5-codex", "OpenAI", 1.25, .125, 10, "Coding-specialized"],
+      ["gpt-4o", "OpenAI", 2.5, .25, 10, "General multimodal"],
+      ["gpt-4o mini", "OpenAI", .15, .015, .6, "Legacy low-cost OpenAI"],
+      ["claude-opus-4.8", "Anthropic", 5, .5, 25, "Highest Claude tier in this table"],
+      ["claude-opus-4.7", "Anthropic", 5, .5, 25, "High-capability Claude"],
+      ["claude-opus-4.6", "Anthropic", 5, .5, 25, "High-capability Claude"],
+      ["claude-opus-4.1", "Anthropic", 15, 1.5, 75, "Older Opus pricing"],
+      ["claude-sonnet-4.6", "Anthropic", 3, .3, 15, "Balanced Claude model"],
+      ["claude-sonnet-4.5", "Anthropic", 3, .3, 15, "Balanced Claude model"],
+      ["claude-sonnet-3.7", "Anthropic", 3, .3, 15, "Previous Sonnet generation"],
+      ["claude-haiku-4.5", "Anthropic", 1, .1, 5, "Fast Claude model"],
+      ["claude-haiku-3.5", "Anthropic", .8, .08, 4, "Older fast Claude model"],
+      ["claude-3-haiku", "Anthropic", .25, .025, 1.25, "Lowest-cost Claude row"],
+      ["deepseek-v4-pro", "Open models", 1.74, .0145, 3.48, "OpenCode Go / Fireworks-style pricing"],
+      ["mimo-v2-pro", "Open models", 1, .2, 3, "Open coding model"],
+      ["mimo-v2-omni", "Open models", .4, .08, 2, "Open coding model"],
+      ["glm-5.2", "Open models", 1.4, .26, 4.4, "Open reasoning model"],
+      ["glm-5.1", "Open models", 1.4, .26, 4.4, "Open reasoning model"],
+      ["mimo-v2.5-pro", "Open models", 1.74, .0145, 3.48, "Open coding model"],
+      ["kimi-k2.7-code", "Open models", .95, .19, 4, "Coding-focused Kimi model"],
+      ["kimi-k2.6", "Open models", .95, .16, 4, "Agentic coding model"],
+      ["minimax-m3", "Open models", .6, .12, 2.4, "Common Shinygen benchmark model"],
+      ["minimax-m2.7", "Open models", .3, .06, 1.2, "Lower-cost MiniMax"],
+      ["minimax-m2.5", "Open models", .3, .06, 1.2, "Lower-cost MiniMax"],
+      ["qwen3.7-max", "Open models", 2.5, .5, 7.5, "Higher-cost Qwen"],
+      ["qwen3.7-plus", "Open models", .4, .04, 1.6, "Balanced Qwen"],
+      ["qwen3.6-plus", "Open models", .5, .05, 3, "Previous Qwen plus"],
+      ["deepseek-v4-flash", "Open models", .14, .0028, .28, "Cheapest paid model in this table"],
+      ["mimo-v2.5", "Open models", .14, .0028, .28, "Cheapest paid model in this table"],
+      ["gemma-4-26b-a4b", "Open models", 0, 0, 0, "Local/free entry in repo table"],
+      ["qwen3.6-27b", "Open models", 0, 0, 0, "Local/free entry in repo table"]
+    ].map(([model, provider, input, cached, output, note]) => ({
+      model, provider, input, cached, output, note, roundtrip: input + output
+    }));
+
+    let provider = "all";
+    let sortKey = "roundtrip";
+    let sortDir = 1;
+
+    const rows = document.querySelector("#rows");
+    const search = document.querySelector("#search");
+    const filters = document.querySelectorAll(".filter");
+
+    function money(value) {
+      return value === 0 ? '<span class="free">Free/local</span>' : `<span class="money">$${value.toFixed(value < 1 ? 4 : 2)}</span>`;
+    }
+
+    function tagClass(value) {
+      return value === "OpenAI" ? "openai" : value === "Anthropic" ? "anthropic" : "opensource";
+    }
+
+    function draw() {
+      const q = search.value.trim().toLowerCase();
+      const visible = models
+        .filter(row => provider === "all" || row.provider === provider)
+        .filter(row => `${row.model} ${row.provider} ${row.note}`.toLowerCase().includes(q))
+        .sort((a, b) => {
+          const av = a[sortKey];
+          const bv = b[sortKey];
+          return (typeof av === "number" ? av - bv : String(av).localeCompare(String(bv))) * sortDir;
+        });
+
+      rows.innerHTML = visible.map(row => `
+        <tr>
+          <td><span class="model">${row.model}</span><span class="note">${row.note}</span></td>
+          <td><span class="tag ${tagClass(row.provider)}">${row.provider}</span></td>
+          <td>${money(row.input)}</td>
+          <td>${money(row.cached)}</td>
+          <td>${money(row.output)}</td>
+          <td>${money(row.roundtrip)}</td>
+        </tr>
+      `).join("");
+    }
+
+    filters.forEach(button => {
+      button.addEventListener("click", () => {
+        provider = button.dataset.provider;
+        filters.forEach(item => item.classList.toggle("active", item === button));
+        draw();
+      });
+    });
+
+    document.querySelectorAll("th").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        sortDir = sortKey === key ? -sortDir : 1;
+        sortKey = key;
+        draw();
+      });
+    });
+
+    search.addEventListener("input", draw);
+    draw();
+  </script>
+</body>
+</html>
