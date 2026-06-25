@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from inspect_ai import Task, task
+from inspect_ai import Task
 from inspect_ai.dataset import MemoryDataset, Sample
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser
 from inspect_ai.scorer import Score, Target, scorer
@@ -31,7 +31,6 @@ from .config import (
     SANDBOX_IMAGE_ENV_DEFAULTS,
     SANDBOX_WORK_DIR,
     is_lmstudio_model,
-    is_opencode_go_model,
     sandbox_time_limit_for_framework,
 )
 from .prompts import build_system_prompt, build_user_prompt
@@ -91,7 +90,6 @@ def stage_docker_context(
 
     Returns the path to the temp directory (caller should clean up).
     """
-    import os
     import re
 
     tmp = Path(tempfile.mkdtemp(prefix="shinygen_"))

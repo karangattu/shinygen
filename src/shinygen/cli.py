@@ -192,7 +192,7 @@ def generate(
 
 def _print_generation_result(result: GenerationResult) -> None:
     """Print a formatted summary of a generation result."""
-    click.secho(f"App generated successfully!", fg="green")
+    click.secho("App generated successfully!", fg="green")
     click.echo(f"  Output:     {result.app_dir}")
     click.echo(f"  Score:      {result.score:.2f}")
     if result.quality_score and result.quality_score != result.score:
@@ -298,7 +298,7 @@ def _print_generation_result(result: GenerationResult) -> None:
         )
 
     if result.screenshot_paths:
-        click.echo(f"  Screenshots:")
+        click.echo("  Screenshots:")
         for sp in result.screenshot_paths:
             click.echo(f"    - {sp}")
 

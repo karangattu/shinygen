@@ -8,6 +8,10 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from inspect_ai.model import Model
 
 PACKAGE_DIR = Path(__file__).parent
 

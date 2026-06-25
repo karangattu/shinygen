@@ -1,0 +1,541 @@
+---
+title: "shinygen"
+subtitle: "Generate, evaluate, and refine Shiny apps using LLM agents in Docker sandboxes"
+jupyter: python3
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    code-copy: true
+    code-overflow: wrap
+    smooth-scroll: true
+    anchor-sections: true
+    fontsize: 1.05em
+    mainfont: "Inter, system-ui, sans-serif"
+    highlight-style: github
+    css: styles.css
+---
+
+::: {.lead}
+**shinygen** turns a text prompt into a production-quality [Shiny](https://shiny.posit.co) dashboard — generated, screenshot-tested, and quality-scored — all inside an isolated Docker sandbox.
+:::
+
+---
+
+## {{< fa star >}} Core Capabilities
+
+::: {.feature-grid}
+
+::: {.feature-card}
+#### {{< fa robot >}} Multiple LLM Agents
+Leverages **Claude Code** (via Anthropic) and **Codex CLI** (via OpenAI) to autonomously write clean and professional app layouts.
+:::
+
+::: {.feature-card}
+#### {{< fa brands docker >}} Docker Isolation
+Generations run in isolated containers using [Inspect AI](https://inspect.ai-safety-institute.org.uk/), protecting your host system from side-effects.
+:::
+
+::: {.feature-card}
+#### {{< fa camera-retro >}} Visual Self-Correction
+The sandbox agent takes local Playwright screenshots, reviews layout rendering, and dynamically corrects visual styling before submission.
+:::
+
+::: {.feature-card}
+#### {{< fa scale-balanced >}} Multi-Judge Evaluation
+An external, host-side LLM panel scores code quality, visual design, functionality, and UX, feeding back critiques for refinement.
+:::
+
+::: {.feature-card}
+#### {{< fa arrows-rotate >}} Iterative Refinement
+Runs automated generate-judge-refine cycles until code meets the quality threshold, up to `--max-iterations`.
+:::
+
+::: {.feature-card}
+#### {{< fa book >}} Custom Skills Injection
+Pass custom guidelines and component directories to enforce branding rules, library preferences, and modern coding standards.
+:::
+
+::: {.feature-card}
+#### {{< fa flask-vial >}} A/B Benchmark Arms
+Compare treatment (`--skills`) vs control (`--no-skills`) to measure exactly how much your skill rules improve generation scores.
+:::
+
+::: {.feature-card}
+#### {{< fa globe >}} Web Search Fetching
+Allows agents to fetch up-to-date documentation and examples from the live web. Can be disabled with `--no-web-fetch`.
+:::
+
+:::
+
+---
+
+## {{< fa bolt >}} Installation & Requirements
+
+### Quick Install
+
+Install `shinygen` via pip in editable mode:
+
+```bash
+git clone https://github.com/karangathe/shinygen.git
+cd shinygen
+pip install -e .
+```
+
+If you plan to use screenshot-based visual evaluation and host-side verification, install the playwright extras:
+
+```bash
+pip install -e ".[screenshot]"
+playwright install chromium
+```
+
+::: {.callout-tip}
+Docker sandbox images containing R, Python, Playwright, and headless Chromium are pulled and built automatically on your first generation run.
+:::
+
+### System Prerequisites
+
+Make sure the following dependencies are available on your system before running `shinygen`:
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+reqs = pl.DataFrame({
+    "Requirement": ["Python", "Docker", "API Key"],
+    "Details": ["3.10+ (Recommended: 3.12)", "Docker Desktop daemon running", "ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENCODE_GO_API_KEY"],
+})
+
+(
+    GT(reqs)
+    .tab_header(title="System Prerequisites")
+    .cols_align(align="left")
+    .opt_stylize(style=1, color="blue")
+    .tab_source_note(
+        md("`export ANTHROPIC_API_KEY='sk-ant-...'`, `export OPENAI_API_KEY='sk-...'`, or `export OPENCODE_GO_API_KEY='sk-...'`")
+    )
+)
+```
+
+---
+
+## {{< fa terminal >}} Quick Start Guide
+
+You can run `shinygen` either through the CLI command `shinygen generate` or via the programmatic Python API.
+
+::: {.panel-tabset}
+
+### Python Dashboard (CLI)
+
+```bash
+# Generate a Python-based Shiny app with Claude Sonnet
+shinygen generate \
+    --prompt "Create a sales dashboard with filters by region and product category" \
+    --model claude-sonnet \
+    --output ./my-dashboard
+```
+
+### R Dashboard (CLI)
+
+```bash
+# Generate an R-based Shiny app (shiny-r)
+shinygen generate \
+    --prompt "Create an interactive mtcars data explorer with ggplot2 charts" \
+    --model claude-sonnet \
+    --framework shiny-r \
+    --output ./my-r-dashboard
+```
+
+### Programmatic API
+
+```python
+import shinygen
+
+result = shinygen.generate(
+    prompt="Create a clinical trials dashboard with enrollment trends",
+    model="claude-sonnet",
+    output_dir="./trials-app",
+    framework="shiny-python",
+    data_csv="./trials_data.csv",
+    screenshot=True,
+    judge_model="anthropic/claude-sonnet-4-6",
+    max_iterations=3,
+)
+
+print(f"Generated app path: {result.app_dir}")
+print(f"Score: {result.score:.2f} (Passed: {result.passed})")
+```
+
+### Batch Generation
+
+Evaluate multiple models or prompts sequentially. Create a JSON config file mapping jobs:
+
+```{.json filename="batch.json"}
+[
+  {
+    "prompt": "Create a clinical trials dashboard with enrollment trends",
+    "model": "claude-sonnet",
+    "output_dir": "./batch/sonnet",
+    "csv_file": "./trials_data.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-sonnet-4-6"
+  },
+  {
+    "prompt": "Create a clinical trials dashboard with enrollment trends",
+    "model": "gpt54",
+    "output_dir": "./batch/gpt54",
+    "csv_file": "./trials_data.csv",
+    "screenshot": true,
+    "judge_model": "anthropic/claude-sonnet-4-6"
+  }
+]
+```
+
+Then run the batch config:
+
+```bash
+shinygen batch --config batch.json
+```
+
+:::
+
+---
+
+## {{< fa diagram-project >}} Architecture & Sandbox Deep Dive
+
+### The Execution Loop
+
+`shinygen` orchestrates a closed feedback loop: it runs the coding agent, spins up the application, takes screenshots, rates the visual output via an external LLM, and refines the code iteratively.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, Arial, sans-serif'}}}%%
+flowchart TD
+    %% Color Palette Definitions
+    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,border-radius:8px
+    classDef core fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a,border-radius:8px
+    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87,border-radius:8px
+    classDef validation fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,border-radius:8px
+    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,border-radius:8px
+    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,border-radius:8px
+
+    A["👤 User Request<br/>(Prompt + Dataset + Flags)"]:::input --> B["shinygen API / CLI"]:::core
+    
+    B --> C["Start Iteration Loop"]:::core
+    
+    subgraph Sandbox["Docker Sandbox Execution"]
+        direction TB
+        C --> D["Inject Framework Skills & Context"]:::agent
+        D --> E["LLM Agent Writes Code<br/>(Claude Code / Codex / OpenCode Go)"]:::agent
+    end
+    
+    E --> F["Host-side Runtime Validation<br/>(Unconditionally Starts App & Captures Logs)"]:::validation
+    
+    F --> G{"Screenshots<br/>Enabled?"}:::validation
+    G -- Yes --> H["Host Playwright Captures UI"]:::validation
+    G -- No --> I{"Judge Model<br/>Enabled?"}:::judge
+    H --> I
+    
+    I -- Yes --> J["LLM Judge Panel Evaluates<br/>(Scores Code + Visuals 1-10)"]:::judge
+    J --> K{"Meets Quality<br/>Threshold?"}:::judge
+    
+    I -- No --> L{"App Started<br/>Successfully?"}:::validation
+    
+    K -- No --> M["Construct Refinement Feedback<br/>(Judge Critiques + Server Error Logs)"]:::core
+    L -- No --> M
+    M --> C
+    
+    K -- Yes --> N["✅ Save Artifacts<br/>(Code, Logs, Screenshots, Summary)"]:::output
+    L -- Yes --> N
+```
+
+### Docker Sandboxing Mechanics
+
+Every generation job occurs inside an isolated Docker sandbox managed via **Inspect AI**.
+- **Images Used**:
+  - Python: `ghcr.io/karangattu/shinygen-sandbox-python:latest`
+  - R: `ghcr.io/karangattu/shinygen-sandbox-r:latest`
+- **Isolation Boundaries**: The agent cannot see or modify files on your host machine. It can only read and write inside `/home/user/project` inside the container.
+- **Auto-dependency Installation**: On startup, `shinygen` executes the framework's install command (`pip install ...` or `install.packages(...)`) to ensure all necessary rendering and plotting libraries (like `plotly`, `bslib`, `faicons`, `ggplot2`) are hot-loaded in the sandbox.
+- **Web Search**: The agent has internet access to look up API docs and download styling examples. Disable this by passing `--no-web-fetch` (which blocks the web search tool).
+
+---
+
+## {{< fa camera-retro >}} Visual QA & Validation
+
+### Hands-on Agent Self-Evaluation
+
+When `--screenshot` is enabled, the sandbox agent leverages the **`visual-qa`** skill:
+1. The agent starts the Shiny app inside the container as a background daemon (using `nohup ... &`).
+2. It runs `screenshot_helper.py` to capture a Playwright screenshot on `http://localhost:8000`. By default, it pauses for **7 seconds** (configurable) to allow JavaScript/charts to load completely.
+3. The agent reviews the screenshot, identifies design flaws (e.g., overlapping text, unstyled charts, missing headers), modifies the code, and takes another screenshot until it is satisfied.
+4. It terminates the background daemon before submitting the final draft.
+
+### Host-Side Verification & Logging
+
+Once the agent completes its run, `shinygen` performs a host-side runtime check:
+- It launches the app on the host machine using a dynamically allocated free port (validated range `1-65535`).
+- It captures startup logs. If the app crashes on launch, `shinygen` catches the traceback and feeds it directly into the next iteration's refinement prompt.
+- It takes host-side Playwright screenshots to pass to the external LLM judge.
+
+---
+
+## {{< fa scale-balanced >}} Quality Evaluation & Value-Based Scoring
+
+### Multi-Judge Panel
+
+If `--judge-model` is specified, `shinygen` routes code and host-side screenshots to an external LLM judge (or a panel of judges, if the flag is repeated). 
+
+::: {.callout-note}
+## Judge Validation & Retries
+The judge model must be fully qualified starting with `anthropic/` or `openai/` (e.g., `anthropic/claude-sonnet-4-6`). Unknown model providers will raise validation errors. Judge calls use automatic retry with exponential backoff (up to 3 attempts) for robustness against rate limits.
+:::
+
+The judges evaluate the dashboard across **four strict criteria**:
+
+1. **Requirement Fidelity**: Does the app implement all requested tabs, charts, filters, and datasets?
+2. **Code Maintainability**: Is the code modular, DRY (Don't Repeat Yourself), cleanly formatted, and easy to modify?
+3. **Visual & UX Quality**: Checked against strict modern design standards (Vercel, Linear, Stripe, Notion). Standard bslib defaults will score a `5` or `6`. Clearing a `7+` requires tailored typography, a clean color palette, card components, and labeled charts.
+4. **Code Robustness**: Graceful error handling (no raw tracebacks visible to users), empty states handled cleanly, and stable reactive bindings.
+
+### Value-Based Scoring Formula
+
+Instead of raw quality alone, `shinygen` optimizes for **value-adjusted scores** to penalize wasteful API calls:
+
+$$\text{value\_score} = \text{quality\_score} - \text{iteration\_penalty} - \text{cost\_penalty}$$
+
+Where:
+- **Iteration Penalty**: Deducts $0.35$ for each extra generation iteration.
+- **Cost Penalty**: Deducts $1.00$ per $\$1.00$ of API generation cost (capped at a maximum deduction of $2.50$).
+
+This formula ensures models that get the dashboard right in the first iteration at lower costs score higher than models that take many expensive correction steps.
+
+---
+
+## {{< fa book >}} Custom Skills Injection & A/B Benchmarks
+
+### Injecting Custom Skills
+
+"Skills" represent styling guides, code templates, and coding standards injected into the agent's workspace.
+- **Standard Skills**: `shinygen` automatically bundles `shiny-python-dashboard` (Python bslib guidelines) and `shiny-bslib` (R bslib guidelines).
+- **Custom Skills**: You can inject your own guidelines (e.g. company styling themes, database query layers) using `--skills-dir <path>`.
+
+### Creating a Custom Skill Directory
+
+To write your own skill, create a folder with the following structure:
+
+```
+my-custom-skills/
+├── SKILL.md                 # REQUIRED: Contains skill description and YAML frontmatter
+└── references/              # OPTIONAL: Supporting markdown guides
+    ├── cards.md
+    └── theming.md
+```
+
+Your `SKILL.md` must start with a YAML frontmatter block:
+
+```yaml
+---
+name: corporate-theme-skill
+description: Guidelines for styling dashboards using the corporate HSL color palette.
+metadata:
+  version: "1.0"
+---
+
+# Corporate Styling Guidelines
+- Use CSS variables for color branding.
+- Avoid absolute positioning.
+```
+
+Inject your custom skill using:
+
+```bash
+shinygen generate --prompt "Sales App" --skills-dir ./my-custom-skills/
+```
+
+### Control vs Treatment Arms (A/B Testing)
+
+You can benchmark skill effectiveness using the control/treatment flags:
+- **Treatment Arm (`--skills`)**: Injects the bundled dashboard skill plus any custom skills.
+- **Control Arm (`--no-skills`)**: Bypasses skill loading entirely. The agent receives only the raw prompt.
+
+`shinygen` tracks the arm used (`skills` or `vanilla`) inside the resulting `run_summary.json` to calculate the lift in quality score.
+
+---
+
+## {{< fa microchip >}} Model Ecosystem
+
+### Model Types
+
+`shinygen` routes across three distinct tiers of LLMs:
+1. **Frontier Models**: Run in Docker containers (e.g., Claude Code, Codex CLI).
+2. **OpenCode Go Models**: Routed via Inspect's message bridge proxies. API calls are authenticated using `OPENCODE_GO_API_KEY` and target `https://opencode.ai/zen/go/v1`.
+3. **Local Models via LM Studio**: Run unmetered local evaluations (e.g., `gemma-4-26b-a4b` or `qwen3.6-27b`).
+   - Runs **entirely on the host** (Docker check is bypassed).
+   - Bypasses API key verification.
+   - Sets pricing to **$0.00** so value-based scores are not penalized by token usage.
+   - Targets the local server on `http://localhost:1234/v1` (configurable via `LMSTUDIO_BASE_URL`).
+
+### Supported Models Reference
+
+The table below outlines the model aliases resolved automatically by `shinygen`:
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+models = pl.DataFrame({
+    "Alias": [
+        "`claude-opus`", "`claude-sonnet`", "`claude-haiku-4-5`",
+        "`gpt55`", "`gpt54`", "`gpt54-mini`",
+        "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`",
+        "`opencode-go/minimax-m3`", "`opencode-go/qwen3.7-max`",
+        "`gemma-4-26b-a4b`", "`qwen3.6-27b`"
+    ],
+    "Agent": [
+        "Claude Code", "Claude Code", "Claude Code",
+        "Codex CLI", "Codex CLI", "Codex CLI",
+        "Native ReAct", "Native ReAct", "Native ReAct",
+        "Native ReAct", "Native ReAct",
+        "Native ReAct", "Native ReAct"
+    ],
+    "Model ID": [
+        "`claude-opus-4-8`", "`claude-sonnet-4-6`", "`claude-haiku-4-5`",
+        "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`",
+        "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`",
+        "`anthropic/opencode-go/minimax-m3`", "`anthropic/opencode-go/qwen3.7-max`",
+        "`openai/gemma-4-26b-a4b`", "`openai/qwen3.6-27b`"
+    ],
+    "Provider": [
+        "Anthropic", "Anthropic", "Anthropic",
+        "OpenAI", "OpenAI", "OpenAI",
+        "OpenCode Go", "OpenCode Go", "OpenCode Go",
+        "OpenCode Go (Anthropic Bridge)", "OpenCode Go (Anthropic Bridge)",
+        "Local (LM Studio)", "Local (LM Studio)"
+    ],
+})
+
+(
+    GT(models)
+    .tab_header(title="Supported Models & Agents")
+    .fmt_markdown(columns=["Alias", "Model ID"])
+    .cols_align(align="left")
+    .opt_stylize(style=1, color="blue")
+)
+```
+
+---
+
+## {{< fa coins >}} Pricing Comparison
+
+Pricing per 1 million tokens for commercial models. Note that local models (LM Studio) run at **$0.00**.
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+costs = pl.DataFrame({
+    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`"],
+    "Input": [5.00, 3.00, 5.00, 2.50, 0.75],
+    "Output": [25.00, 15.00, 30.00, 15.00, 4.50],
+})
+
+(
+    GT(costs)
+    .tab_header(
+        title="Cost per 1M Tokens",
+        subtitle="USD pricing by model",
+    )
+    .fmt_markdown(columns="Model")
+    .fmt_currency(columns=["Input", "Output"], currency="USD")
+    .cols_label(Input="Input ($/1M tokens)", Output="Output ($/1M tokens)")
+    .cols_align(align="right", columns=["Input", "Output"])
+    .cols_align(align="left", columns="Model")
+    .data_color(
+        columns="Output",
+        palette=["#d4edda", "#f8d7da"],
+    )
+    .opt_stylize(style=1, color="blue")
+)
+```
+
+---
+
+## {{< fa database >}} Data Inputs Configuration
+
+`shinygen` provides convenient mappings to inject CSVs or custom files:
+
+```{python}
+#| echo: false
+from great_tables import GT, md
+import polars as pl
+
+data_inputs = pl.DataFrame({
+    "Option": ["Single CSV", "Multiple files"],
+    "CLI Options": ["`--csv-file`", "`--data-file` (repeatable)"],
+    "Python API Keys": ["`data_csv`", "`data_files`"],
+    "Notes": ["Convenient shorthand; is mapped directly by basename.", "Accepts any text-based data format (JSON, TXT, CSV)."],
+})
+
+(
+    GT(data_inputs)
+    .tab_header(title="Data Input Options")
+    .fmt_markdown(columns=["CLI Options", "Python API Keys"])
+    .cols_align(align="left")
+    .opt_stylize(style=1, color="blue")
+    .tab_source_note(md("Note: If both options supply the same file name, `--csv-file` takes precedence."))
+)
+```
+
+---
+
+## {{< fa clip >}} Environment Variables
+
+Set the following variables in your terminal or a `.env` file at the project root to authenticate:
+
+| Environment Variable | Purpose | Example |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | Authenticate Anthropic models (e.g. Claude Sonnet/Opus) | `export ANTHROPIC_API_KEY='sk-ant-...'` |
+| `OPENAI_API_KEY` | Authenticate OpenAI models (e.g. GPT-5.4) | `export OPENAI_API_KEY='sk-...'` |
+| `OPENCODE_GO_API_KEY` | Authenticate OpenCode Go proxied models | `export OPENCODE_GO_API_KEY='sk-...'` |
+| `LMSTUDIO_BASE_URL` | Base URL endpoint for local LM Studio servers | `export LMSTUDIO_BASE_URL='http://localhost:1234/v1'` |
+
+---
+
+## {{< fa flask >}} Local Development & Testing
+
+We maintain a complete suite of unit tests. Run them locally to verify sandbox configurations, config parsers, and API bindings:
+
+```bash
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+```
+
+---
+
+## {{< fa comments >}} DashSwipe: Interactive Dashboard User Testing
+
+To help align dashboard styles, this repository includes **DashSwipe**, an interactive user-testing survey application located in the [user_testing_app/](user_testing_app/) directory.
+
+- **Purpose**: Collects human feedback on LLM-generated layouts. It serves screenshots anonymously, lets users tier-rank layouts (S/A/B/C/D/F), prompts for 2-word critiques, and writes evaluation statistics directly to a Supabase database.
+- **Run Locally**:
+  ```bash
+  python3 -m http.server 8080 --directory user_testing_app
+  ```
+  Open **[http://localhost:8080/](http://localhost:8080/)** in your browser.
+- **Database Schema**: Refer to [user_testing_app/README.md](user_testing_app/README.md) to set up the Postgres schema.
+
+---
+
+## {{< fa scale-balanced >}} License
+
+This project is licensed under the [MIT License](LICENSE).
