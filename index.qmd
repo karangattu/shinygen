@@ -212,7 +212,8 @@ shinygen batch --config batch.json
 
 `shinygen` orchestrates a closed feedback loop: it runs the coding agent, spins up the application, takes screenshots, rates the visual output via an external LLM, and refines the code iteratively.
 
-```mermaid
+```{mermaid}
+%%| fig-width: 9
 %%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, Arial, sans-serif'}}}%%
 flowchart TD
     %% Color Palette Definitions
@@ -372,9 +373,10 @@ You can benchmark skill effectiveness using the control/treatment flags:
 ### Model Types
 
 `shinygen` routes across three distinct tiers of LLMs:
+
 1. **Frontier Models**: Run in Docker containers (e.g., Claude Code, Codex CLI).
 2. **OpenCode Go Models**: Routed via Inspect's message bridge proxies. API calls are authenticated using `OPENCODE_GO_API_KEY` and target `https://opencode.ai/zen/go/v1`.
-3. **Local Models via LM Studio**: Run unmetered local evaluations (e.g., `gemma-4-26b-a4b` or `qwen3.6-27b`).
+3. **Local Models via LM Studio**: Run unmetered local evaluations (e.g., `gemma-4-26b-a4b` or `qwen3.6-27b`):
    - Runs **entirely on the host** (Docker check is bypassed).
    - Bypasses API key verification.
    - Sets pricing to **$0.00** so value-based scores are not penalized by token usage.
