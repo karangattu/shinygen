@@ -3,7 +3,7 @@
     "prompt": "Create a clinical trials dashboard with enrollment trends and status filters",
     "model": "claude-sonnet",
     "framework": "shiny-r",
-    "output_dir": "./batch_r/sonnet",
+    "output_dir": "./batch_r/sonnet-5",
     "csv_file": "./test_data_csv_files/trials_short_50.csv",
     "screenshot": true,
     "judge_model": "anthropic/claude-opus-4-7",

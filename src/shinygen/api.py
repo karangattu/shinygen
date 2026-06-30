@@ -77,7 +77,7 @@ def generate(
         model: Model alias or full model ID.
             Aliases: "claude-opus", "claude-opus-4-8", "claude-sonnet", "gpt55",
             "gpt54", "gpt54-mini".
-            Or pass a full model ID like "anthropic/claude-sonnet-4-6".
+            Or pass a full model ID like "anthropic/claude-sonnet-5".
         framework: Target framework.
             Options: "shiny_python" (default), "shiny_r", "python", "r".
         output_dir: Directory where the final app will be written.
@@ -93,7 +93,7 @@ def generate(
             the app is accepted on first successful generation without
             judging. Pass a single model ID/alias for the classic
             single-judge flow, or a sequence (e.g.
-            ``["anthropic/claude-sonnet-4-6", "openai/gpt-5.4-mini-2026-03-17"]``)
+            ``["anthropic/claude-sonnet-5", "openai/gpt-5.4-mini-2026-03-17"]``)
             to run a panel of judges and average their scores.
         max_iterations: Maximum number of generate-judge-refine cycles.
         quality_threshold: Minimum value-adjusted score (1-10) to accept when
@@ -129,7 +129,7 @@ def generate(
                 "Interactive stock price tracker",
                 model="claude-sonnet",
                 screenshot=True,
-                judge_model="anthropic/claude-sonnet-4-6",
+                judge_model="anthropic/claude-sonnet-5",
                 max_iterations=3,
                 quality_threshold=7.0,
             )

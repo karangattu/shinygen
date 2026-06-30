@@ -33,14 +33,14 @@ class TestExtractGenerationUsageRows:
             total_cost = 0.05
 
         class MockStats:
-            model_usage = {"anthropic/claude-sonnet-4-6": MockUsage()}
+            model_usage = {"anthropic/claude-sonnet-5": MockUsage()}
 
         class MockLog:
             stats = MockStats()
 
         rows = _extract_generation_usage_rows(MockLog())
         assert len(rows) == 1
-        assert rows[0]["model"] == "anthropic/claude-sonnet-4-6"
+        assert rows[0]["model"] == "anthropic/claude-sonnet-5"
         assert rows[0]["input_tokens"] == 1000
         assert rows[0]["output_tokens"] == 500
         assert rows[0]["cache_write_tokens"] == 200
@@ -384,7 +384,7 @@ class TestWriteRunSummary:
         )
         result.usage.add(
             stage="judge",
-            model="anthropic/claude-sonnet-4-6",
+            model="anthropic/claude-sonnet-5",
             input_tokens=600,
             output_tokens=200,
             elapsed=0.4,
@@ -400,7 +400,7 @@ class TestWriteRunSummary:
             agent="codex_cli",
             framework_key="shiny_python",
             artifact_name="app.py",
-            judge_models=["anthropic/claude-sonnet-4-6"],
+            judge_models=["anthropic/claude-sonnet-5"],
             data_file_names=["airbnb-asheville-short.csv"],
         )
 
@@ -413,8 +413,8 @@ class TestWriteRunSummary:
         assert summary["model"]["agent"] == "codex_cli"
         assert summary["framework"] == "shiny_python"
         assert summary["artifact_name"] == "app.py"
-        assert summary["judge_model"] == "anthropic/claude-sonnet-4-6"
-        assert summary["judge_models"] == ["anthropic/claude-sonnet-4-6"]
+        assert summary["judge_model"] == "anthropic/claude-sonnet-5"
+        assert summary["judge_models"] == ["anthropic/claude-sonnet-5"]
         assert summary["passed"] is True
         assert summary["score"] == 8.7
         assert summary["quality_score"] == 9.1

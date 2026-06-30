@@ -32,7 +32,7 @@ def main() -> None:
     default="claude-sonnet",
     show_default=True,
     help=(
-        'Model alias or full ID. Aliases: "claude-opus", "claude-sonnet", '
+        'Model alias or full ID. Aliases: "claude-opus", "claude-sonnet-5", '
         '"gpt55", "gpt54", "gpt54-mini".'
     ),
 )
@@ -84,7 +84,7 @@ def main() -> None:
     multiple=True,
     default=(),
     help=(
-        'Model for quality evaluation (e.g. "anthropic/claude-sonnet-4-6"). '
+        'Model for quality evaluation (e.g. "anthropic/claude-sonnet-5"). '
         "Repeat the flag to run a panel of judges and average their scores."
     ),
 )

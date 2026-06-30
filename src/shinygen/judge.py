@@ -369,7 +369,7 @@ def judge_app_with_api(
 
     Args:
         code: The generated app source code.
-        judge_model: Model ID (e.g., "anthropic/claude-sonnet-4-6").
+        judge_model: Model ID (e.g., "anthropic/claude-sonnet-5").
         screenshot_paths: Optional screenshots for multimodal evaluation.
         user_prompt: The original user prompt for context.
 
@@ -415,7 +415,7 @@ def judge_app_with_models(
     Args:
         code: The generated app source code.
         judge_models: One or more resolved model IDs
-            (e.g. ``["anthropic/claude-sonnet-4-6", "openai/gpt-5.4-mini-..."]``).
+            (e.g. ``["anthropic/claude-sonnet-5", "openai/gpt-5.4-mini-..."]``).
         screenshot_paths: Optional screenshots for multimodal evaluation.
         user_prompt: The original user prompt for context.
 

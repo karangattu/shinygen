@@ -67,7 +67,7 @@ env:
     claude-opus-4-6
     claude-opus-4-7
     claude-opus-4-8
-    claude-sonnet-4-6
+    claude-sonnet-5
     gpt-5.4
     gpt-5.4-mini
     gpt-5.4-nano
@@ -184,7 +184,7 @@ jobs:
           - idx: "02"
             name: claude-opus-4-7
           - idx: "03"
-            name: claude-sonnet-4-6
+            name: claude-sonnet-5
           - idx: "20"
             name: claude-opus-4-8
           - idx: "04"
@@ -474,7 +474,7 @@ jobs:
         claude-opus-4-6
         claude-opus-4-7
         claude-opus-4-8
-        claude-sonnet-4-6
+        claude-sonnet-5
         gpt-5.4
         gpt-5.4-mini
         gpt-5.4-nano

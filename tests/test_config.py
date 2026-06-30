@@ -38,9 +38,9 @@ class TestResolveModel:
         assert agent == "claude_code"
 
     def test_full_anthropic_id(self):
-        agent, model_id = resolve_model("anthropic/claude-sonnet-4-6")
+        agent, model_id = resolve_model("anthropic/claude-sonnet-5")
         assert agent == "claude_code"
-        assert model_id == "anthropic/claude-sonnet-4-6"
+        assert model_id == "anthropic/claude-sonnet-5"
 
     def test_full_openai_id(self):
         agent, model_id = resolve_model("openai/gpt-5.4")
@@ -48,9 +48,9 @@ class TestResolveModel:
         assert model_id == "openai/gpt-5.4"
 
     def test_exact_anthropic_model_name_without_provider(self):
-        agent, model_id = resolve_model("claude-sonnet-4-5")
+        agent, model_id = resolve_model("claude-sonnet-5")
         assert agent == "claude_code"
-        assert model_id == "anthropic/claude-sonnet-4-5"
+        assert model_id == "anthropic/claude-sonnet-5"
 
     def test_exact_anthropic_opus_model_name_without_provider(self):
         agent, model_id = resolve_model("claude-opus-4-7")

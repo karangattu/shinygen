@@ -191,7 +191,7 @@ class TestJudgeAppWithApi:
         fake_anthropic = types.SimpleNamespace(Anthropic=lambda: FakeAnthropicClient())
         monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
 
-        result = judge_app_with_api("print('hello')", "anthropic/claude-sonnet-4-6", None, "")
+        result = judge_app_with_api("print('hello')", "anthropic/claude-sonnet-5", None, "")
         assert result.composite == 7.0
 
     def test_openai_prefix_accepted(self, monkeypatch):
