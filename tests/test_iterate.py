@@ -205,7 +205,7 @@ class TestNoJudgeRuntimeRefinement:
             model="gpt-5.4",
             framework="shiny_python",
             output_dir=tmp_path,
-            judge_model="anthropic/claude-opus-4-7",
+            judge_model="anthropic/claude-opus-4-8",
             screenshot=False,
             max_iterations=2,
             quality_threshold=5.0,

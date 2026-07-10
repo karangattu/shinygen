@@ -108,9 +108,9 @@ def test_benchmark_workflow_uses_generic_benchmark_metadata():
 
 
 def test_benchmark_workflow_uses_claude_opus_judge():
-    """Benchmarks default to a single visual judge: anthropic/claude-opus-4-7.
+    """Benchmarks default to a single visual judge: anthropic/claude-opus-4-8.
 
-    Opus 4.7 is the strongest multimodal scorer we have access to, so we
+    Opus 4.8 is the strongest multimodal scorer we have access to, so we
     trust its judgment over a vendor-averaged panel. The workflow keeps
     `BENCHMARK_JUDGE_MODELS` as a newline-separated list so additional
     judges can be added back later by editing one env var.
@@ -118,7 +118,7 @@ def test_benchmark_workflow_uses_claude_opus_judge():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "BENCHMARK_JUDGE_MODELS:" in workflow
-    assert "anthropic/claude-opus-4-7" in workflow
+    assert "anthropic/claude-opus-4-8" in workflow
     # The generation step must expand the list into repeated --judge-model
     # flags rather than the old single-flag form, even with one entry, so
     # adding more judges later remains a one-line change.
@@ -148,9 +148,9 @@ def test_benchmark_workflow_uses_sandbox_screenshots_without_runner_browser_inst
 def test_benchmark_workflow_runs_all_opus_generations_for_comparison():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "name: claude-opus-4-6" in workflow
-    assert "name: claude-opus-4-7" in workflow
     assert "name: claude-opus-4-8" in workflow
+    assert "name: claude-opus-4-7" not in workflow
+    assert "name: claude-opus-4-6" not in workflow
 
 
 def test_benchmark_workflow_includes_gpt55_in_generation_matrix():
@@ -250,4 +250,4 @@ def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
 
     assert batch_config
     for entry in batch_config:
-        assert entry["judge_model"] == "anthropic/claude-opus-4-7"
+        assert entry["judge_model"] == "anthropic/claude-opus-4-8"

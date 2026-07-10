@@ -53,9 +53,9 @@ class TestResolveModel:
         assert model_id == "anthropic/claude-sonnet-5"
 
     def test_exact_anthropic_opus_model_name_without_provider(self):
-        agent, model_id = resolve_model("claude-opus-4-7")
+        agent, model_id = resolve_model("claude-opus-4-8")
         assert agent == "claude_code"
-        assert model_id == "anthropic/claude-opus-4-7"
+        assert model_id == "anthropic/claude-opus-4-8"
 
     def test_exact_anthropic_opus_4_8_model_name_without_provider(self):
         agent, model_id = resolve_model("claude-opus-4-8")

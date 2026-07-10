@@ -17,7 +17,7 @@ class TestGetPricing:
         assert len(result) == 2
 
     def test_new_claude_opus_release_returns_expected_price(self):
-        result = get_pricing("anthropic/claude-opus-4-7")
+        result = get_pricing("anthropic/claude-opus-4-8")
         assert result == (5.00, 25.00)
 
     def test_claude_opus_4_8_release_returns_expected_price(self):
@@ -39,7 +39,7 @@ class TestGetPricing:
 
     def test_static_table_no_network_calls(self):
         """Pricing should work without any network access."""
-        result = get_pricing("claude-opus-4-6")
+        result = get_pricing("claude-opus-4-8")
         assert result is not None
         assert result == (5.00, 25.00)
 
@@ -88,8 +88,8 @@ class TestCalculateCost:
         assert cost == 0.0
 
     def test_strips_prefix(self):
-        cost_with = calculate_cost("anthropic/claude-opus-4-6", 1000, 1000)
-        cost_without = calculate_cost("claude-opus-4-6", 1000, 1000)
+        cost_with = calculate_cost("anthropic/claude-opus-4-8", 1000, 1000)
+        cost_without = calculate_cost("claude-opus-4-8", 1000, 1000)
         assert cost_with == cost_without
 
 

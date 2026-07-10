@@ -54,18 +54,16 @@ permissions:
   packages: read
 
 env:
-  # Single judge: claude-opus-4-7 is currently the strongest visual judge
+  # Single judge: claude-opus-4-8 is currently the strongest visual judge
   # we have access to, so we trust its multimodal scoring instead of
   # averaging across a panel. Each entry below still produces one
   # --judge-model flag; add more models here to re-enable a panel.
   BENCHMARK_JUDGE_MODELS: |
-    anthropic/claude-opus-4-7
+    anthropic/claude-opus-4-8
   BENCHMARK_EXPECTED_FRAMEWORKS: |
     shiny_python
     shiny_r
   BENCHMARK_EXPECTED_MODELS: |
-    claude-opus-4-6
-    claude-opus-4-7
     claude-opus-4-8
     claude-sonnet-5
     gpt-5.4
@@ -169,7 +167,7 @@ jobs:
   run:
     needs: prepare
     runs-on: ubuntu-latest
-    # Bumped from 120 → 150 after run 24787647185: claude-opus-4-7+skills hit
+    # Bumped from 120 → 150 after run 24787647185: claude-opus-4-8+skills hit
     # the hard 2h job timeout, was canceled, and uploaded no run_summary.json
     # (so its row was lost from the aggregate). 150 min keeps headroom over
     # the 25-min sandbox time_limit × 3 iterations + judging + screenshotting.
@@ -182,10 +180,6 @@ jobs:
           - shiny_python
           - shiny_r
         model:
-          - idx: "01"
-            name: claude-opus-4-6
-          - idx: "02"
-            name: claude-opus-4-7
           - idx: "03"
             name: claude-sonnet-5
           - idx: "20"
@@ -480,8 +474,6 @@ jobs:
         shiny_python
         shiny_r
       BENCHMARK_EXPECTED_MODELS: |
-        claude-opus-4-6
-        claude-opus-4-7
         claude-opus-4-8
         claude-sonnet-5
         gpt-5.4

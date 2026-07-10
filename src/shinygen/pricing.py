@@ -130,8 +130,6 @@ class Timer:
 _PRICING: dict[str, tuple[float, float]] = {
     # Anthropic models
     "claude-opus-4-8": (5.00, 25.00),
-    "claude-opus-4-7": (5.00, 25.00),
-    "claude-opus-4-6": (5.00, 25.00),
     "claude-opus-4-5": (5.00, 25.00),
     "claude-opus-4-1": (15.00, 75.00),
     "claude-opus-4": (15.00, 75.00),

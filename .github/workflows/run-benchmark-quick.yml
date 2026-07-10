@@ -23,8 +23,6 @@ on:
         type: choice
         options:
           - claude-opus-4-8
-          - claude-opus-4-7
-          - claude-opus-4-6
           - claude-sonnet-5
           - claude-haiku-4-5
           - gpt-5.5
@@ -110,10 +108,10 @@ permissions:
 
 env:
   # Same judge as run-benchmark-matrix.yml so deltas are comparable.
-  # claude-opus-4-7 is the strongest visual judge available; add more
+  # Claude Opus 4.8 is the strongest visual judge available; add more
   # entries here to re-enable a multi-judge panel.
   BENCHMARK_JUDGE_MODELS: |
-    anthropic/claude-opus-4-7
+    anthropic/claude-opus-4-8
   BENCHMARK_MAX_ITERATIONS: ${{ inputs.max_iterations || '2' }}
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
   SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"
