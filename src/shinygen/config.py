@@ -272,6 +272,10 @@ def is_opencode_go_model(model_id: str) -> bool:
 def is_lmstudio_model(model_id: str) -> bool:
     """Return True when a resolved Inspect model points to LM Studio."""
     model = model_id.lower().strip()
+    # Provider-qualified OpenCode Go IDs can contain the same model names as
+    # local LM Studio aliases; the provider prefix must take precedence.
+    if is_opencode_go_model(model):
+        return False
     return (
         model.startswith("lmstudio/")
         or "gemma-4-26b-a4b" in model

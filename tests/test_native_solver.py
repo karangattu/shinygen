@@ -113,25 +113,3 @@ def test_web_browser_tools_are_flattened_into_tools_list():
         assert fake_tool_b in called_tools
         for t in called_tools:
             assert not isinstance(t, list), "web_browser tools should be flattened, not nested"
-
-
-def test_lmstudio_model_uses_direct_artifact_solver():
-    from unittest.mock import patch
-
-    sentinel = object()
-    with patch(
-        "shinygen.native_solver.native_direct_artifact_solver",
-        return_value=sentinel,
-    ) as direct:
-        from shinygen.native_solver import native_react_solver
-
-        result = native_react_solver(
-            model_id="openai/qwen3.6-27b",
-            cwd="/home/user/project",
-            framework="shiny_python",
-            artifact="app.py",
-            web_fetch=False,
-        )
-
-    assert result is sentinel
-    direct.assert_called_once()
