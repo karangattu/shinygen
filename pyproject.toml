@@ -31,6 +31,7 @@ dependencies = [
     "anthropic>=0.109.2",
     # inspect-ai 0.3.245 does not yet support openai 2.45's required
     # InputTokensDetails.cache_write_tokens field.
+    # TODO: Remove the upper bound when inspect-ai adds compatibility.
     "openai>=2.42.0,<2.45.0",
     "zstandard>=0.25.0",
 ]
