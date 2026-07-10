@@ -85,6 +85,22 @@ class TestResolveModel:
         assert agent == "codex_cli"
         assert model_id == expected_model_id
 
+    @pytest.mark.parametrize(
+        ("alias", "expected_model_id"),
+        [
+            ("sol", "openai/gpt-5.6-sol"),
+            ("gpt56-sol", "openai/gpt-5.6-sol"),
+            ("terra", "openai/gpt-5.6-terra"),
+            ("gpt56-terra", "openai/gpt-5.6-terra"),
+            ("luna", "openai/gpt-5.6-luna"),
+            ("gpt56-luna", "openai/gpt-5.6-luna"),
+        ],
+    )
+    def test_gpt56_aliases_resolve_to_codex_cli(self, alias, expected_model_id):
+        agent, model_id = resolve_model(alias)
+        assert agent == "codex_cli"
+        assert model_id == expected_model_id
+
     def test_opencode_go_alias_resolves_to_native_react_solver(self):
         agent, model_id = resolve_model("opencode-go/kimi-k2.6")
         assert agent == "native_react_solver"

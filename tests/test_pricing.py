@@ -28,6 +28,11 @@ class TestGetPricing:
         assert get_pricing("openai/gpt-5.5") == (5.00, 30.00)
         assert get_pricing("openai/gpt-5.5-2026-04-23") == (5.00, 30.00)
 
+    def test_gpt56_variant_prices(self):
+        assert get_pricing("openai/gpt-5.6-sol") == (5.00, 30.00)
+        assert get_pricing("openai/gpt-5.6-terra") == (2.50, 15.00)
+        assert get_pricing("openai/gpt-5.6-luna") == (1.00, 6.00)
+
     def test_unknown_model_returns_none(self):
         result = get_pricing("unknown/mystery-model")
         assert result is None

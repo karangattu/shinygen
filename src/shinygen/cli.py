@@ -33,7 +33,8 @@ def main() -> None:
     show_default=True,
     help=(
         'Model alias or full ID. Aliases: "claude-opus", "claude-sonnet-5", '
-        '"gpt55", "gpt54", "gpt54-mini".'
+        '"gpt55", "gpt54", "gpt54-mini", "gpt56-sol", "gpt56-terra", '
+        '"gpt56-luna".'
     ),
 )
 @click.option(

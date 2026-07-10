@@ -72,6 +72,9 @@ env:
     gpt-5.4-mini
     gpt-5.4-nano
     gpt-5.5
+    gpt-5.6-sol
+    gpt-5.6-terra
+    gpt-5.6-luna
     glm-5.1
     glm-5.2
     kimi-k2.6
@@ -195,6 +198,12 @@ jobs:
             name: gpt-5.4-nano
           - idx: "07"
             name: gpt-5.5
+          - idx: "23"
+            name: gpt-5.6-sol
+          - idx: "24"
+            name: gpt-5.6-terra
+          - idx: "25"
+            name: gpt-5.6-luna
           - idx: "08"
             name: glm-5.1
           - idx: "09"
@@ -479,6 +488,9 @@ jobs:
         gpt-5.4-mini
         gpt-5.4-nano
         gpt-5.5
+        gpt-5.6-sol
+        gpt-5.6-terra
+        gpt-5.6-luna
         glm-5.1
         glm-5.2
         kimi-k2.6
