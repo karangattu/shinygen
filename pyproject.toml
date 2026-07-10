@@ -29,7 +29,9 @@ dependencies = [
     "inspect-ai>=0.3.240",
     "inspect-swe>=0.2.63",
     "anthropic>=0.109.2",
-    "openai>=2.42.0",
+    # inspect-ai 0.3.245 does not yet support openai 2.45's required
+    # InputTokensDetails.cache_write_tokens field.
+    "openai>=2.42.0,<2.45.0",
     "zstandard>=0.25.0",
 ]
 
