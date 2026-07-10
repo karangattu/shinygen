@@ -1100,7 +1100,9 @@ def generate_and_refine(
                     best_quality_score = 0.0
                     result.screenshot_paths = screenshot_paths
                     result.runtime_valid = runtime_valid
-                    result.passed = runtime_valid
+                    # Preserve the artifact, but do not count an unscored
+                    # judge outage as a quality pass.
+                    result.passed = False
                     break
                 # Attribute token usage per judge so the cost breakdown stays
                 # accurate when more than one judge runs. Fall back to the

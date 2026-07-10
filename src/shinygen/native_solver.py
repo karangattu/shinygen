@@ -749,7 +749,7 @@ def native_react_solver(
 ) -> Solver:
     """Return an Inspect ``Solver`` driven by the native ``react()`` agent."""
     lower_id = model_id.lower()
-    if "kimi" in lower_id or "minimax" in lower_id or is_lmstudio_model(model_id):
+    if "kimi" in lower_id or "minimax" in lower_id:
         return native_direct_artifact_solver(
             cwd=cwd,
             framework=framework,

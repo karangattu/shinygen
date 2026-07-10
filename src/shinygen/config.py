@@ -272,11 +272,6 @@ def is_opencode_go_model(model_id: str) -> bool:
 def is_lmstudio_model(model_id: str) -> bool:
     """Return True when a resolved Inspect model points to LM Studio."""
     model = model_id.lower().strip()
-    # OpenCode Go exposes several models also used by local LM Studio setups.
-    # The resolved provider prefix is authoritative: OpenCode Go must stay on
-    # its native Docker/Inspect path.
-    if is_opencode_go_model(model):
-        return False
     return (
         model.startswith("lmstudio/")
         or "gemma-4-26b-a4b" in model
@@ -421,6 +416,8 @@ def check_api_key(agent: str, model_id: str | None = None) -> None:
                 "native_react_solver requires a resolved Inspect model ID so shinygen "
                 "can determine which provider API key is needed."
             )
+        # These calls terminate in the claude_code/codex_cli branches above;
+        # neither branch recurses back into native_react_solver.
         if model_id.startswith("anthropic/"):
             check_api_key("claude_code")
         elif model_id.startswith("openai/"):
