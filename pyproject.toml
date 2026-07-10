@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "click>=8.1.3,<8.2.2",
-    "inspect-ai>=0.3.240",
+    "inspect-ai>=0.3.245",
     "inspect-swe>=0.2.63",
     "anthropic>=0.109.2",
     # inspect-ai 0.3.245 does not yet support openai 2.45's required
