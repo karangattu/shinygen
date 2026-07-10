@@ -314,6 +314,11 @@ class TestCheckAPIKey:
             check_api_key("native_react_solver", "openai/google/gemma-4-26b-a4b-qat")
             check_api_key("native_react_solver", "openai/qwen/qwen3.6-27b")
 
+    def test_native_openai_model_requires_openai_key(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(APIKeyMissingError, match="OPENAI_API_KEY"):
+                check_api_key("native_react_solver", "openai/gpt-5.6-luna")
+
     def test_build_lmstudio_model(self):
         from shinygen.config import _build_lmstudio_model
         from inspect_ai.model import GenerateConfig

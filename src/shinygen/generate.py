@@ -93,7 +93,10 @@ def stage_docker_context(
     import re
 
     tmp = Path(tempfile.mkdtemp(prefix="shinygen_"))
-    compose_file = FRAMEWORK_COMPOSE.get(framework_key, "compose-python.yaml")
+    try:
+        compose_file = FRAMEWORK_COMPOSE[framework_key]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported framework: {framework_key!r}") from exc
 
     # Resolve the sandbox image name from environment / defaults.
     env_var, default_image = SANDBOX_IMAGE_ENV_DEFAULTS.get(framework_key, ("", ""))
@@ -463,7 +466,10 @@ def build_generation_task(
     """
     fw = FRAMEWORKS[framework_key]
     artifact = fw["primary_artifact"]
-    compose_file = FRAMEWORK_COMPOSE.get(framework_key, "compose-python.yaml")
+    try:
+        compose_file = FRAMEWORK_COMPOSE[framework_key]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported framework: {framework_key!r}") from exc
 
     # Build data file names list for system prompt
     data_file_names = list(data_files.keys()) if data_files else None

@@ -99,7 +99,7 @@ WORKFLOW:
    shiny, bslib, bsicons, ggplot2, dplyr, readr, tidyr, stringr,
    lubridate, plotly, DT, leaflet, scales, thematic, htmltools, htmlwidgets.
    Only install packages that are NOT in the list above:
-   {install_command}
+   Run `install.packages(c("package1", "package2"), repos = "https://cloud.r-project.org")` only for packages that are actually missing.
 3. Write your R code to /home/user/project/app.R
 4. Verify: Rscript -e "parse('app.R'); cat('OK\\n')"
 

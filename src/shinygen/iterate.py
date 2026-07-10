@@ -1083,7 +1083,25 @@ def generate_and_refine(
                         judge_models,
                         screenshot_paths or None,
                         prompt,
+                        "r" if framework_key == "shiny_r" else "python",
                     )
+                if not judge_result.scores:
+                    # A judge outage must not discard an app that already
+                    # passed runtime validation; preserve it for the caller.
+                    logger.warning(
+                        "All judges failed in iteration %d; preserving the "
+                        "runtime-valid app without a quality score",
+                        iteration,
+                    )
+                    best_code = code
+                    best_runtime_valid = runtime_valid
+                    best_runtime_logs = runtime_logs
+                    best_score = 0.0
+                    best_quality_score = 0.0
+                    result.screenshot_paths = screenshot_paths
+                    result.runtime_valid = runtime_valid
+                    result.passed = runtime_valid
+                    break
                 # Attribute token usage per judge so the cost breakdown stays
                 # accurate when more than one judge runs. Fall back to the
                 # merged totals if per-judge attribution is unavailable.
@@ -1477,9 +1495,7 @@ def _run_generation(
         extra_config = _generation_extra_config(agent)
 
         eval_model = model_id
-        if is_lmstudio_model(model_id):
-            eval_model = _build_lmstudio_model(model_id)
-        elif is_opencode_go_anthropic_model(model_id):
+        if is_opencode_go_anthropic_model(model_id):
             from inspect_ai.model import get_model
 
             base_url = os.environ.get("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL)

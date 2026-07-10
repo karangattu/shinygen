@@ -243,6 +243,7 @@ def _build_judge_message(
     code: str,
     screenshot_paths: list[Path] | None = None,
     user_prompt: str = "",
+    language: str = "python",
 ) -> str:
     """Build the user message for the judge (text-only version).
 
@@ -252,7 +253,7 @@ def _build_judge_message(
     if user_prompt:
         parts.append(f"## Original Requirements\n\n{user_prompt}\n")
 
-    parts.append(f"## Source Code\n\n```python\n{code}\n```\n")
+    parts.append(f"## Source Code\n\n```{language}\n{code}\n```\n")
 
     if screenshot_paths:
         count = len(screenshot_paths)
@@ -305,11 +306,12 @@ def _build_judge_content_multimodal(
     code: str,
     screenshot_paths: list[Path],
     user_prompt: str = "",
+    language: str = "python",
 ) -> list[dict]:
     """Build multimodal content parts (text + base64 images) for the judge."""
     parts: list[dict] = []
 
-    text_msg = _build_judge_message(code, screenshot_paths, user_prompt)
+    text_msg = _build_judge_message(code, screenshot_paths, user_prompt, language)
     parts.append({"type": "text", "text": text_msg})
 
     for img_path in screenshot_paths:
@@ -364,6 +366,7 @@ def judge_app_with_api(
     judge_model: str,
     screenshot_paths: list[Path] | None = None,
     user_prompt: str = "",
+    language: str = "python",
 ) -> JudgeResult:
     """Judge app quality using a direct Anthropic/OpenAI API call.
 
@@ -380,11 +383,19 @@ def judge_app_with_api(
 
     if judge_model.startswith("anthropic/"):
         return _judge_with_anthropic(
-            code, judge_model, screenshot_paths if has_images else None, user_prompt
+            code,
+            judge_model,
+            screenshot_paths if has_images else None,
+            user_prompt,
+            language,
         )
     elif judge_model.startswith("openai/"):
         return _judge_with_openai(
-            code, judge_model, screenshot_paths if has_images else None, user_prompt
+            code,
+            judge_model,
+            screenshot_paths if has_images else None,
+            user_prompt,
+            language,
         )
     else:
         raise ValueError(
@@ -398,6 +409,7 @@ def judge_app_with_models(
     judge_models: list[str],
     screenshot_paths: list[Path] | None = None,
     user_prompt: str = "",
+    language: str = "python",
 ) -> JudgeResult:
     """Judge app quality using one or more judge models and merge results.
 
@@ -432,7 +444,7 @@ def judge_app_with_models(
     for model_id in judge_models:
         try:
             single = judge_app_with_api(
-                code, model_id, screenshot_paths, user_prompt
+                code, model_id, screenshot_paths, user_prompt, language
             )
             merged.input_tokens += single.input_tokens
             merged.output_tokens += single.output_tokens
@@ -506,6 +518,7 @@ def _judge_with_anthropic(
     model: str,
     screenshot_paths: list[Path] | None,
     user_prompt: str,
+    language: str = "python",
 ) -> JudgeResult:
     """Judge using the Anthropic API directly."""
     import anthropic
@@ -514,9 +527,11 @@ def _judge_with_anthropic(
     model_name = model.removeprefix("anthropic/")
 
     if screenshot_paths:
-        content = _build_judge_content_multimodal(code, screenshot_paths, user_prompt)
+        content = _build_judge_content_multimodal(
+            code, screenshot_paths, user_prompt, language
+        )
     else:
-        content = _build_judge_message(code, None, user_prompt)
+        content = _build_judge_message(code, None, user_prompt, language)
 
     def _call_api():
         return client.messages.create(
@@ -541,6 +556,7 @@ def _judge_with_openai(
     model: str,
     screenshot_paths: list[Path] | None,
     user_prompt: str,
+    language: str = "python",
 ) -> JudgeResult:
     """Judge using the OpenAI API directly."""
     import openai
@@ -553,7 +569,7 @@ def _judge_with_openai(
         else {"max_tokens": 2048}
     )
 
-    user_text = _build_judge_message(code, screenshot_paths, user_prompt)
+    user_text = _build_judge_message(code, screenshot_paths, user_prompt, language)
 
     content: list[dict] | str
     if screenshot_paths:
