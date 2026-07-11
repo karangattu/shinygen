@@ -66,6 +66,26 @@ class TestParseJudgeResponse:
         # because missing criteria default to 0
         assert result.composite == 3.0 / 4
 
+    def test_invalid_scores_are_clamped(self):
+        response = json.dumps(
+            {
+                "requirement_fidelity": {"score": 12, "rationale": "Too high"},
+                "code_maintainability": {"score": -3, "rationale": "Too low"},
+                "visual_ux_quality": {"score": "nan", "rationale": "Invalid"},
+                "code_robustness": {"score": "invalid", "rationale": "Invalid"},
+            }
+        )
+
+        result = parse_judge_response(response)
+
+        assert result.scores == {
+            "requirement_fidelity": 10.0,
+            "code_maintainability": 0.0,
+            "visual_ux_quality": 0.0,
+            "code_robustness": 0.0,
+        }
+        assert result.composite == 2.5
+
 
 class TestJudgeResult:
     def test_passed_threshold(self):
@@ -176,22 +196,35 @@ class TestJudgeAppWithApi:
             class Messages:
                 def create(self, **kwargs):
                     class FakeContent:
-                        text = json.dumps({
-                            "requirement_fidelity": {"score": 7, "rationale": "Good"},
-                            "code_maintainability": {"score": 7, "rationale": "Clean"},
-                            "visual_ux_quality": {"score": 7, "rationale": "Solid"},
-                            "code_robustness": {"score": 7, "rationale": "Robust"},
-                        })
+                        text = json.dumps(
+                            {
+                                "requirement_fidelity": {
+                                    "score": 7,
+                                    "rationale": "Good",
+                                },
+                                "code_maintainability": {
+                                    "score": 7,
+                                    "rationale": "Clean",
+                                },
+                                "visual_ux_quality": {"score": 7, "rationale": "Solid"},
+                                "code_robustness": {"score": 7, "rationale": "Robust"},
+                            }
+                        )
+
                     class FakeResponse:
                         content = [FakeContent()]
                         usage = None
+
                     return FakeResponse()
+
             messages = Messages()
 
         fake_anthropic = types.SimpleNamespace(Anthropic=lambda: FakeAnthropicClient())
         monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
 
-        result = judge_app_with_api("print('hello')", "anthropic/claude-sonnet-5", None, "")
+        result = judge_app_with_api(
+            "print('hello')", "anthropic/claude-sonnet-5", None, ""
+        )
         assert result.composite == 7.0
 
     def test_openai_prefix_accepted(self, monkeypatch):
@@ -200,12 +233,14 @@ class TestJudgeAppWithApi:
             completion_tokens = 50
 
         class FakeMessage:
-            content = json.dumps({
-                "requirement_fidelity": {"score": 8, "rationale": "Good"},
-                "code_maintainability": {"score": 8, "rationale": "Clean"},
-                "visual_ux_quality": {"score": 8, "rationale": "Solid"},
-                "code_robustness": {"score": 8, "rationale": "Robust"},
-            })
+            content = json.dumps(
+                {
+                    "requirement_fidelity": {"score": 8, "rationale": "Good"},
+                    "code_maintainability": {"score": 8, "rationale": "Clean"},
+                    "visual_ux_quality": {"score": 8, "rationale": "Solid"},
+                    "code_robustness": {"score": 8, "rationale": "Robust"},
+                }
+            )
 
         class FakeChoice:
             message = FakeMessage()

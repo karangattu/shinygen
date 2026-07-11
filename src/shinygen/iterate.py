@@ -51,6 +51,16 @@ def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").lower() in ("1", "true", "yes")
 
 
+def _safe_data_filename(filename: str) -> str:
+    """Validate a data-file name before writing it into a work directory."""
+    if not isinstance(filename, str):
+        raise ValueError(f"Unsafe data filename: {filename!r}")
+    path = Path(filename)
+    if path.is_absolute() or ".." in path.parts or len(path.parts) != 1:
+        raise ValueError(f"Unsafe data filename: {filename!r}; use a plain filename.")
+    return filename
+
+
 def _trim_runtime_logs(logs: str, limit: int = RUNTIME_LOG_SUMMARY_LIMIT) -> str:
     """Return the tail of startup logs for prompts and run summaries."""
     stripped = logs.strip()
@@ -201,17 +211,27 @@ cleanup() {{
 trap cleanup EXIT
 ({start_cmd}) > {log_path} 2>&1 &
 app_pid=$!
-sleep {wait_seconds}
-if kill -0 "$app_pid" 2>/dev/null; then
-  echo "Startup validation: process is still running after {wait_seconds}s."
-  tail -n 160 {log_path} || true
-  exit 0
-fi
-wait "$app_pid"
-status=$?
-echo "Startup validation: process exited with status $status."
+elapsed=0
+while [ "$elapsed" -lt {wait_seconds} ]; do
+  if ! kill -0 "$app_pid" 2>/dev/null; then
+    wait "$app_pid"
+    status=$?
+    echo "Startup validation: process exited with status $status."
+    tail -n 160 {log_path} || true
+    exit "$status"
+  fi
+  if curl --silent --show-error --fail --max-time 1 \
+      "http://127.0.0.1:{port}/" > /dev/null 2>&1; then
+    echo "Startup validation: app responded on port {port}."
+    tail -n 160 {log_path} || true
+    exit 0
+  fi
+  sleep 1
+  elapsed=$((elapsed + 1))
+done
+echo "Startup validation: app did not respond on port {port} within {wait_seconds}s."
 tail -n 160 {log_path} || true
-exit "$status"
+exit 1
 """.strip()
 
 
@@ -775,6 +795,17 @@ def generate_and_refine(
     agent, model_id = resolve_model(model)
     prepare_model_environment(model_id)
 
+    if data_files:
+        for filename in data_files:
+            _safe_data_filename(filename)
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    # Never leave a previous generated app behind when this run fails before
+    # producing a replacement. Other user-owned files in output_dir are kept.
+    artifact_name = FRAMEWORKS[framework_key]["primary_artifact"]
+    (output_path / artifact_name).unlink(missing_ok=True)
+
     # Pre-flight: Docker running + API key present
     preflight_checks(agent, model_id)
 
@@ -791,8 +822,6 @@ def generate_and_refine(
     effective_port = port or find_free_port()
 
     result = GenerationResult()
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
 
     # Load skills (skipped entirely when use_skills=False so we have a
     # truly vanilla baseline arm for control/treatment benchmarks).
@@ -824,6 +853,7 @@ def generate_and_refine(
     best_score_breakdown: dict | None = None
     best_runtime_valid: bool | None = None
     best_runtime_logs: str = ""
+    best_screenshot_paths: list[Path] = []
 
     for iteration in range(1, max_iterations + 1):
         logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
@@ -1034,6 +1064,7 @@ def generate_and_refine(
                         best_runtime_logs = runtime_logs
                         best_score = 0.0
                         best_quality_score = 0.0
+                        best_screenshot_paths = list(screenshot_paths)
                     break
                 if not judge_models:
                     # No judging configured: the screenshot is cosmetic.
@@ -1093,12 +1124,13 @@ def generate_and_refine(
                         "runtime-valid app without a quality score",
                         iteration,
                     )
-                    best_code = code
-                    best_runtime_valid = runtime_valid
-                    best_runtime_logs = runtime_logs
-                    best_score = 0.0
-                    best_quality_score = 0.0
-                    result.screenshot_paths = screenshot_paths
+                    if best_code is None:
+                        best_code = code
+                        best_runtime_valid = runtime_valid
+                        best_runtime_logs = runtime_logs
+                        best_score = 0.0
+                        best_quality_score = 0.0
+                        best_screenshot_paths = list(screenshot_paths)
                     result.runtime_valid = runtime_valid
                     # Preserve the artifact, but do not count an unscored
                     # judge outage as a quality pass.
@@ -1167,7 +1199,7 @@ def generate_and_refine(
                         value_score.iteration_penalty,
                     )
 
-                if score > best_score:
+                if best_code is None or score > best_score:
                     best_score = score
                     best_quality_score = quality_score
                     best_code = code
@@ -1175,7 +1207,7 @@ def generate_and_refine(
                     best_score_breakdown = value_score.to_dict()
                     best_runtime_valid = True
                     best_runtime_logs = runtime_logs
-                    result.screenshot_paths = screenshot_paths
+                    best_screenshot_paths = list(screenshot_paths)
 
                 if score >= quality_threshold:
                     logger.info("Value threshold met! Accepting app.")
@@ -1205,11 +1237,13 @@ def generate_and_refine(
 
             except Exception as exc:
                 logger.warning("Judge failed: %s", exc)
-                best_code = code
-                best_runtime_valid = True
-                best_runtime_logs = runtime_logs
-                best_score = 0.0
-                best_quality_score = 0.0
+                if best_code is None:
+                    best_code = code
+                    best_runtime_valid = True
+                    best_runtime_logs = runtime_logs
+                    best_score = 0.0
+                    best_quality_score = 0.0
+                    best_screenshot_paths = list(screenshot_paths)
         else:
             # No judge — accept the app as soon as it runs cleanly. The
             # no-judge arm only iterates again when the app is actually
@@ -1219,7 +1253,7 @@ def generate_and_refine(
             best_runtime_logs = runtime_logs
             best_score = 10.0 if runtime_valid else 0.0
             best_quality_score = best_score
-            result.screenshot_paths = screenshot_paths
+            best_screenshot_paths = list(screenshot_paths)
 
             if runtime_valid:
                 result.passed = True
@@ -1262,7 +1296,7 @@ def generate_and_refine(
         # Copy screenshots and update paths to point to output dir
         result.screenshot_paths = _copy_output_screenshots(
             output_path,
-            result.screenshot_paths,
+            best_screenshot_paths,
         )
 
         result.app_dir = output_path
@@ -1375,55 +1409,36 @@ def _run_local_generation(
         model = _build_lmstudio_model(model_id)
         port = find_free_port()
 
-        try:
-            code, usage_rows, hit_token_limit = asyncio.run(
-                generate_artifact_on_host(
-                    model=model,
-                    framework=framework_key,
-                    artifact=artifact_name,
-                    work_dir=work_dir,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    extra_instructions=extra_instructions,
-                    port=port,
-                    python_executable=sys.executable,
-                )
+        def generate_on_host():
+            return generate_artifact_on_host(
+                model=model,
+                framework=framework_key,
+                artifact=artifact_name,
+                work_dir=work_dir,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                extra_instructions=extra_instructions,
+                port=port,
+                python_executable=sys.executable,
             )
-        except RuntimeError as exc:
-            # asyncio.run raises RuntimeError if an event loop is already
-            # running (Inspect runs inside one). Fall back to a fresh loop.
-            logger.warning(
-                "Iteration %d: asyncio.run blocked (%s); using new loop",
-                iteration,
-                exc,
-            )
-            loop = asyncio.new_event_loop()
-            try:
-                code, usage_rows, hit_token_limit = loop.run_until_complete(
-                    generate_artifact_on_host(
-                        model=model,
-                        framework=framework_key,
-                        artifact=artifact_name,
-                        work_dir=work_dir,
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        extra_instructions=extra_instructions,
-                        port=port,
-                        python_executable=sys.executable,
-                    )
-                )
-            finally:
-                loop.close()
 
-        if code and output_path is not None:
-            # Mirror the Docker path: copy the generated artifact + data
-            # files into the user-facing output directory so the app is
-            # runnable directly from there.
-            output_path.mkdir(parents=True, exist_ok=True)
-            (output_path / artifact_name).write_text(code, encoding="utf-8")
-            if data_files:
-                for fname, content in data_files.items():
-                    (output_path / fname).write_text(content, encoding="utf-8")
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            code, usage_rows, hit_token_limit = asyncio.run(generate_on_host())
+        else:
+            # A running event loop cannot be nested in this thread. Run the
+            # synchronous API's coroutine in a dedicated worker instead.
+            from concurrent.futures import ThreadPoolExecutor
+
+            logger.warning(
+                "Iteration %d: active event loop detected; using worker thread",
+                iteration,
+            )
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                code, usage_rows, hit_token_limit = executor.submit(
+                    lambda: asyncio.run(generate_on_host())
+                ).result()
 
         return code, usage_rows, hit_token_limit
     except Exception as exc:

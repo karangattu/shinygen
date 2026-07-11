@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from shinygen import api
 from shinygen.api import BatchJob, read_data_files
 from shinygen.iterate import GenerationResult
@@ -55,10 +57,12 @@ def test_batch_runs_all_jobs(monkeypatch):
 
     monkeypatch.setattr(api, "generate_and_refine", fake_generate_and_refine)
 
-    result = api.batch([
-        {"prompt": "app one", "model": "claude-sonnet", "output_dir": "./out1"},
-        {"prompt": "app two", "model": "gpt54", "output_dir": "./out2"},
-    ])
+    result = api.batch(
+        [
+            {"prompt": "app one", "model": "claude-sonnet", "output_dir": "./out1"},
+            {"prompt": "app two", "model": "gpt54", "output_dir": "./out2"},
+        ]
+    )
 
     assert len(result.results) == 2
     assert result.succeeded == 2
@@ -78,9 +82,11 @@ def test_batch_accepts_csv_file_alias(tmp_path, monkeypatch):
 
     monkeypatch.setattr(api, "generate_and_refine", fake_generate_and_refine)
 
-    result = api.batch([
-        {"prompt": "app one", "csv_file": str(csv_path), "output_dir": "./out1"},
-    ])
+    result = api.batch(
+        [
+            {"prompt": "app one", "csv_file": str(csv_path), "output_dir": "./out1"},
+        ]
+    )
 
     assert result.succeeded == 1
     assert calls[0]["data_files"] == {"sales.csv": "x,y\n1,2\n"}
@@ -99,8 +105,9 @@ def test_batch_with_batch_job_objects(monkeypatch):
 
     jobs = [
         BatchJob(prompt="dashboard", model="claude-opus", output_dir="./a"),
-        BatchJob(prompt="dashboard", model="gpt54-mini", output_dir="./b",
-                 screenshot=True),
+        BatchJob(
+            prompt="dashboard", model="gpt54-mini", output_dir="./b", screenshot=True
+        ),
     ]
     result = api.batch(jobs)
 
@@ -121,10 +128,12 @@ def test_batch_records_failures(monkeypatch):
 
     monkeypatch.setattr(api, "generate_and_refine", fake_generate_and_refine)
 
-    result = api.batch([
-        {"prompt": "a", "output_dir": "./x"},
-        {"prompt": "b", "output_dir": "./y"},
-    ])
+    result = api.batch(
+        [
+            {"prompt": "a", "output_dir": "./x"},
+            {"prompt": "b", "output_dir": "./y"},
+        ]
+    )
 
     assert result.failed == 1
     assert result.succeeded == 1
@@ -152,6 +161,13 @@ class TestReadDataFiles:
         data = {"file.txt": "content"}
         result = read_data_files(data_files=data)
         assert result == {"file.txt": "content"}
+
+    @pytest.mark.parametrize(
+        "filename", ["../outside.txt", "/tmp/outside.txt", "dir/data.csv"]
+    )
+    def test_rejects_unsafe_data_file_names(self, filename):
+        with pytest.raises(ValueError, match="Unsafe data filename"):
+            read_data_files(data_files={filename: "content"})
 
     def test_reads_csv_file(self, tmp_path):
         csv_path = tmp_path / "data.csv"
@@ -207,4 +223,3 @@ class TestReadDataFiles:
 
         result = read_data_files(data_csv=str(csv_path))
         assert result == {"data.csv": "content"}
-

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from .iterate import GenerationResult, generate_and_refine
+from .iterate import GenerationResult, _safe_data_filename, generate_and_refine
 
 
 def read_data_files(
@@ -30,7 +30,9 @@ def read_data_files(
     merged: dict[str, str] | None = None
 
     if data_files:
-        merged = dict(data_files)
+        merged = {}
+        for filename, content in data_files.items():
+            merged[_safe_data_filename(filename)] = content
 
     if data_file_paths:
         if merged is None:
@@ -285,7 +287,10 @@ def batch(jobs: list[BatchJob | dict]) -> BatchResult:
         job = _normalize_batch_job(job)
         logger.info(
             "Batch job %d/%d: model=%s output_dir=%s",
-            idx, len(jobs), job.model, job.output_dir,
+            idx,
+            len(jobs),
+            job.model,
+            job.output_dir,
         )
         try:
             result = generate(

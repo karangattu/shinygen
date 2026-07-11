@@ -37,9 +37,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/karangathani/shinygen"
-Repository = "https://github.com/karangathani/shinygen"
-"Bug Tracker" = "https://github.com/karangathani/shinygen/issues"
+Homepage = "https://github.com/karangattu/shinygen"
+Repository = "https://github.com/karangattu/shinygen"
+"Bug Tracker" = "https://github.com/karangattu/shinygen/issues"
 
 [project.optional-dependencies]
 screenshot = [

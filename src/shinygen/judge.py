@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import math
 import re
 import time
 from collections.abc import Callable
@@ -258,9 +259,7 @@ def _build_judge_message(
     if screenshot_paths:
         count = len(screenshot_paths)
         if count == 1:
-            parts.append(
-                "\n1 screenshot is attached as an image (the rendered app).\n"
-            )
+            parts.append("\n1 screenshot is attached as an image (the rendered app).\n")
         else:
             # Name each screenshot so the judge can correlate the image with
             # its tab/view label. Multi-tab dashboards used to be scored
@@ -347,16 +346,28 @@ def parse_judge_response(raw: str) -> JudgeResult:
         logger.warning("Failed to parse judge response as JSON: %s", exc)
         return result
 
-    for criterion in CRITERIA:
-        entry = parsed.get(criterion, {})
-        if isinstance(entry, dict):
-            result.scores[criterion] = float(entry.get("score", 0))
-            result.rationales[criterion] = entry.get("rationale", "")
-        elif isinstance(entry, (int, float)):
-            result.scores[criterion] = float(entry)
+    if not isinstance(parsed, dict):
+        logger.warning("Judge response JSON was not an object")
+        return result
 
-    if result.scores:
-        result.composite = sum(result.scores.values()) / len(result.scores)
+    for criterion in CRITERIA:
+        entry = parsed.get(criterion)
+        if not isinstance(entry, dict):
+            result.scores[criterion] = 0.0
+            result.rationales[criterion] = "Missing from judge response."
+            continue
+
+        try:
+            score = float(entry.get("score", 0))
+        except (TypeError, ValueError):
+            score = 0.0
+        if not math.isfinite(score):
+            score = 0.0
+
+        result.scores[criterion] = max(0.0, min(10.0, score))
+        result.rationales[criterion] = str(entry.get("rationale", ""))
+
+    result.composite = sum(result.scores.values()) / len(CRITERIA)
 
     return result
 
@@ -498,17 +509,23 @@ def _retry_with_backoff(
             last_exception = exc
             exc_name = type(exc).__name__
             if attempt < max_retries - 1:
-                delay = base_delay * (2 ** attempt)
+                delay = base_delay * (2**attempt)
                 logger.warning(
                     "Judge API call failed (%s: %s), retrying in %.1fs "
                     "(attempt %d/%d)",
-                    exc_name, exc, delay, attempt + 1, max_retries,
+                    exc_name,
+                    exc,
+                    delay,
+                    attempt + 1,
+                    max_retries,
                 )
                 time.sleep(delay)
             else:
                 logger.error(
                     "Judge API call failed after %d attempts: %s: %s",
-                    max_retries, exc_name, exc,
+                    max_retries,
+                    exc_name,
+                    exc,
                 )
     raise last_exception
 

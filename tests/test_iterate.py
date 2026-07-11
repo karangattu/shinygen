@@ -104,6 +104,78 @@ class TestRuntimeLogFailureDetection:
 
 
 class TestNoJudgeRuntimeRefinement:
+    def test_failed_run_removes_previous_generated_app(self, tmp_path, monkeypatch):
+        previous_app = tmp_path / "app.py"
+        previous_app.write_text("stale app", encoding="utf-8")
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr(
+            "shinygen.iterate._run_generation",
+            lambda *a, **k: (None, [], False),
+        )
+
+        result = generate_and_refine(
+            prompt="Build an app",
+            model="gpt-5.4",
+            output_dir=tmp_path,
+            max_iterations=1,
+        )
+
+        assert result.error == "Failed to extract app code from any iteration"
+        assert not previous_app.exists()
+
+    def test_judge_outage_preserves_previously_scored_app(self, tmp_path, monkeypatch):
+        from shinygen.judge import JudgeResult
+
+        generated = ["first app", "second app"]
+        calls = 0
+
+        def fake_run_generation(*args, **kwargs):
+            nonlocal calls
+            code = generated[calls]
+            calls += 1
+            return code, [], False
+
+        judge_calls = 0
+
+        def fake_judge(*args, **kwargs):
+            nonlocal judge_calls
+            judge_calls += 1
+            if judge_calls == 1:
+                return JudgeResult(
+                    scores={
+                        criterion: 8.0
+                        for criterion in [
+                            "requirement_fidelity",
+                            "code_maintainability",
+                            "visual_ux_quality",
+                            "code_robustness",
+                        ]
+                    },
+                    composite=8.0,
+                )
+            return JudgeResult()
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_generation)
+        monkeypatch.setattr(
+            "shinygen.iterate._validate_generated_app_runtime",
+            lambda *a, **k: (True, "Listening on http://127.0.0.1:8000"),
+        )
+        monkeypatch.setattr("shinygen.judge.judge_app_with_models", fake_judge)
+
+        result = generate_and_refine(
+            prompt="Build an app",
+            model="gpt-5.4",
+            output_dir=tmp_path,
+            judge_model="openai/gpt-5.4",
+            max_iterations=2,
+            quality_threshold=9.0,
+        )
+
+        assert result.source_code == generated[0]
+        assert result.score > 0
+
     def test_no_judge_run_accepts_clean_first_iteration_without_refining(
         self,
         tmp_path,
