@@ -483,12 +483,20 @@ jobs:
               print(f"No aggregate root at {root}; nothing to summarize.")
               raise SystemExit(0)
 
-          for artifact_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-              summary_paths = sorted(artifact_dir.rglob("run_summary.json"))
-              if not summary_paths:
-                  missing.append(artifact_dir.name)
+          # download-artifact@v7 extracts a single matched artifact directly
+          # into `path` (flat layout) but creates one subfolder per artifact
+          # when two or more match the pattern (nested layout). Scan the
+          # whole root recursively so single-arm runs (which download only
+          # one artifact and land files at the root) still surface a row.
+          seen_labels = set()
+          for summary_path in sorted(root.rglob("run_summary.json")):
+              rel = summary_path.relative_to(root)
+              artifact_label = rel.parts[0] if len(rel.parts) > 1 else root.name
+              if artifact_label in seen_labels:
                   continue
-              summary = json.loads(summary_paths[0].read_text(encoding="utf-8"))
+              seen_labels.add(artifact_label)
+
+              summary = json.loads(summary_path.read_text(encoding="utf-8"))
               usage = summary.get("usage") or {}
               model = summary.get("model") or {}
               judge_models = summary.get("judge_models") or (
@@ -496,7 +504,7 @@ jobs:
               )
               rows.append(
                   {
-                      "artifact_dir": artifact_dir.name,
+                      "artifact_dir": artifact_label,
                       "framework": summary.get("framework"),
                       "model": model.get("requested"),
                       "agent": model.get("agent"),
@@ -515,6 +523,17 @@ jobs:
                       "total_time_seconds": usage.get("total_time_seconds"),
                   }
               )
+
+          # Flag top-level per-artifact directories that downloaded without a
+          # run_summary.json. Auxiliary subfolders (e.g. eval_logs/) are
+          # emitted inside an artifact during extraction, so only directories
+          # whose name matches the artifact prefix are real artifact roots.
+          for artifact_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+              if any(artifact_dir.rglob("run_summary.json")):
+                  continue
+              if not artifact_dir.name.startswith("shinygen-"):
+                  continue
+              missing.append(artifact_dir.name)
 
           summary_json = {
               "benchmark": os.environ["BENCHMARK_CHALLENGE"],
