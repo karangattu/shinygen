@@ -16,7 +16,15 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from anthropic.types import ImageBlockParam, MessageParam, TextBlockParam
+    from openai.types.chat import (
+        ChatCompletionContentPartParam,
+        ChatCompletionSystemMessageParam,
+        ChatCompletionUserMessageParam,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -306,9 +314,9 @@ def _build_judge_content_multimodal(
     screenshot_paths: list[Path],
     user_prompt: str = "",
     language: str = "python",
-) -> list[dict]:
+) -> list[TextBlockParam | ImageBlockParam]:
     """Build multimodal content parts (text + base64 images) for the judge."""
-    parts: list[dict] = []
+    parts: list[TextBlockParam | ImageBlockParam] = []
 
     text_msg = _build_judge_message(code, screenshot_paths, user_prompt, language)
     parts.append({"type": "text", "text": text_msg})
@@ -501,12 +509,13 @@ def _retry_with_backoff(
     base_delay: float = 1.0,
 ) -> Any:
     """Retry a function with exponential backoff on transient failures."""
-    last_exception = None
+    if max_retries < 1:
+        raise ValueError("max_retries must be at least 1")
+
     for attempt in range(max_retries):
         try:
             return func()
         except Exception as exc:
-            last_exception = exc
             exc_name = type(exc).__name__
             if attempt < max_retries - 1:
                 delay = base_delay * (2**attempt)
@@ -527,7 +536,7 @@ def _retry_with_backoff(
                     exc_name,
                     exc,
                 )
-    raise last_exception
+                raise
 
 
 def _judge_with_anthropic(
@@ -550,12 +559,14 @@ def _judge_with_anthropic(
     else:
         content = _build_judge_message(code, None, user_prompt, language)
 
+    message: MessageParam = {"role": "user", "content": content}
+
     def _call_api():
         return client.messages.create(
             model=model_name,
             max_tokens=2048,
             system=JUDGE_SYSTEM,
-            messages=[{"role": "user", "content": content}],
+            messages=[message],
         )
 
     response = _retry_with_backoff(_call_api)
@@ -580,15 +591,10 @@ def _judge_with_openai(
 
     client = openai.OpenAI()
     model_name = model.removeprefix("openai/")
-    token_limit_arg = (
-        {"max_completion_tokens": 2048}
-        if model_name.startswith("gpt-5")
-        else {"max_tokens": 2048}
-    )
 
     user_text = _build_judge_message(code, screenshot_paths, user_prompt, language)
 
-    content: list[dict] | str
+    content: list[ChatCompletionContentPartParam] | str
     if screenshot_paths:
         content = [{"type": "text", "text": user_text}]
         for img_path in screenshot_paths:
@@ -604,14 +610,27 @@ def _judge_with_openai(
     else:
         content = user_text
 
+    system_message: ChatCompletionSystemMessageParam = {
+        "role": "system",
+        "content": JUDGE_SYSTEM,
+    }
+    user_message: ChatCompletionUserMessageParam = {
+        "role": "user",
+        "content": content,
+    }
+
     def _call_api():
+        messages = [system_message, user_message]
+        if model_name.startswith("gpt-5"):
+            return client.chat.completions.create(
+                model=model_name,
+                max_completion_tokens=2048,
+                messages=messages,
+            )
         return client.chat.completions.create(
             model=model_name,
-            **token_limit_arg,
-            messages=[
-                {"role": "system", "content": JUDGE_SYSTEM},
-                {"role": "user", "content": content},
-            ],
+            max_tokens=2048,
+            messages=messages,
         )
 
     response = _retry_with_backoff(_call_api)

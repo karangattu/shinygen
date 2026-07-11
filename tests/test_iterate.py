@@ -530,6 +530,7 @@ class TestCopyAgentScreenshotArtifact:
         )
 
         assert copied == output_path / "agent_last_screenshot.png"
+        assert copied is not None
         assert copied.read_bytes() == b"full-page"
 
     def test_accepts_legacy_agent_last_from_results_volume(self, tmp_path):
@@ -547,6 +548,7 @@ class TestCopyAgentScreenshotArtifact:
         )
 
         assert copied == output_path / "agent_last_screenshot.png"
+        assert copied is not None
         assert copied.read_bytes() == b"legacy-agent"
 
     def test_falls_back_to_last_eval_log_image_attachment(self, tmp_path):
@@ -598,6 +600,7 @@ class TestCopyAgentScreenshotArtifact:
         )
 
         assert copied == output_path / "agent_last_screenshot.png"
+        assert copied is not None
         assert copied.read_bytes() == last_image
 
 

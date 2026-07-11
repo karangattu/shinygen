@@ -37,7 +37,7 @@ import os
 import shlex
 from pathlib import Path
 
-from inspect_ai.agent import AgentPrompt, react
+from inspect_ai.agent import AgentPrompt, AgentState, react
 from inspect_ai.model import (
     ChatMessageSystem,
     ChatMessageUser,
@@ -803,7 +803,14 @@ def native_react_solver(
                         )
                     )
                 )
-            return await agent(state)
+            agent_state = AgentState(messages=state.messages)
+            try:
+                agent_state = await agent(agent_state)
+            finally:
+                state.messages = agent_state.messages
+                state.output = agent_state.output
+            return state
+
         return solve
 
     return react_with_init()

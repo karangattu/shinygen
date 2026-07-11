@@ -150,6 +150,7 @@ def test_batch_handles_exception(monkeypatch):
 
     assert result.failed == 1
     assert result.succeeded == 0
+    assert result.results[0].error is not None
     assert "kaboom" in result.results[0].error
 
 

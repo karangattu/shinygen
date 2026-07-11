@@ -11,7 +11,7 @@ import shlex
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from inspect_ai import Task
 from inspect_ai.dataset import MemoryDataset, Sample
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 CODEX_CLI_VERSION = "auto"
 CODEX_CONFIG_OVERRIDES = {"web_search": "live"}
-CODEX_DISALLOWED_TOOLS = ["web_search"]
+CODEX_DISALLOWED_TOOLS: list[Literal["web_search"]] = ["web_search"]
 
 # Artifact names we search for
 APP_ARTIFACTS = ("app.py", "app.R")
@@ -551,6 +551,8 @@ def build_generation_task(
             disallowed_tools=codex_disallowed_tools,
         )
     elif agent == "native_react_solver":
+        if model_id is None:
+            raise ValueError("model_id is required for native_react_solver")
         # We drive OpenCode Go models with our own native ReAct solver — same shape as
         # claude_code / codex_cli but talking directly to the OpenCode Go
         # endpoint. This avoids the mini bridge's litellm cost-tracking

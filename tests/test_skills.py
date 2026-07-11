@@ -288,7 +288,7 @@ class TestBuildGenerationTask:
         # Even if the caller passed skills, the vanilla arm must drop them.
         assert captured["skills"] is None
 
-        sample_files = task.dataset.samples[0].files or {}
+        sample_files = task.dataset[0].files or {}
         # Data files still present.
         assert sample_files["sales.csv"] == "x,y\n1,2\n"
         # Screenshot helper script still present (vanilla arm still
@@ -330,7 +330,7 @@ class TestBuildGenerationTask:
         assert task.solver is sentinel_solver
         assert captured["skills"] == skills
 
-        sample_files = task.dataset.samples[0].files or {}
+        sample_files = task.dataset[0].files or {}
         assert sample_files["sales.csv"] == "x,y\n1,2\n"
         if agent == "codex_cli":
             # codex_cli additionally stages bundled skill files into the
@@ -376,7 +376,7 @@ class TestBuildGenerationTask:
         skill_names = [skill.name for skill in captured["skills"]]
         assert skill_names == ["shiny-python-dashboard", "visual-qa"]
 
-        sample_files = task.dataset.samples[0].files or {}
+        sample_files = task.dataset[0].files or {}
         assert ".tools/screenshot_helper.py" in sample_files
         staged = [key for key in sample_files if key.startswith(".agents/skills/")]
         if agent == "codex_cli":
@@ -449,7 +449,9 @@ class TestDatasetContextInjection:
             use_skills=use_skills,
         )
 
-        user_msgs = [m for m in task.dataset.samples[0].input if m.role == "user"]
+        sample_input = task.dataset[0].input
+        assert not isinstance(sample_input, str)
+        user_msgs = [m for m in sample_input if m.role == "user"]
         assert user_msgs, "expected at least one user message in the sample input"
         user_content = user_msgs[-1].content
         # Exact filename, columns, and anti-swap directive must reach the
@@ -468,6 +470,8 @@ class TestDatasetContextInjection:
             docker_context_dir=tmp_path,
         )
 
-        user_msgs = [m for m in task.dataset.samples[0].input if m.role == "user"]
+        sample_input = task.dataset[0].input
+        assert not isinstance(sample_input, str)
+        user_msgs = [m for m in sample_input if m.role == "user"]
         user_content = user_msgs[-1].content
         assert "DATASET(S) YOU MUST USE" not in user_content

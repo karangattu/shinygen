@@ -35,7 +35,11 @@ def _read_zip_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
             "ZIP method 93 (zstd) requires the zstandard package"
         ) from exc
 
-    with open(zf.filename, "rb") as archive:
+    archive_path = zf.filename
+    if archive_path is None:
+        raise ValueError("Zstandard fallback requires a path-backed ZIP archive")
+
+    with open(archive_path, "rb") as archive:
         archive.seek(info.header_offset)
         local_header = archive.read(30)
         (

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from .iterate import GenerationResult, _safe_data_filename, generate_and_refine
 
@@ -198,7 +198,7 @@ class BatchResult:
     failed: int = 0
 
 
-def _normalize_batch_job(job: BatchJob | dict[str, object]) -> BatchJob:
+def _normalize_batch_job(job: BatchJob | dict[str, Any]) -> BatchJob:
     """Normalize dict batch jobs to BatchJob.
 
     Supports both API-style keys (``data_csv``) and CLI-style keys
@@ -231,7 +231,7 @@ def _normalize_batch_job(job: BatchJob | dict[str, object]) -> BatchJob:
     return BatchJob(**spec)
 
 
-def batch(jobs: list[BatchJob | dict]) -> BatchResult:
+def batch(jobs: Sequence[BatchJob | dict[str, Any]]) -> BatchResult:
     """Run multiple generation jobs sequentially.
 
     Each job is an independent generation with its own model, prompt,

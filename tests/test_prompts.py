@@ -108,6 +108,7 @@ class TestBuildDatasetContext:
 
     def test_includes_anti_swap_directive(self):
         ctx = build_dataset_context({"sales.csv": "a,b\n1,2\n"})
+        assert ctx is not None
         assert "Do NOT substitute" in ctx
         assert "mtcars" in ctx
         assert "penguins" in ctx

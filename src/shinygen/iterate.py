@@ -15,7 +15,7 @@ import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Sequence, TypedDict, cast
 
 from .config import (
     DEFAULT_MAX_ITERATIONS,
@@ -37,7 +37,7 @@ from .extract import _read_zip_member, extract_from_log
 from .pricing import Timer, UsageStats, calculate_value_score
 
 if TYPE_CHECKING:
-    from inspect_ai.log import EvalLog
+    from inspect_ai.model import GenerateConfigArgs
     from inspect_ai.tool import Skill
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,15 @@ AGENT_LAST_SCREENSHOT_NAME = "agent_last_screenshot.png"
 RUNTIME_VALIDATION_STARTUP_WAIT = 6
 RUNTIME_VALIDATION_TIMEOUT = 45
 RUNTIME_LOG_SUMMARY_LIMIT = 8_000
+
+
+class _GenerationUsageRow(TypedDict):
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cache_write_tokens: int
+    cache_read_tokens: int
+    cost_override: float | None
 
 
 def _env_truthy(name: str) -> bool:
@@ -140,11 +149,11 @@ def _write_run_summary(
     return summary_path
 
 
-def _extract_generation_usage_rows(log: "EvalLog") -> list[dict[str, object]]:
+def _extract_generation_usage_rows(log: object) -> list[_GenerationUsageRow]:
     """Extract model usage rows from an Inspect eval log object."""
     stats = getattr(log, "stats", None)
     model_usage = getattr(stats, "model_usage", None) or {}
-    rows: list[dict[str, object]] = []
+    rows: list[_GenerationUsageRow] = []
 
     for model_name, usage in model_usage.items():
         input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
@@ -326,7 +335,7 @@ def _validate_generated_app_runtime(
         )
     except subprocess.TimeoutExpired as exc:
         output = "\n".join(
-            part
+            part.decode(errors="replace") if isinstance(part, bytes) else part
             for part in (
                 "Startup validation timed out.",
                 exc.stdout or "",
@@ -345,7 +354,7 @@ def _validate_generated_app_runtime(
     )
 
 
-def _generation_extra_config(agent: str) -> dict[str, object]:
+def _generation_extra_config(agent: str) -> "GenerateConfigArgs":
     """Return provider-specific generation settings."""
     if agent == "claude_code":
         # Medium reasoning keeps Claude 4.6 on adaptive thinking without
@@ -863,7 +872,7 @@ def generate_and_refine(
         from .prompts import build_truncation_retry_prompt
 
         code: str | None = None
-        generation_usage_rows: list[dict[str, object]] = []
+        generation_usage_rows: list[_GenerationUsageRow] = []
         # 3 attempts before any artifact exists: original prompt, direct-write
         # retry on truncation, and one more direct-write attempt if needed.
         # Once we already have a fallback app from an earlier iteration, avoid
@@ -1353,7 +1362,7 @@ def _run_local_generation(
     iteration: int,
     output_path: Path | None = None,
     use_skills: bool = True,
-) -> tuple[str | None, list[dict[str, object]], bool]:
+) -> tuple[str | None, list[_GenerationUsageRow], bool]:
     """Generate a Shiny artifact on the host via LM Studio (no Docker).
 
     Host-side counterpart of :func:`_run_generation` for local LM Studio
@@ -1440,7 +1449,7 @@ def _run_local_generation(
                     lambda: asyncio.run(generate_on_host())
                 ).result()
 
-        return code, usage_rows, hit_token_limit
+        return code, cast(list[_GenerationUsageRow], usage_rows), hit_token_limit
     except Exception as exc:
         logger.error("Local generation failed in iteration %d: %s", iteration, exc)
         return None, [], False
@@ -1461,7 +1470,7 @@ def _run_generation(
     output_path: Path | None = None,
     *,
     use_skills: bool = True,
-) -> tuple[str | None, list[dict[str, object]], bool]:
+) -> tuple[str | None, list[_GenerationUsageRow], bool]:
     """Run a single generation via Inspect AI and extract the code.
 
     LM Studio models bypass the Docker/Inspect-Task path entirely and run
@@ -1491,7 +1500,7 @@ def _run_generation(
     docker_dir = stage_docker_context(framework_key)
     logs_dir = docker_dir / "logs"
     log_path: Path | None = None
-    generation_usage_rows: list[dict[str, object]] = []
+    generation_usage_rows: list[_GenerationUsageRow] = []
     try:
         task = build_generation_task(
             user_prompt=prompt,

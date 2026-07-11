@@ -136,7 +136,7 @@ def _expr_is_plotly_figure(
             and chain[1] == "express"
         ):
             return True
-        if root in symbols["graph_aliases"] and chain[-1] == "Figure":
+        if root in symbols["graph_aliases"] and chain[-1:] == ("Figure",):
             return True
         if (
             root in symbols["plotly_roots"]

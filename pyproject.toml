@@ -68,3 +68,6 @@ profile = "black"
 [tool.pyright]
 pythonVersion = "3.10"
 typeCheckingMode = "basic"
+include = ["src", "tests"]
+venvPath = "."
+venv = ".venv"
