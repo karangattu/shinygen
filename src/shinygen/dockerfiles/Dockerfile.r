@@ -1,5 +1,5 @@
-# Combined R + Python sandbox for Shiny R app generation.
-# Base: rocker/r-ver provides R 4.4; Python 3.12 added on top.
+# R sandbox for Shiny R app generation.
+# Base: rocker/r-ver provides R 4.4; Python is present only for benchmark tools.
 #
 # Built and published to GitHub Container Registry by
 # `.github/workflows/build-sandbox-images.yml` so benchmark runs reuse a
@@ -9,8 +9,6 @@
 # Pre-installed:
 #   - System libraries needed by Chromium (Playwright) and the geo stack
 #   - R + base CRAN packages used by generated Shiny apps
-#   - Python + visualization packages (so the same image works for both
-#     framework variants when needed)
 #   - Playwright + Chromium browser
 #   - uv (used by native_react_solver)
 #   - `claude` (Anthropic Claude Code) standalone binary on PATH
@@ -75,20 +73,11 @@ RUN Rscript -e ' \
     } \
 '
 
-# Python packages (so the image can also exercise Python helpers when
-# needed; keeps a single image surface for both framework variants).
+# Python is needed by the benchmark harness, but Python dashboard libraries
+# belong only in Dockerfile.python. Keeping them out materially reduces the R
+# image's cold-pull and container-unpack time.
 RUN pip3 install --break-system-packages --no-cache-dir -U uv && \
     uv pip install --system --break-system-packages --no-cache --upgrade \
-    shiny \
-    plotly \
-    faicons \
-    pandas \
-    matplotlib \
-    seaborn \
-    great-tables \
-    itables \
-    htmltools \
-    shinywidgets \
     playwright
 
 # Install Chromium for Playwright (used by agent for visual self-evaluation)

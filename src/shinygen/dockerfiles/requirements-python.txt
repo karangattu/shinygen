@@ -1,0 +1,17 @@
+shiny
+shinyswatch
+plotly
+faicons
+pandas
+matplotlib
+seaborn
+great-tables
+itables
+htmltools
+shinywidgets
+folium
+pydeck
+lonboard
+geopandas
+numpy
+playwright

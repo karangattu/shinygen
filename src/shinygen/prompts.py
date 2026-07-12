@@ -31,9 +31,10 @@ the task FAILS.
 
 IMPORTANT WORKFLOW:
 1. cd to /home/user/project (this is your working directory)
-2. Install any additional Python packages you need: {install_command}
-    NOTE: shiny, shinywidgets, plotly, faicons, pandas, matplotlib,
-    seaborn are already installed.
+2. Do not install packages during benchmark runs. The sandbox already includes
+   shiny, shinyswatch, shinywidgets, plotly, faicons, pandas, matplotlib,
+   seaborn, great-tables, itables, htmltools, folium, pydeck, lonboard,
+   geopandas, numpy, and playwright. Jump straight to creating the app.
 3. Create the file /home/user/project/app.py with the dashboard code.
    CRITICAL: The file MUST be app.py (NOT app.R). Use Python language syntax.
 4. Verify Python syntax: python -c "import ast; \
@@ -98,7 +99,8 @@ WORKFLOW:
 2. The following R packages are ALREADY INSTALLED — do NOT reinstall them:
    shiny, bslib, bsicons, ggplot2, dplyr, readr, tidyr, stringr,
    lubridate, plotly, DT, leaflet, scales, thematic, htmltools, htmlwidgets.
-   Only install packages that are NOT in the list above:
+   Do not install packages during benchmark runs; the sandbox image is
+   preloaded. Outside benchmarks, only install packages that are NOT in the list above:
    Run `install.packages(c("package1", "package2"), repos = "https://cloud.r-project.org")` only for packages that are actually missing.
 3. Write your R code to /home/user/project/app.R
 4. Verify: Rscript -e "parse('app.R'); cat('OK\\n')"

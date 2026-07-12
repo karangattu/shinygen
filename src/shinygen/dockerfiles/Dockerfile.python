@@ -36,26 +36,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 libnspr4 libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-install Python packages used by generated Shiny apps
+# Keep the complete dashboard dependency set in one auditable manifest. This
+# layer changes only when the manifest changes and is reused by BuildKit.
+COPY requirements-python.txt /tmp/requirements-python.txt
 RUN pip install --no-cache-dir -U uv && \
     uv pip install --system --no-cache --upgrade \
-    shiny \
-    shinyswatch \
-    plotly \
-    faicons \
-    pandas \
-    matplotlib \
-    seaborn \
-    great-tables \
-    itables \
-    htmltools \
-    shinywidgets \
-    folium \
-    pydeck \
-    lonboard \
-    geopandas \
-    numpy \
-    playwright
+        -r /tmp/requirements-python.txt && \
+    rm /tmp/requirements-python.txt
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
 RUN playwright install chromium
 
