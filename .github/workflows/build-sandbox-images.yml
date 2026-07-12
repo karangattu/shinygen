@@ -86,5 +86,5 @@ jobs:
           if [[ "${{ matrix.image.name }}" == "shinygen-sandbox-python" ]]; then
             docker run --rm "${IMAGE}" python -c 'import shiny, shinywidgets, plotly, pandas, geopandas, playwright'
           else
-            docker run --rm "${IMAGE}" Rscript -e 'library(shiny); library(bslib); library(leaflet); library(plotly)'
+            docker run --rm "${IMAGE}" Rscript -e 'library(shiny); library(bslib); library(leaflet); library(sf); library(plotly)'
           fi

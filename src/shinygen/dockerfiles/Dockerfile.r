@@ -57,10 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
     libxrandr2 libgbm1 libpango-1.0-0 libcairo2 \
     libasound2t64 libnspr4 libdbus-1-3 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Pre-install R packages
-RUN Rscript -e ' \
+    && Rscript -e ' \
     pkgs <- c( \
         "shiny", "bslib", "bsicons", \
         "ggplot2", "dplyr", "readr", "tidyr", "stringr", "lubridate", \
@@ -72,7 +69,29 @@ RUN Rscript -e ' \
     if (length(missing) > 0) { \
         stop("Failed to install packages: ", paste(missing, collapse = ", ")); \
     } \
-'
+' \
+    && apt-get purge -y \
+        build-essential \
+        cmake \
+        pkg-config \
+        libcurl4-openssl-dev \
+        libssl-dev \
+        libxml2-dev \
+        libfontconfig1-dev \
+        libfreetype6-dev \
+        libpng-dev \
+        libtiff5-dev \
+        libjpeg-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
+        libgdal-dev \
+        libgeos-dev \
+        libproj-dev \
+        libudunits2-dev \
+        libsqlite3-dev \
+        libuv1-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Python is needed by the benchmark harness, but Python dashboard libraries
 # belong only in Dockerfile.python. Keeping them out materially reduces the R
