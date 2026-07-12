@@ -136,8 +136,8 @@ def test_benchmark_workflow_uses_sandbox_screenshots_without_runner_browser_inst
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "Install shinygen CLI on runner" in workflow
-    assert 'python -m pip install -e "."' in workflow
-    assert 'python -m pip install -e ".[screenshot]"' not in workflow
+    assert 'uv pip install --system -e "."' in workflow
+    assert 'uv pip install --system -e ".[screenshot]"' not in workflow
     assert "python -m playwright install --with-deps chromium" not in workflow
     assert 'SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"' in workflow
     assert 'SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "1"' in workflow

@@ -253,7 +253,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: "pip"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
       - name: Validate benchmark inputs and required API key secrets
         shell: bash
@@ -328,7 +330,7 @@ jobs:
           # Benchmark screenshots are captured inside the pre-built sandbox
           # images. Keep the runner install lean; host-side screenshot fallback
           # is disabled by SHINYGEN_STRICT_SANDBOX_SCREENSHOT=1.
-          python -m pip install -e "."
+          uv pip install --system -e "."
 
       - name: Run shinygen benchmark generation
         shell: bash

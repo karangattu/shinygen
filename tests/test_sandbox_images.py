@@ -54,3 +54,21 @@ def test_image_build_smoke_tests_preinstalled_framework_dependencies():
 
     assert "import shiny, shinywidgets, plotly, pandas, geopandas, playwright" in workflow
     assert 'library(shiny); library(bslib); library(leaflet); library(plotly)' in workflow
+
+
+def test_sandbox_images_use_uv_for_every_python_package_install():
+    for name in ("Dockerfile.python", "Dockerfile.r"):
+        dockerfile = (DOCKER_DIR / name).read_text(encoding="utf-8")
+
+        assert "COPY --from=ghcr.io/astral-sh/uv:" in dockerfile
+        assert "RUN pip install" not in dockerfile
+        assert "RUN pip3 install" not in dockerfile
+        assert "/bin/pip install" not in dockerfile
+        assert "uv pip install" in dockerfile
+
+
+def test_github_workflows_use_uv_for_python_package_installs():
+    for path in (ROOT / ".github" / "workflows").glob("*.yml"):
+        workflow = path.read_text(encoding="utf-8")
+
+        assert "python -m pip install" not in workflow

@@ -16,6 +16,9 @@
 
 FROM rocker/r-ver:4.4.2
 
+# Bootstrap uv from its official static image so pip is never needed.
+COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
+
 ARG TARGETARCH
 ARG CLAUDE_VERSION=2.1.205
 ARG CODEX_VERSION=rust-v0.142.5
@@ -34,8 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     tar \
     python3 \
-    python3-pip \
-    python3-venv \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
@@ -76,8 +77,7 @@ RUN Rscript -e ' \
 # Python is needed by the benchmark harness, but Python dashboard libraries
 # belong only in Dockerfile.python. Keeping them out materially reduces the R
 # image's cold-pull and container-unpack time.
-RUN pip3 install --break-system-packages --no-cache-dir -U uv && \
-    uv pip install --system --break-system-packages --no-cache --upgrade \
+RUN uv pip install --system --break-system-packages --no-cache --upgrade \
     playwright
 
 # Install Chromium for Playwright (used by agent for visual self-evaluation)
@@ -85,8 +85,8 @@ RUN playwright install chromium
 
 # Install inspect-tool-support for web_browser() tool sandbox service
 ENV PATH="$PATH:/opt/inspect_tool_support/bin"
-RUN python3 -m venv /opt/inspect_tool_support && \
-    /opt/inspect_tool_support/bin/pip install inspect-tool-support && \
+RUN uv venv --python python3 /opt/inspect_tool_support && \
+    uv pip install --python /opt/inspect_tool_support/bin/python inspect-tool-support && \
     /opt/inspect_tool_support/bin/inspect-tool-support post-install
 
 # Pre-install Claude Code and Codex CLI standalone binaries.

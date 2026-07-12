@@ -194,7 +194,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: "pip"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
       - name: Validate API keys
         shell: bash
@@ -256,7 +258,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -e "."
+          uv pip install --system -e "."
 
       - name: Run shinygen benchmark generation
         shell: bash
