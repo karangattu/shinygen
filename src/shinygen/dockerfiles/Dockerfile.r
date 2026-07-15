@@ -20,8 +20,8 @@ FROM rocker/r-ver:4.4.2
 COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
 
 ARG TARGETARCH
-ARG CLAUDE_VERSION=2.1.205
-ARG CODEX_VERSION=rust-v0.142.5
+ARG CLAUDE_VERSION=2.1.210
+ARG CODEX_VERSION=rust-v0.144.4
 
 # System deps for R packages, Python, and Chromium (Playwright)
 # Includes build tooling (cmake, pkg-config) required by recent CRAN packages
