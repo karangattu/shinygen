@@ -171,6 +171,31 @@ class TestBuildGenerationTask:
 
         assert captured["disallowed_tools"] == ["web_search"]
 
+    @pytest.mark.parametrize("tier", ["sol", "terra", "luna"])
+    def test_gpt56_uses_bridge_compatible_codex_profile(
+        self,
+        tmp_path,
+        monkeypatch,
+        tier,
+    ):
+        captured = {}
+
+        def fake_solver(**kwargs):
+            captured.update(kwargs)
+            return object()
+
+        monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
+
+        build_generation_task(
+            user_prompt="Build a dashboard",
+            agent="codex_cli",
+            framework_key="shiny_python",
+            docker_context_dir=tmp_path,
+            model_id=f"openai/gpt-5.6-{tier}",
+        )
+
+        assert captured["model_config"] == "inspect-generic"
+
     def test_opencode_go_openai_model_uses_native_react_solver(
         self,
         tmp_path,

@@ -545,6 +545,18 @@ def build_generation_task(
         solver = codex_cli(
             cwd=SANDBOX_WORK_DIR,
             attempts=1,
+            # Codex's GPT-5.6 profiles emit a Responses-Lite
+            # `additional_tools` item that Inspect's agent bridge cannot parse.
+            model_config=(
+                "inspect-generic"
+                if model_id
+                in {
+                    "openai/gpt-5.6-sol",
+                    "openai/gpt-5.6-terra",
+                    "openai/gpt-5.6-luna",
+                }
+                else None
+            ),
             skills=resolved_skills or None,
             version=CODEX_CLI_VERSION,
             config_overrides=CODEX_CONFIG_OVERRIDES,
