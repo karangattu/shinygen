@@ -84,18 +84,42 @@ CRITERIA = [
 
 
 VISUAL_UX_DESIGN_GUIDELINES = """\
-For visual_ux_quality, judge the dashboard against MODERN professional UI \
-standards (think Vercel, Linear, Stripe, Notion, Observable, modern BI tools). \
-Be ruthlessly strict — most Shiny defaults are NOT modern and should score 5-6, \
-not 7+. Holding a high bar here is the explicit goal of this benchmark.
+For visual_ux_quality, judge human-perceived visual quality: whether the \
+rendered dashboard looks clear, useful, cohesive, trustworthy, and complete \
+at first glance. Use modern professional dashboard standards, but do not \
+confuse novelty, custom CSS, or framework disguise with quality. A \
+conventional Shiny or BI layout can score highly when its analytical story is \
+immediate and its composition is strong.
 
 Core design principles to evaluate: visual hierarchy, spacing and alignment, \
 typography, contrast and readability, responsive layout behavior, \
 accessibility basics, chart and table legibility, and empty, loading, and \
 error states. Absence of several of these is evidence of a sub-7 score.
 
+Human preference calibration
+- prioritize one-screen usefulness: the landing view should communicate the \
+subject, key metrics, and main analytical story within five seconds
+- a compact filter rail, 3-4 concise KPIs, a prominent primary visualization, \
+balanced supporting charts, and a detail table is a strong human-rated \
+archetype, though not a mandatory template
+- reward purposeful information density; large empty regions and oversized KPI \
+tiles are not "clean" when they displace useful analysis
+- judge the landing screenshot independently before considering secondary \
+views; extra tabs add depth but do not repair a weak first impression
+- do not award points merely for more views, more components, custom styling, \
+or interaction claims that cannot be seen in the screenshot
+- Clean alone is not enough. A tidy but sparse, basic, or non-explorable \
+dashboard should remain in the middle of the scale
+
+Render-state gate
+- trust visible screenshot evidence over what the code intends to render
+- repeated empty cards, unresolved outputs, tiny placeholder marks, or stuck \
+loading indicators cap visual_ux_quality at 3 even when the surrounding chrome \
+looks polished
+- a single explained and intentionally styled empty state is not a failure
+
 Layout & structure
-- intentional grid with generous, consistent spacing (not cramped "bslib default" look)
+- intentional grid with comfortable, consistent spacing and aligned edges
 - clear visual hierarchy: primary KPIs prominent, secondary info subordinated
 - sensible information density — neither empty nor crowded
 - responsive behavior: content reflows, no horizontal scroll at common widths
@@ -106,7 +130,8 @@ Typography & color
 - readable line-height and measure; no walls of default 14px text
 - restrained, intentional color palette (2-4 accent colors max, semantic usage)
 - sufficient contrast for text, icons, and chart elements (WCAG AA or better)
-- dark-mode friendliness or coherent light theme — not the grey Shiny default
+- a coherent light or dark theme with legible surfaces; familiar neutral shells \
+are acceptable
 
 Components & interactions
 - inputs grouped logically with clear labels and helper text where useful
@@ -128,23 +153,26 @@ viewport
 non-color-only cues, descriptive labels
 
 Calibration for visual_ux_quality specifically:
-- Default bslib / shinydashboard / fluidPage with minor tweaks = 5
-- Reasonable bslib page_sidebar with value_boxes and plotly defaults = 6
-- Thoughtful layout + restrained palette + labeled charts + polished tables = 7
-- Add modern typography, coherent spacing system, styled KPI tiles, refined \
-chart styling = 8
-- Production-grade look indistinguishable from a hand-crafted modern BI tool = 9
+- Broken, loading, or repeatedly empty visible outputs = 1-3
+- Confusing, cramped, patchwork, or substantially incomplete dashboard = 4
+- Mixed hierarchy, density, chart choice, or coherence = 5
+- Tidy but basic, sparse, weakly prioritized, or visually generic = 6
+- Clear, trustworthy conventional dashboard with useful information density = 7
+- Strong professional composition, coherent palette, legible visualizations, \
+and an immediately useful landing view = 8
+- An immediate human favorite: exceptionally cohesive, information-rich, \
+legible, and visually complete = 9
 - 10 is essentially unreachable.
 
-Deduct aggressively for: cramped spacing, default Shiny look, unlabeled or \
+Deduct aggressively for: cramped spacing, wasted space, unlabeled or \
 rainbow charts, raw numeric tables, clashing colors, broken responsive \
 behavior, missing empty/error states, or any visible layout bug in the \
 screenshots.
 
 Prefer screenshot evidence when available. If screenshots are unavailable, \
 infer from the code and structure with LOWER confidence and cap \
-visual_ux_quality at 7 unless the code unambiguously demonstrates modern \
-styling (custom CSS, design tokens, deliberate theme configuration, etc.).
+visual_ux_quality at 7 unless the code unambiguously demonstrates clear \
+human-aligned composition, deliberate theming, and complete state handling.
 """
 
 
@@ -220,17 +248,18 @@ Scoring rubric:
  1 = Failing: incomprehensible, no structure whatsoever
 
 ## Visual & UX Quality (how polished does the dashboard look?)
-Judge this criterion against the MODERN UI design principles above. Be \
-strict: default Shiny/bslib output is NOT modern and should not clear 6. Use \
-screenshot evidence as the primary signal.
+Judge this criterion against the human-aligned dashboard principles above. \
+Use screenshot evidence as the primary signal. Do not penalize a conventional \
+Shiny or BI layout merely for looking familiar; judge how clearly, cohesively, \
+and completely it communicates.
 10 = Unimprovable: award-winning design, pixel-perfect, delightful animations, accessibility-first — essentially impossible
- 9 = Exceptional: production-grade polish indistinguishable from a hand-crafted modern BI tool; refined typography, coherent spacing system, styled KPI tiles, deliberate color palette, responsive, thoughtful micro-interactions
- 8 = Strong: modern look with polished layout, custom styling beyond defaults, restrained palette, well-labeled charts, tables with aligned numerics and readable density
- 7 = Good: clean professional look going noticeably beyond Shiny defaults — thoughtful layout, restrained palette, labeled charts, polished tables; a few rough edges remain
- 6 = Adequate: sensible bslib layout with value_boxes and default plotly charts; functional but plain, unmistakably "Shiny default" styling
- 5 = Mixed: default fluidPage or shinydashboard with minor tweaks; noticeable spacing issues, unlabeled charts, or inconsistent component styling
+ 9 = Exceptional: an immediate human favorite with superb first-impression clarity, purposeful density, cohesive styling, useful visualizations, and complete rendering
+ 8 = Strong: professional composition with a clear analytical story, restrained palette, well-labeled charts, readable tables, and only minor rough edges
+ 7 = Good: clean, useful, and trustworthy, including a well-composed conventional Shiny layout; some refinement opportunities remain
+ 6 = Adequate: tidy and functional but basic, sparse, weakly prioritized, or visually generic
+ 5 = Mixed: useful content is present, but hierarchy, density, chart choice, or component consistency noticeably limits comprehension
  4 = Below average: cluttered or inconsistent styling, poor spacing, rainbow/default chart colors, cramped tables
- 3 = Weak: unattractive, hard to scan, significant layout problems, obvious visual bugs in screenshots
+ 3 = Weak: unattractive, hard to scan, significant layout problems, repeated blank outputs, or stuck loading states
  2 = Poor: very rough visually, poor readability, clashing colors, broken responsive behavior
  1 = Failing: broken layout, unreadable, no meaningful styling
 

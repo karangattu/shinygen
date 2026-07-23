@@ -130,6 +130,17 @@ class TestJudgePrompt:
         assert "design principle" in message
         assert "lower confidence" in message
 
+    def test_visual_ux_rubric_is_calibrated_to_human_dashboard_preferences(self):
+        for phrase in [
+            "human-perceived visual quality",
+            "one-screen usefulness",
+            "conventional Shiny",
+            "prominent primary visualization",
+            "Clean alone is not enough",
+            "stuck loading indicators",
+        ]:
+            assert phrase in JUDGE_SYSTEM
+
 
 class TestOpenAIJudgeRequest:
     def test_gpt5_uses_max_completion_tokens(self, monkeypatch):

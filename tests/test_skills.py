@@ -58,6 +58,19 @@ class TestLoadDefaultSkills:
         assert "python3 /home/user/project/.tools/screenshot_helper.py" in instructions
         assert 'pkill -f "Rscript" || true' in instructions
 
+    def test_visual_qa_skill_teaches_human_preference_calibration(self):
+        skills = load_visual_qa_skills()
+
+        assert len(skills) == 1
+        skill = skills[0]
+        instructions = skill.instructions
+
+        assert "Human Preference Calibration" in instructions
+        assert "one-screen usefulness" in instructions
+        assert "Clean alone is not enough" in instructions
+        assert "render-state gate" in instructions
+        assert "human_visual_preferences.md" in skill.references
+
     def test_shiny_python_skill_teaches_non_squished_dashboard_layouts(self):
         instructions = load_skill_context_text("shiny_python")
 
