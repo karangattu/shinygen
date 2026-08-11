@@ -32,6 +32,7 @@ repeated 500s on the second tool-turn.
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 import shlex
@@ -41,12 +42,13 @@ from inspect_ai.agent import AgentPrompt, AgentState, react
 from inspect_ai.model import (
     ChatMessageSystem,
     ChatMessageUser,
+    ContentImage,
     GenerateConfig,
     Model,
     get_model,
 )
 from inspect_ai.solver import Generate, Solver, TaskState, solver
-from inspect_ai.tool import bash, text_editor, python, tool, Tool
+from inspect_ai.tool import Tool, bash, python, text_editor, tool
 from inspect_ai.util import sandbox
 
 from .config import (
@@ -57,7 +59,7 @@ from .config import (
     opencode_go_anthropic_model_name,
 )
 from .extract import find_app_code_in_text
-from .validation import validate_framework_artifact
+from .validation import runtime_logs_indicate_failure, validate_framework_artifact
 
 # Default per-tool execution timeout (seconds). Generous because some
 # OpenCode Go models like to run package installs / linters between edits.
@@ -69,6 +71,7 @@ _DIRECT_ARTIFACT_ATTEMPTS = 2
 # is never truncated mid-generation.
 _DIRECT_ARTIFACT_MAX_TOKENS = 16_384
 _SERVER_VALIDATION_TIMEOUT = 45
+_SERVER_VALIDATION_STARTUP_WAIT = 6
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,7 @@ _REACT_INSTRUCTIONS_TEMPLATE = (
     "  - `python`: execute Python code snippets to explore data or test logic.\n"
     "  - `text_editor`: view, create, and edit files in the sandbox.\n"
     "  - `validate_app_tool`: starts the generated app and returns server logs.\n"
+    "  - `view_screenshot_tool`: (if available) opens screenshot.png for visual review.\n"
     "  - `web_browser`: (if available) fetch web pages to check documentation.\n\n"
     "IMPORTANT RULES:\n"
     "- You MUST create the artifact file using `text_editor` before calling "
@@ -169,39 +173,71 @@ def _extract_direct_artifact_code(
     return code if valid else None
 
 
-def _server_validation_command(*, framework: str, artifact: str, cwd: str) -> str:
-    """Return a shell command that starts the app and prints server logs."""
+def _readiness_validation_command(
+    *,
+    start_cmd: str,
+    cwd: str,
+    port: int,
+) -> str:
+    """Start an app, require an HTTP response, and print its server logs."""
     quoted_cwd = shlex.quote(cwd)
-    quoted_artifact = shlex.quote(artifact)
     log_path = "/tmp/shinygen_app_validation.log"
-
-    if framework == "shiny_r":
-        start_cmd = (
-            f"Rscript -e \"shiny::runApp('{artifact}', port=8000, "
-            "launch.browser=FALSE)\""
-        )
-        process_pattern = "Rscript"
-    else:
-        start_cmd = f"python3 -m shiny run {quoted_artifact} --port 8000"
-        process_pattern = "shiny run"
 
     return f"""
 set +e
 cd {quoted_cwd} || exit 1
 rm -f {log_path}
+cleanup() {{
+  if [ -n "${{app_pid:-}}" ] && kill -0 "$app_pid" 2>/dev/null; then
+    kill "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
+  fi
+}}
+trap cleanup EXIT
 ({start_cmd}) > {log_path} 2>&1 &
 app_pid=$!
-sleep 6
-if kill -0 "$app_pid" 2>/dev/null; then
-  tail -n 120 {log_path} || true
-  pkill -f {shlex.quote(process_pattern)} || kill "$app_pid" 2>/dev/null || true
-  exit 0
-fi
-wait "$app_pid"
-status=$?
+elapsed=0
+while [ "$elapsed" -lt {_SERVER_VALIDATION_STARTUP_WAIT} ]; do
+  if ! kill -0 "$app_pid" 2>/dev/null; then
+    wait "$app_pid"
+    status=$?
+    echo "Startup validation: process exited with status $status."
+    tail -n 120 {log_path} || true
+    if [ "$status" -eq 0 ]; then exit 1; fi
+    exit "$status"
+  fi
+  if curl --silent --show-error --fail --max-time 1 \
+      "http://127.0.0.1:{port}/" > /dev/null 2>&1; then
+    echo "Startup validation: app responded on port {port}."
+    tail -n 120 {log_path} || true
+    exit 0
+  fi
+  sleep 1
+  elapsed=$((elapsed + 1))
+done
+echo "Startup validation: app did not respond on port {port} within {_SERVER_VALIDATION_STARTUP_WAIT}s."
 tail -n 120 {log_path} || true
-exit "$status"
+exit 1
 """.strip()
+
+
+def _server_validation_command(*, framework: str, artifact: str, cwd: str) -> str:
+    """Return a shell command that starts the app and checks HTTP readiness."""
+    quoted_artifact = shlex.quote(artifact)
+
+    if framework == "shiny_r":
+        start_cmd = (
+            f"Rscript -e \"shiny::runApp('{quoted_artifact}', port=8000, "
+            'launch.browser=FALSE)"'
+        )
+    else:
+        start_cmd = f"python3 -m shiny run {quoted_artifact} --port 8000"
+
+    return _readiness_validation_command(
+        start_cmd=start_cmd,
+        cwd=cwd,
+        port=8000,
+    )
 
 
 def _build_direct_repair_prompt(*, artifact: str, validation_output: str) -> str:
@@ -245,7 +281,9 @@ async def _validate_artifact_server(
     artifact: str,
 ) -> tuple[bool, str]:
     """Start the generated app in the sandbox and return server logs."""
-    command = _server_validation_command(framework=framework, artifact=artifact, cwd=cwd)
+    command = _server_validation_command(
+        framework=framework, artifact=artifact, cwd=cwd
+    )
     try:
         result = await sandbox().exec(
             ["sh", "-lc", command],
@@ -257,12 +295,17 @@ async def _validate_artifact_server(
     stdout = getattr(result, "stdout", "") or getattr(result, "output", "") or ""
     stderr = getattr(result, "stderr", "") or ""
     output = "\n".join(part for part in (stdout, stderr) if part).strip()
-    return getattr(result, "returncode", 1) == 0, output
+    return (
+        getattr(result, "returncode", 1) == 0
+        and not runtime_logs_indicate_failure(output),
+        output,
+    )
 
 
 @tool
 def validate_app_tool(cwd: str, framework: str, artifact: str) -> Tool:
     """A tool that starts the generated app and captures server logs."""
+
     async def execute() -> str:
         """
         Start the generated app and capture server logs. Use this to verify that the app
@@ -275,8 +318,30 @@ def validate_app_tool(cwd: str, framework: str, artifact: str) -> Tool:
             return f"Success. App started without errors.\n\nLogs:\n{output}"
         else:
             return f"Error. App failed to start.\n\nLogs:\n{output}"
+
     return execute
 
+
+@tool
+def view_screenshot_tool(cwd: str) -> Tool:
+    """A tool that returns the generated dashboard screenshot as an image."""
+
+    async def execute() -> ContentImage:
+        """
+        View the dashboard screenshot at screenshot.png. Run the screenshot helper
+        first, then use this tool to inspect layout, rendering, labels, and colours.
+        """
+        path = f"{cwd.rstrip('/')}/screenshot.png"
+        contents = await sandbox().read_file(path, text=False)
+        if isinstance(contents, str):
+            contents = contents.encode()
+        encoded = base64.b64encode(contents).decode("ascii")
+        return ContentImage(
+            image=f"data:image/png;base64,{encoded}",
+            detail="high",
+        )
+
+    return execute
 
 
 async def _collect_sandbox_data_context(cwd: str) -> str:
@@ -402,40 +467,24 @@ def _host_validation_command(
     Host-side counterpart of :func:`_server_validation_command`. Uses the
     project Python (``sys.executable``) instead of the sandbox ``python3``.
     """
-    quoted_cwd = shlex.quote(str(cwd))
     quoted_artifact = shlex.quote(artifact)
-    log_path = "/tmp/shinygen_app_validation.log"
 
     if framework == "shiny_r":
         start_cmd = (
-            f"Rscript -e \"shiny::runApp('{artifact}', port={port}, "
+            f"Rscript -e \"shiny::runApp('{quoted_artifact}', port={port}, "
             'launch.browser=FALSE)"'
         )
-        process_pattern = "Rscript"
     else:
         start_cmd = (
             f"{shlex.quote(python_executable)} -m shiny run {quoted_artifact} "
             f"--port {port}"
         )
-        process_pattern = "shiny run"
 
-    return f"""
-set +e
-cd {quoted_cwd} || exit 1
-rm -f {log_path}
-({start_cmd}) > {log_path} 2>&1 &
-app_pid=$!
-sleep 6
-if kill -0 "$app_pid" 2>/dev/null; then
-  tail -n 120 {log_path} || true
-  pkill -f {shlex.quote(process_pattern)} || kill "$app_pid" 2>/dev/null || true
-  exit 0
-fi
-wait "$app_pid"
-status=$?
-tail -n 120 {log_path} || true
-exit "$status"
-""".strip()
+    return _readiness_validation_command(
+        start_cmd=start_cmd,
+        cwd=str(cwd),
+        port=port,
+    )
 
 
 def _validate_artifact_on_host(
@@ -469,7 +518,10 @@ def _validate_artifact_on_host(
     output = "\n".join(
         part for part in (completed.stdout, completed.stderr) if part
     ).strip()
-    return completed.returncode == 0, output
+    return (
+        completed.returncode == 0 and not runtime_logs_indicate_failure(output),
+        output,
+    )
 
 
 async def generate_artifact_on_host(
@@ -745,6 +797,7 @@ def native_react_solver(
     framework: str,
     artifact: str,
     web_fetch: bool = True,
+    screenshot: bool = False,
     extra_instructions: str | None = None,
 ) -> Solver:
     """Return an Inspect ``Solver`` driven by the native ``react()`` agent."""
@@ -775,9 +828,13 @@ def native_react_solver(
         validate_app_tool(cwd=cwd, framework=framework, artifact=artifact),
     ]
 
+    if screenshot:
+        tools.append(view_screenshot_tool(cwd=cwd))
+
     if web_fetch:
         try:
             from inspect_ai.tool import web_browser
+
             tools.extend(web_browser())
         except ImportError:
             pass

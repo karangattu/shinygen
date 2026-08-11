@@ -594,6 +594,7 @@ def build_generation_task(
             framework=framework_key,
             artifact=artifact,
             web_fetch=web_fetch,
+            screenshot=screenshot,
             extra_instructions=extra_instructions,
         )
         # Fail fast for the open-weights tier: the prior 25-min ceiling

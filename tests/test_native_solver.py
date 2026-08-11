@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+
+from inspect_ai.model import ContentImage
+
 from shinygen.native_solver import (
     _build_direct_artifact_instructions,
-    _build_invalid_code_retry_prompt,
     _build_direct_repair_prompt,
+    _build_invalid_code_retry_prompt,
     _extract_direct_artifact_code,
+    _host_validation_command,
     _server_validation_command,
+    _validate_artifact_server,
+    view_screenshot_tool,
 )
 
 
@@ -63,6 +70,61 @@ def test_server_validation_command_captures_python_logs():
     assert "python3 -m shiny run app.py --port 8000" in command
     assert "/tmp/shinygen_app_validation.log" in command
     assert "tail -n 120 /tmp/shinygen_app_validation.log" in command
+    assert "curl --silent --show-error --fail" in command
+    assert "app did not respond on port 8000" in command
+
+
+def test_host_validation_command_waits_for_http_readiness(tmp_path):
+    command = _host_validation_command(
+        framework="shiny_python",
+        artifact="app.py",
+        cwd=tmp_path,
+        port=8123,
+        python_executable="/test/python",
+    )
+
+    assert '"http://127.0.0.1:8123/"' in command
+    assert "curl --silent --show-error --fail" in command
+    assert "app did not respond on port 8123" in command
+
+
+def test_server_validation_rejects_exception_logs(monkeypatch):
+    class Result:
+        returncode = 0
+        stdout = "TypeError: invalid sidebar"
+        stderr = ""
+
+    class FakeSandbox:
+        async def exec(self, *_args, **_kwargs):
+            return Result()
+
+    monkeypatch.setattr("shinygen.native_solver.sandbox", lambda: FakeSandbox())
+
+    valid, output = asyncio.run(
+        _validate_artifact_server(
+            cwd="/home/user/project",
+            framework="shiny_python",
+            artifact="app.py",
+        )
+    )
+
+    assert valid is False
+    assert "TypeError: invalid sidebar" in output
+
+
+def test_view_screenshot_tool_returns_image_content(monkeypatch):
+    class FakeSandbox:
+        async def read_file(self, path, text=True):
+            assert path == "/home/user/project/screenshot.png"
+            assert text is False
+            return b"fake-png"
+
+    monkeypatch.setattr("shinygen.native_solver.sandbox", lambda: FakeSandbox())
+
+    result = asyncio.run(view_screenshot_tool("/home/user/project")())
+
+    assert isinstance(result, ContentImage)
+    assert result.image.startswith("data:image/png;base64,")
 
 
 def test_direct_repair_prompt_includes_server_logs():
@@ -88,18 +150,21 @@ def test_invalid_code_retry_prompt_shows_previous_model_output():
 
 
 def test_web_browser_tools_are_flattened_into_tools_list():
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
 
     fake_tool_a = MagicMock(name="tool_a")
     fake_tool_b = MagicMock(name="tool_b")
 
-    with patch("shinygen.native_solver.react") as mock_react, \
-         patch("shinygen.native_solver.get_model") as mock_get_model, \
-         patch("inspect_ai.tool.web_browser", return_value=[fake_tool_a, fake_tool_b]):
+    with (
+        patch("shinygen.native_solver.react") as mock_react,
+        patch("shinygen.native_solver.get_model") as mock_get_model,
+        patch("inspect_ai.tool.web_browser", return_value=[fake_tool_a, fake_tool_b]),
+    ):
         mock_get_model.return_value = MagicMock()
         mock_react.return_value = MagicMock()
 
         from shinygen.native_solver import native_react_solver
+
         native_react_solver(
             model_id="openai-api/opencode-go/glm-5.2",
             cwd="/home/user/project",
@@ -112,4 +177,33 @@ def test_web_browser_tools_are_flattened_into_tools_list():
         assert fake_tool_a in called_tools
         assert fake_tool_b in called_tools
         for t in called_tools:
-            assert not isinstance(t, list), "web_browser tools should be flattened, not nested"
+            assert not isinstance(
+                t, list
+            ), "web_browser tools should be flattened, not nested"
+
+
+def test_screenshot_mode_gives_react_agent_an_image_viewer():
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch("shinygen.native_solver.react") as mock_react,
+        patch("shinygen.native_solver.get_model") as mock_get_model,
+    ):
+        mock_get_model.return_value = MagicMock()
+        mock_react.return_value = MagicMock()
+
+        from shinygen.native_solver import native_react_solver
+
+        native_react_solver(
+            model_id="openai-api/opencode-go/glm-5.2",
+            cwd="/home/user/project",
+            framework="shiny_python",
+            artifact="app.py",
+            web_fetch=False,
+            screenshot=True,
+        )
+
+        registry_names = {
+            tool.__registry_info__.name for tool in mock_react.call_args.kwargs["tools"]
+        }
+        assert "shinygen/view_screenshot_tool" in registry_names

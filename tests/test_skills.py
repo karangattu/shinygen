@@ -238,6 +238,7 @@ class TestBuildGenerationTask:
 
         assert task.solver is sentinel_agent
         assert captured["model_id"] == ("openai-api/opencode-go/deepseek-v4-flash")
+        assert captured["screenshot"] is False
         # Fail-fast 10-min ceiling for the open-weights tier.
         assert task.time_limit == 600
         assert task.working_limit == 600

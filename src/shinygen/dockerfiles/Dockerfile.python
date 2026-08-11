@@ -24,8 +24,8 @@ FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
 
 ARG TARGETARCH
-ARG CLAUDE_VERSION=2.1.210
-ARG CODEX_VERSION=rust-v0.144.4
+ARG CLAUDE_VERSION=2.1.227
+ARG CODEX_VERSION=rust-v0.147.0
 
 # System deps (includes libraries required by Chromium for Playwright)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -66,14 +66,14 @@ RUN set -eux; \
     curl -fsSL "https://downloads.claude.ai/claude-code-releases/${CLAUDE_VERSION}/${claude_plat}/claude" \
         -o /usr/local/bin/claude; \
     chmod +x /usr/local/bin/claude; \
-    /usr/local/bin/claude --version || true; \
+    /usr/local/bin/claude --version; \
     tmp_dir="$(mktemp -d)"; \
     curl -fsSL "https://github.com/openai/codex/releases/download/${CODEX_VERSION}/codex-${codex_arch}-unknown-linux-musl.tar.gz" \
         -o "${tmp_dir}/codex.tar.gz"; \
     tar -xzf "${tmp_dir}/codex.tar.gz" -C "${tmp_dir}"; \
     install -m 0755 "$(find "${tmp_dir}" -type f -name 'codex-*-unknown-linux-musl' | head -n1)" /usr/local/bin/codex; \
     rm -rf "${tmp_dir}"; \
-    /usr/local/bin/codex --version || true
+    /usr/local/bin/codex --version
 
 LABEL org.opencontainers.image.source="https://github.com/karangattu/shinygen" \
       org.opencontainers.image.description="shinygen sandbox image (Python) with claude-code + codex-cli pre-installed" \

@@ -35,6 +35,7 @@ from .config import (
 )
 from .extract import _read_zip_member, extract_from_log
 from .pricing import Timer, UsageStats, calculate_value_score
+from .validation import runtime_logs_indicate_failure
 
 if TYPE_CHECKING:
     from inspect_ai.model import GenerateConfigArgs
@@ -227,6 +228,7 @@ while [ "$elapsed" -lt {wait_seconds} ]; do
     status=$?
     echo "Startup validation: process exited with status $status."
     tail -n 160 {log_path} || true
+    if [ "$status" -eq 0 ]; then exit 1; fi
     exit "$status"
   fi
   if curl --silent --show-error --fail --max-time 1 \
@@ -246,18 +248,7 @@ exit 1
 
 def _runtime_logs_indicate_failure(logs: str) -> bool:
     """Return True when startup logs contain a Python/R exception signature."""
-    failure_markers = (
-        "Traceback (most recent call last):",
-        "TypeError:",
-        "ValueError:",
-        "NameError:",
-        "ImportError:",
-        "ModuleNotFoundError:",
-        "SyntaxError:",
-        "Error in ",
-        "Execution halted",
-    )
-    return any(marker in logs for marker in failure_markers)
+    return runtime_logs_indicate_failure(logs)
 
 
 def _validate_generated_app_runtime(

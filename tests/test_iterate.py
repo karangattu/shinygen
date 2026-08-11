@@ -16,6 +16,8 @@ from shinygen.iterate import (
     _recover_code_from_eval_logs,
     _resolve_judge_screenshot_paths,
     _runtime_logs_indicate_failure,
+    _runtime_validation_command,
+    _validate_generated_app_runtime,
     _write_run_summary,
     generate_and_refine,
 )
@@ -92,6 +94,15 @@ class TestGenerationExtraConfig:
 
 
 class TestRuntimeLogFailureDetection:
+    def test_early_clean_process_exit_is_still_a_startup_failure(self):
+        command = _runtime_validation_command(
+            framework_key="shiny_python",
+            artifact_name="app.py",
+            port=8000,
+        )
+
+        assert 'if [ "$status" -eq 0 ]; then exit 1; fi' in command
+
     def test_detects_exception_signatures(self):
         assert _runtime_logs_indicate_failure(
             "Startup validation: process is still running.\nTypeError: bad sidebar"
@@ -102,8 +113,60 @@ class TestRuntimeLogFailureDetection:
             "Listening on http://127.0.0.1:8000\nPress Ctrl+C to stop"
         )
 
+    def test_real_host_validation_captures_startup_exception(self, tmp_path):
+        (tmp_path / "app.py").write_text(
+            'raise TypeError("iteration feedback sentinel")\n',
+            encoding="utf-8",
+        )
+
+        valid, logs = _validate_generated_app_runtime(
+            tmp_path,
+            "shiny_python",
+            "app.py",
+            18891,
+            model_id="lmstudio/test-model",
+        )
+
+        assert valid is False
+        assert "iteration feedback sentinel" in logs
+
 
 class TestNoJudgeRuntimeRefinement:
+    def test_real_startup_logs_flow_into_the_next_agent_turn(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        prompts_seen: list[str] = []
+        generated = [
+            'raise TypeError("iteration feedback sentinel")\n',
+            (
+                "from shiny import App, ui\n"
+                "app = App(ui.page_fluid('fixed'), "
+                "lambda input, output, session: None)\n"
+            ),
+        ]
+
+        def fake_run_generation(prompt, *args, **kwargs):
+            prompts_seen.append(prompt)
+            return generated[len(prompts_seen) - 1], [], False
+
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_generation)
+
+        result = generate_and_refine(
+            prompt="Build a dashboard",
+            model="lmstudio/test-model",
+            output_dir=tmp_path,
+            use_skills=False,
+            max_iterations=2,
+        )
+
+        assert result.passed is True
+        assert result.iterations == 2
+        assert "RUNTIME LOG REVIEW" in prompts_seen[1]
+        assert "iteration feedback sentinel" in prompts_seen[1]
+
     def test_failed_run_removes_previous_generated_app(self, tmp_path, monkeypatch):
         previous_app = tmp_path / "app.py"
         previous_app.write_text("stale app", encoding="utf-8")

@@ -82,7 +82,7 @@ jobs:
           set -euxo pipefail
           IMAGE="ghcr.io/${{ github.repository_owner }}/${{ matrix.image.name }}:sha-$(echo ${{ github.sha }} | cut -c1-7)"
           docker pull "${IMAGE}"
-          docker run --rm "${IMAGE}" bash -lc 'set -e; which claude; which codex; claude --version || true; codex --version || true'
+          docker run --rm "${IMAGE}" bash -lc 'set -e; which claude; which codex; claude --version; codex --version'
           if [[ "${{ matrix.image.name }}" == "shinygen-sandbox-python" ]]; then
             docker run --rm "${IMAGE}" python -c 'import shiny, shinywidgets, plotly, pandas, geopandas, playwright'
           else

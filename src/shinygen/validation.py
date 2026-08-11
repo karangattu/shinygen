@@ -7,6 +7,23 @@ from __future__ import annotations
 
 import ast
 
+RUNTIME_FAILURE_MARKERS = (
+    "Traceback (most recent call last):",
+    "TypeError:",
+    "ValueError:",
+    "NameError:",
+    "ImportError:",
+    "ModuleNotFoundError:",
+    "SyntaxError:",
+    "Error in ",
+    "Execution halted",
+)
+
+
+def runtime_logs_indicate_failure(logs: str) -> bool:
+    """Return True when startup logs contain a Python/R exception signature."""
+    return any(marker in logs for marker in RUNTIME_FAILURE_MARKERS)
+
 
 def _attribute_chain(node: ast.AST) -> tuple[str, ...]:
     parts: list[str] = []
