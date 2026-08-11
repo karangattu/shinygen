@@ -3,11 +3,13 @@
 import base64
 import json
 import os
+import subprocess
 import zipfile
 from pathlib import Path
 
 import pytest
 
+from shinygen.config import find_free_port
 from shinygen.iterate import (
     GenerationResult,
     _copy_agent_screenshot_artifact,
@@ -146,6 +148,37 @@ class TestGenerationExtraConfig:
 
 
 class TestRuntimeLogFailureDetection:
+    def test_runtime_validation_does_not_kill_unrelated_matching_processes(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        _install_fake_shiny_runtime(tmp_path, monkeypatch)
+        (tmp_path / "app.py").write_text(
+            "from shiny import App, ui\n"
+            "app = App(ui.page_fluid('ok'), "
+            "lambda input, output, session: None)\n",
+            encoding="utf-8",
+        )
+        port = find_free_port()
+        pattern = f"shiny run app.py --port {port}"
+        decoy = subprocess.Popen(["bash", "-c", f'exec -a "{pattern} decoy" sleep 30'])
+
+        try:
+            valid, _logs = _validate_generated_app_runtime(
+                tmp_path,
+                "shiny_python",
+                "app.py",
+                port,
+                model_id="lmstudio/test-model",
+            )
+
+            assert valid is True
+            assert decoy.poll() is None
+        finally:
+            decoy.terminate()
+            decoy.wait(timeout=5)
+
     def test_early_clean_process_exit_is_still_a_startup_failure(self):
         command = _runtime_validation_command(
             framework_key="shiny_python",

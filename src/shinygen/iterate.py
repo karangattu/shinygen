@@ -200,26 +200,24 @@ def _runtime_validation_command(
             f"Rscript -e \"shiny::runApp('{artifact_name}', port={port}, "
             'launch.browser=FALSE)"'
         )
-        process_pattern = f"Rscript.*{artifact_name}.*{port}"
     else:
         start_cmd = (
             f"{shlex.quote(python_executable)} -m shiny run {quoted_artifact} "
             f"--port {port}"
         )
-        process_pattern = f"shiny run {artifact_name} --port {port}"
 
     return f"""
 set +e
 rm -f {log_path}
 app_pid=""
 cleanup() {{
-  if [ -n "${{app_pid:-}}" ]; then
+  if [ -n "${{app_pid:-}}" ] && kill -0 "$app_pid" 2>/dev/null; then
     kill "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
   fi
-  pkill -f {shlex.quote(process_pattern)} 2>/dev/null || true
 }}
 trap cleanup EXIT
-({start_cmd}) > {log_path} 2>&1 &
+{start_cmd} > {log_path} 2>&1 &
 app_pid=$!
 elapsed=0
 while [ "$elapsed" -lt {wait_seconds} ]; do
