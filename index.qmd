@@ -322,7 +322,7 @@ This formula ensures models that get the dashboard right in the first iteration 
 ### Injecting Custom Skills
 
 "Skills" represent styling guides, code templates, and coding standards injected into the agent's workspace.
-- **Standard Skills**: `shinygen` automatically bundles `shiny-python-dashboard` (Python bslib guidelines) and `shiny-bslib` (R bslib guidelines).
+- **Standard Skills**: For Python, `shinygen` fetches the official `shiny-for-python` app-authoring skill from [`posit-dev/py-shiny`](https://github.com/posit-dev/py-shiny/tree/main/shiny/.agents/skills/shiny-for-python) at runtime and caches the latest successful download. The R `shiny-bslib` skill remains bundled locally. Set `SHINYGEN_PY_SHINY_SKILL_REF` to use a py-shiny tag or commit instead of `main`.
 - **Custom Skills**: You can inject your own guidelines (e.g. company styling themes, database query layers) using `--skills-dir <path>`.
 
 ### Creating a Custom Skill Directory
@@ -361,7 +361,7 @@ shinygen generate --prompt "Sales App" --skills-dir ./my-custom-skills/
 ### Control vs Treatment Arms (A/B Testing)
 
 You can benchmark skill effectiveness using the control/treatment flags:
-- **Treatment Arm (`--skills`)**: Injects the bundled dashboard skill plus any custom skills.
+- **Treatment Arm (`--skills`)**: Injects the framework skill plus any custom skills.
 - **Control Arm (`--no-skills`)**: Bypasses skill loading entirely. The agent receives only the raw prompt.
 
 `shinygen` tracks the arm used (`skills` or `vanilla`) inside the resulting `run_summary.json` to calculate the lift in quality score.
