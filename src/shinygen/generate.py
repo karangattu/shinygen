@@ -500,7 +500,7 @@ def build_generation_task(
         helper_script = (Path(__file__).parent / "screenshot_helper.py").read_text()
         sample_files[".tools/screenshot_helper.py"] = helper_script
 
-    # For Codex CLI, also stage the bundled skill at `.agents/skills/<name>/`
+    # For Codex CLI, also stage the framework skill at `.agents/skills/<name>/`
     # so Codex's documented discovery picks it up. inspect_swe writes skills
     # under `$CODEX_HOME/skills` (i.e. `.codex/skills`), which is not a
     # Codex-scanned path per https://developers.openai.com/codex/skills.

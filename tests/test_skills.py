@@ -1,14 +1,50 @@
 """Tests for skill loading and agent wiring."""
 
+import io
+import tarfile
+
 import pytest
 
 from shinygen.config import SANDBOX_TIME_LIMIT_BY_FRAMEWORK
 from shinygen.generate import build_generation_task
 from shinygen.skills import (
+    collect_skill_sample_files,
     load_default_skills,
     load_skill_context_text,
     load_visual_qa_skills,
 )
+
+
+@pytest.fixture(autouse=True)
+def py_shiny_skill_archive(tmp_path, monkeypatch):
+    """Serve an upstream-shaped py-shiny skill archive without network I/O."""
+    archive_path = tmp_path / "py-shiny.tar.gz"
+    files = {
+        "py-shiny-main/shiny/.agents/skills/shiny-for-python/SKILL.md": (
+            "---\n"
+            "name: shiny-for-python\n"
+            "description: Official Shiny for Python app-authoring guidance.\n"
+            "---\n\n"
+            "# Shiny for Python\n\n"
+            "Read [layouts](references/layouts.md).\n"
+        ),
+        "py-shiny-main/shiny/.agents/skills/shiny-for-python/references/layouts.md": (
+            "# Layouts\n\nUse current Shiny layout APIs.\n"
+        ),
+        # Contributor skills under .claude must not be installed into generated apps.
+        "py-shiny-main/.claude/skills/py-shiny-release/SKILL.md": (
+            "---\nname: py-shiny-release\ndescription: Release py-shiny.\n---\n"
+        ),
+    }
+    with tarfile.open(archive_path, "w:gz") as archive:
+        for name, content in files.items():
+            payload = content.encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+
+    monkeypatch.setenv("SHINYGEN_PY_SHINY_SKILL_ARCHIVE_URL", archive_path.as_uri())
+    monkeypatch.setenv("SHINYGEN_SKILLS_CACHE_DIR", str(tmp_path / "cache"))
 
 
 class TestLoadDefaultSkills:
@@ -17,8 +53,8 @@ class TestLoadDefaultSkills:
         [
             (
                 "shiny_python",
-                "shiny-python-dashboard",
-                "layout-and-navigation.md",
+                "shiny-for-python",
+                "layouts.md",
             ),
             ("shiny_r", "shiny-bslib", "page-layouts.md"),
         ],
@@ -71,63 +107,28 @@ class TestLoadDefaultSkills:
         assert "render-state gate" in instructions
         assert "human_visual_preferences.md" in skill.references
 
-    def test_shiny_python_skill_teaches_non_squished_dashboard_layouts(self):
+    def test_shiny_python_context_comes_from_upstream_skill(self):
         instructions = load_skill_context_text("shiny_python")
 
-        assert 'width="240px"' in instructions
-        assert "Use `fillable=False` for dense dashboards" in instructions
-        assert 'min_height="320px"' in instructions
-        assert (
-            "Do not place more than 2 medium or large visualization cards in a row"
-            in instructions
+        assert "# Shiny for Python" in instructions
+        assert "Use current Shiny layout APIs." in instructions
+
+    def test_stages_only_the_upstream_app_authoring_skill(self):
+        files = collect_skill_sample_files("shiny_python")
+
+        assert ".agents/skills/shiny-for-python/SKILL.md" in files
+        assert ".agents/skills/shiny-for-python/references/layouts.md" in files
+        assert not any("py-shiny-release" in path for path in files)
+
+    def test_uses_cached_python_skill_when_refresh_fails(self, monkeypatch):
+        assert load_default_skills("shiny_python")[0].name == "shiny-for-python"
+
+        monkeypatch.setenv(
+            "SHINYGEN_PY_SHINY_SKILL_ARCHIVE_URL",
+            "file:///archive-that-does-not-exist.tar.gz",
         )
-        assert "+ .bslib-grid" in instructions
-        assert "Sizing Null Safety" in instructions
 
-    def test_shiny_python_skill_teaches_native_data_table(self):
-        instructions = load_skill_context_text("shiny_python")
-
-        assert "render.DataTable(" in instructions
-        assert "ui.output_data_frame(" in instructions
-        assert "height=" in instructions
-
-    def test_shiny_python_skill_warns_about_lonboard_arrow_dtypes(self):
-        instructions = load_skill_context_text("shiny_python")
-
-        assert "ArrowDtype" in instructions
-        assert 'convert_dtypes(dtype_backend="pyarrow")' in instructions
-        assert 'astype("float64")' in instructions
-
-    def test_shiny_python_skill_maps_plotly_inputs_to_column_values(self):
-        instructions = load_skill_context_text("shiny_python")
-
-        assert (
-            'choices={"Meal time": "time", "Day": "day", "Smoker": "smoker"}'
-            in instructions
-        )
-        assert "the input value must be an actual dataframe column name" in instructions
-        assert "do not invert that mapping" in instructions
-
-    def test_shiny_python_skill_forbids_plotly_in_render_plot(self):
-        instructions = load_skill_context_text("shiny_python")
-
-        assert "Never return a Plotly figure from `@render.plot`" in instructions
-        assert "output_widget" in instructions
-        assert "render_plotly" in instructions or "render_widget" in instructions
-
-    def test_shiny_python_skill_teaches_plot_color_alignment(self):
-        instructions = load_skill_context_text("shiny_python")
-        assert "Mandatory" in instructions
-        assert "color_discrete_sequence=BRAND_SEQUENCE" in instructions
-        assert "BRAND_COLORS" in instructions
-        assert "BRAND_SEQUENCE" in instructions
-        assert "WRONG" in instructions
-        assert "CORRECT" in instructions
-
-    def test_shiny_python_skill_teaches_nan_serialization_safety(self):
-        instructions = load_skill_context_text("shiny_python")
-        assert "Null / NaN Serialization Safety" in instructions
-        assert "Out of range float values are not JSON compliant: nan" in instructions
+        assert load_default_skills("shiny_python")[0].name == "shiny-for-python"
 
 
 class TestBuildGenerationTask:
@@ -412,7 +413,7 @@ class TestBuildGenerationTask:
 
         assert task.solver is sentinel_solver
         skill_names = [skill.name for skill in captured["skills"]]
-        assert skill_names == ["shiny-python-dashboard", "visual-qa"]
+        assert skill_names == ["shiny-for-python", "visual-qa"]
 
         sample_files = task.dataset[0].files or {}
         assert ".tools/screenshot_helper.py" in sample_files
@@ -420,8 +421,7 @@ class TestBuildGenerationTask:
         if agent == "codex_cli":
             assert all(not key.startswith("/") for key in staged)
             assert any(
-                key.startswith(".agents/skills/shiny-python-dashboard/")
-                for key in staged
+                key.startswith(".agents/skills/shiny-for-python/") for key in staged
             )
             assert any(key.startswith(".agents/skills/visual-qa/") for key in staged)
         else:

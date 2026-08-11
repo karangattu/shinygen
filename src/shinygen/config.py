@@ -126,7 +126,7 @@ FRAMEWORKS: dict[str, dict[str, str]] = {
         "install_command": (
             "pip install shiny shinywidgets plotly faicons pandas " "matplotlib seaborn"
         ),
-        "skill_dir": "shiny-python-dashboard",
+        "skill_dir": "shiny-for-python",
     },
     "shiny_r": {
         "label": "Shiny for R",
@@ -169,7 +169,7 @@ WEB_SEARCH_TOOL_NAME: dict[str, str] = {
 # https://developers.openai.com/codex/skills. Claude Code uses `.claude/skills`.
 # Note: inspect_swe's codex_cli solver internally installs skills under
 # `$CODEX_HOME/skills` (i.e. `.codex/skills`), which is NOT one of Codex's
-# documented scan paths. shinygen.generate also stages the bundled skill into
+# documented scan paths. shinygen.generate also stages each framework skill into
 # `.agents/skills/<name>/` via Sample.files to guarantee discovery.
 AGENT_SKILLS_DIR: dict[str, str] = {
     "claude_code": ".claude/skills",
