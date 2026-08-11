@@ -7,7 +7,6 @@ import types
 import pytest
 
 from shinygen.judge import (
-    CRITERIA,
     JUDGE_SYSTEM,
     JudgeResult,
     _build_judge_message,
@@ -143,7 +142,7 @@ class TestJudgePrompt:
 
 
 class TestOpenAIJudgeRequest:
-    def test_gpt5_uses_max_completion_tokens(self, monkeypatch):
+    def test_luna_uses_high_reasoning_and_max_completion_tokens(self, monkeypatch):
         captured: dict[str, object] = {}
 
         class FakeUsage:
@@ -184,13 +183,14 @@ class TestOpenAIJudgeRequest:
 
         result = _judge_with_openai(
             "print('hello')",
-            "openai/gpt-5.4-mini-2026-03-17",
+            "openai/gpt-5.6-luna",
             None,
             "",
         )
 
         assert result.composite == 7.0
-        assert captured["model"] == "gpt-5.4-mini-2026-03-17"
+        assert captured["model"] == "gpt-5.6-luna"
+        assert captured["reasoning_effort"] == "high"
         assert captured["max_completion_tokens"] == 2048
         assert "max_tokens" not in captured
 

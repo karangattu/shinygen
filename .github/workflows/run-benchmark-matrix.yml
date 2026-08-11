@@ -54,12 +54,11 @@ permissions:
   packages: read
 
 env:
-  # Single judge: claude-opus-4-8 is currently the strongest visual judge
-  # we have access to, so we trust its multimodal scoring instead of
-  # averaging across a panel. Each entry below still produces one
-  # --judge-model flag; add more models here to re-enable a panel.
+  # Single human-aligned visual judge. GPT-5.6 Luna is configured with high
+  # reasoning effort by shinygen's judge clients. Each entry below still
+  # produces one --judge-model flag; add more models to re-enable a panel.
   BENCHMARK_JUDGE_MODELS: |
-    anthropic/claude-opus-4-8
+    openai/gpt-5.6-luna
   BENCHMARK_EXPECTED_FRAMEWORKS: |
     shiny_python
     shiny_r
@@ -272,7 +271,17 @@ jobs:
           needs_opencode_go=0
 
           if [[ "${{ inputs.enable_judges }}" == "true" ]]; then
-            needs_anthropic=1
+            while IFS= read -r judge_model; do
+              judge_model="${judge_model//[$'\t\r ']/}"
+              case "${judge_model}" in
+                anthropic/*)
+                  needs_anthropic=1
+                  ;;
+                openai/*)
+                  needs_openai=1
+                  ;;
+              esac
+            done <<< "${BENCHMARK_JUDGE_MODELS}"
           fi
 
           case "${{ matrix.model.name }}" in

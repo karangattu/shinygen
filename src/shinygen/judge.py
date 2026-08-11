@@ -651,11 +651,14 @@ def _judge_with_openai(
     def _call_api():
         messages = [system_message, user_message]
         if model_name.startswith("gpt-5"):
-            return client.chat.completions.create(
-                model=model_name,
-                max_completion_tokens=2048,
-                messages=messages,
-            )
+            kwargs: dict[str, Any] = {
+                "model": model_name,
+                "max_completion_tokens": 2048,
+                "messages": messages,
+            }
+            if model_name == "gpt-5.6-luna":
+                kwargs["reasoning_effort"] = "high"
+            return client.chat.completions.create(**kwargs)
         return client.chat.completions.create(
             model=model_name,
             max_tokens=2048,

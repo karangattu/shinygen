@@ -88,13 +88,22 @@ def test_benchmark_matrix_can_disable_screenshots_and_judges():
         in workflow
     )
     assert 'if [[ "${{ inputs.enable_judges }}" == "true" ]]; then' in workflow
-    assert "needs_anthropic=1" in workflow
+    assert "needs_openai=1" in workflow
     assert 'case "${{ matrix.model.name }}" in' in workflow
     assert '[[ "${needs_anthropic}" -eq 1 && -z "${ANTHROPIC_API_KEY:-}" ]]' in workflow
     assert 'if [[ "${{ inputs.enable_screenshot }}" == "true" ]]; then' in workflow
     assert 'screenshot_flag="--no-screenshot"' in workflow
     assert 'screenshot_flag="--screenshot"' in workflow
     assert '"${screenshot_flag}" \\' in workflow
+
+
+def test_benchmark_workflows_require_keys_for_configured_judge_providers():
+    for path in (WORKFLOW_PATH, QUICK_WORKFLOW_PATH):
+        workflow = path.read_text(encoding="utf-8")
+
+        assert 'done <<< "${BENCHMARK_JUDGE_MODELS}"' in workflow
+        assert "anthropic/*)" in workflow
+        assert "openai/*)" in workflow
 
 
 def test_benchmark_workflow_uses_generic_benchmark_metadata():
@@ -107,24 +116,26 @@ def test_benchmark_workflow_uses_generic_benchmark_metadata():
     assert "# Benchmark:" in workflow
 
 
-def test_benchmark_workflow_uses_claude_opus_judge():
-    """Benchmarks default to a single visual judge: anthropic/claude-opus-4-8.
+def test_benchmark_workflows_use_gpt56_luna_judge():
+    """Benchmarks default to a single visual judge: openai/gpt-5.6-luna.
 
-    Opus 4.8 is the strongest multimodal scorer we have access to, so we
-    trust its judgment over a vendor-averaged panel. The workflow keeps
-    `BENCHMARK_JUDGE_MODELS` as a newline-separated list so additional
-    judges can be added back later by editing one env var.
+    The workflows keep `BENCHMARK_JUDGE_MODELS` as a newline-separated list
+    so additional judges can be added back later by editing one env var.
     """
-    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    workflows = [
+        WORKFLOW_PATH.read_text(encoding="utf-8"),
+        QUICK_WORKFLOW_PATH.read_text(encoding="utf-8"),
+    ]
 
-    assert "BENCHMARK_JUDGE_MODELS:" in workflow
-    assert "anthropic/claude-opus-4-8" in workflow
-    # The generation step must expand the list into repeated --judge-model
-    # flags rather than the old single-flag form, even with one entry, so
-    # adding more judges later remains a one-line change.
-    assert "BENCHMARK_JUDGE_MODEL " not in workflow
-    assert '--judge-model "${BENCHMARK_JUDGE_MODEL}"' not in workflow
-    assert "judge_args+=(--judge-model" in workflow
+    for workflow in workflows:
+        assert "BENCHMARK_JUDGE_MODELS:" in workflow
+        assert "openai/gpt-5.6-luna" in workflow
+        # The generation step must expand the list into repeated --judge-model
+        # flags rather than the old single-flag form, even with one entry, so
+        # adding more judges later remains a one-line change.
+        assert "BENCHMARK_JUDGE_MODEL " not in workflow
+        assert '--judge-model "${BENCHMARK_JUDGE_MODEL}"' not in workflow
+        assert "judge_args+=(--judge-model" in workflow
 
 
 def test_benchmark_workflow_uses_sandbox_screenshots_without_runner_browser_install():
@@ -250,4 +261,4 @@ def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
 
     assert batch_config
     for entry in batch_config:
-        assert entry["judge_model"] == "anthropic/claude-opus-4-8"
+        assert entry["judge_model"] == "openai/gpt-5.6-luna"
