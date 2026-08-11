@@ -2,6 +2,7 @@
 
 import base64
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -21,6 +22,57 @@ from shinygen.iterate import (
     _write_run_summary,
     generate_and_refine,
 )
+
+
+def _install_fake_shiny_runtime(tmp_path: Path, monkeypatch) -> None:
+    """Provide the subprocess contract needed by runtime-validation tests."""
+    runtime_root = tmp_path / "fake_runtime"
+    package = runtime_root / "shiny"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text(
+        """
+class _UI:
+    @staticmethod
+    def page_fluid(*children):
+        return children
+
+ui = _UI()
+
+class App:
+    def __init__(self, app_ui, server):
+        self.app_ui = app_ui
+        self.server = server
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (package / "__main__.py").write_text(
+        """
+import runpy
+import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+artifact = sys.argv[2]
+port = int(sys.argv[sys.argv.index("--port") + 1])
+runpy.run_path(artifact, run_name="__main__")
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+
+    def log_message(self, format, *args):
+        pass
+
+HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+""".lstrip(),
+        encoding="utf-8",
+    )
+    existing = os.environ.get("PYTHONPATH")
+    paths = [str(runtime_root)]
+    if existing:
+        paths.append(existing)
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(paths))
 
 
 class TestExtractGenerationUsageRows:
@@ -113,7 +165,12 @@ class TestRuntimeLogFailureDetection:
             "Listening on http://127.0.0.1:8000\nPress Ctrl+C to stop"
         )
 
-    def test_real_host_validation_captures_startup_exception(self, tmp_path):
+    def test_real_host_validation_captures_startup_exception(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        _install_fake_shiny_runtime(tmp_path, monkeypatch)
         (tmp_path / "app.py").write_text(
             'raise TypeError("iteration feedback sentinel")\n',
             encoding="utf-8",
@@ -137,6 +194,7 @@ class TestNoJudgeRuntimeRefinement:
         tmp_path,
         monkeypatch,
     ):
+        _install_fake_shiny_runtime(tmp_path, monkeypatch)
         prompts_seen: list[str] = []
         generated = [
             'raise TypeError("iteration feedback sentinel")\n',
