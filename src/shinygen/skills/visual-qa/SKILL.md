@@ -49,18 +49,31 @@ After capturing screenshots:
 
 ```bash
 nohup python -m shiny run app.py --port 8000 > /tmp/app.log 2>&1 &
+printf '%s\n' "$!" > /tmp/shinygen_app.pid
 tail -n 80 /tmp/app.log
 python /home/user/project/.tools/screenshot_helper.py
 tail -n 80 /tmp/app.log
-pkill -f "shiny run" || true
+if [ -s /tmp/shinygen_app.pid ]; then
+  read -r app_pid < /tmp/shinygen_app.pid
+  kill "$app_pid" 2>/dev/null || true
+  rm -f /tmp/shinygen_app.pid
+fi
 ```
+
+Use the recorded PID for restarts too. Never use `pkill`, `killall`, or another
+pattern-based process command because it can terminate the agent itself.
 
 ### R Verification Pipeline
 
 ```bash
 nohup Rscript -e "shiny::runApp('app.R', port=8000, launch.browser=FALSE)" > /tmp/app.log 2>&1 &
+printf '%s\n' "$!" > /tmp/shinygen_app.pid
 tail -n 80 /tmp/app.log
 python3 /home/user/project/.tools/screenshot_helper.py
 tail -n 80 /tmp/app.log
-pkill -f "Rscript" || true
+if [ -s /tmp/shinygen_app.pid ]; then
+  read -r app_pid < /tmp/shinygen_app.pid
+  kill "$app_pid" 2>/dev/null || true
+  rm -f /tmp/shinygen_app.pid
+fi
 ```

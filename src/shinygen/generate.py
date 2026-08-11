@@ -61,6 +61,7 @@ ARTIFACT_SEARCH_ROOTS = (
 
 DOCKERFILES_DIR = Path(__file__).parent / "dockerfiles"
 
+
 def _docker_image_exists_locally(image: str) -> bool:
     """Return True when *image* is already available in the local Docker daemon."""
     import subprocess as _sp
@@ -274,18 +275,29 @@ async def _ensure_sandbox_screenshot(
         logger.debug("Helper presence check failed: %s", exc)
         return False
 
+    app_pid_path = "/tmp/shinygen_auto_app.pid"
     if framework == "shiny_r":
         start_cmd = (
-            "cd {p} && nohup Rscript -e \"shiny::runApp('app.R', port=8000, "
-            'launch.browser=FALSE)" > /tmp/auto_app.log 2>&1 &'
-        ).format(p=project)
-        stop_cmd = "pkill -f 'Rscript' || true"
+            "cd {p} || exit 1\n"
+            "nohup Rscript -e \"shiny::runApp('app.R', port=8000, "
+            'launch.browser=FALSE)" > /tmp/auto_app.log 2>&1 &\n'
+            "printf '%s\\n' \"$!\" > {pid}"
+        ).format(p=project, pid=app_pid_path)
     else:
         start_cmd = (
-            "cd {p} && nohup python3 -m shiny run app.py --port 8000 "
-            "> /tmp/auto_app.log 2>&1 &"
-        ).format(p=project)
-        stop_cmd = "pkill -f 'shiny run' || true"
+            "cd {p} || exit 1\n"
+            "nohup python3 -m shiny run app.py --port 8000 "
+            "> /tmp/auto_app.log 2>&1 &\n"
+            "printf '%s\\n' \"$!\" > {pid}"
+        ).format(p=project, pid=app_pid_path)
+
+    stop_cmd = f"""
+if [ -s {app_pid_path} ]; then
+  read -r app_pid < {app_pid_path}
+  kill "$app_pid" 2>/dev/null || true
+  rm -f {app_pid_path}
+fi
+"""
 
     try:
         await sb.exec(["sh", "-lc", start_cmd])

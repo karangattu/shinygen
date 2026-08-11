@@ -51,7 +51,9 @@ SYSTEM_PROMPT_VISUAL_QA = """\
 
 VISUAL SELF-EVALUATION (screenshot mode is ON):
 After creating your app, you MUST visually verify it:
-1. Start the app: nohup python -m shiny run app.py --port 8000 > /tmp/app.log 2>&1 &
+1. Start the app and record only its PID:
+   nohup python -m shiny run app.py --port 8000 > /tmp/app.log 2>&1 &
+   printf '%s\\n' "$!" > /tmp/shinygen_app.pid
 2. Inspect the server log before screenshotting: tail -n 80 /tmp/app.log
 3. Once the app is up, take a screenshot with: python /home/user/project/.tools/screenshot_helper.py
     The helper waits 7 seconds before capturing so late-loading dashboard sections can render.
@@ -59,7 +61,14 @@ After creating your app, you MUST visually verify it:
 5. View the screenshot to check the visual output.
 6. Evaluate: layout correctness, chart visibility, text readability, colours, styling.
 7. Fix any visual issues, then re-screenshot to confirm.
-8. Stop the app when done: pkill -f "shiny run" || true
+8. Stop only the recorded app process when done:
+   if [ -s /tmp/shinygen_app.pid ]; then
+     read -r app_pid < /tmp/shinygen_app.pid
+     kill "$app_pid" 2>/dev/null || true
+     rm -f /tmp/shinygen_app.pid
+   fi
+Never use `pkill`, `killall`, or another pattern-based process command; it can
+terminate the agent itself. Use the recorded PID for restarts too.
 You may iterate up to 3 times on visual fixes. If the screenshot is blank, \
 check /tmp/app.log for errors.
 """
@@ -68,7 +77,9 @@ SYSTEM_PROMPT_VISUAL_QA_R = """\
 
 VISUAL SELF-EVALUATION (screenshot mode is ON):
 After creating your app, you MUST visually verify it:
-1. Start the app: nohup Rscript -e "shiny::runApp('app.R', port=8000, launch.browser=FALSE)" > /tmp/app.log 2>&1 &
+1. Start the app and record only its PID:
+   nohup Rscript -e "shiny::runApp('app.R', port=8000, launch.browser=FALSE)" > /tmp/app.log 2>&1 &
+   printf '%s\\n' "$!" > /tmp/shinygen_app.pid
 2. Inspect the server log before screenshotting: tail -n 80 /tmp/app.log
 3. Once the app is up, take a screenshot with: python3 /home/user/project/.tools/screenshot_helper.py
     The helper waits 7 seconds before capturing so late-loading dashboard sections can render.
@@ -76,7 +87,14 @@ After creating your app, you MUST visually verify it:
 5. View the screenshot to check the visual output.
 6. Evaluate: layout correctness, chart visibility, text readability, colours, styling.
 7. Fix any visual issues, then re-screenshot to confirm.
-8. Stop the app when done: pkill -f "Rscript" || true
+8. Stop only the recorded app process when done:
+   if [ -s /tmp/shinygen_app.pid ]; then
+     read -r app_pid < /tmp/shinygen_app.pid
+     kill "$app_pid" 2>/dev/null || true
+     rm -f /tmp/shinygen_app.pid
+   fi
+Never use `pkill`, `killall`, or another pattern-based process command; it can
+terminate the agent itself. Use the recorded PID for restarts too.
 You may iterate up to 3 times on visual fixes. If the screenshot is blank, \
 check /tmp/app.log for errors.
 """

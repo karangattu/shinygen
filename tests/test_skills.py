@@ -1,12 +1,14 @@
 """Tests for skill loading and agent wiring."""
 
+import asyncio
 import io
 import tarfile
+from types import SimpleNamespace
 
 import pytest
 
 from shinygen.config import SANDBOX_TIME_LIMIT_BY_FRAMEWORK
-from shinygen.generate import build_generation_task
+from shinygen.generate import _ensure_sandbox_screenshot, build_generation_task
 from shinygen.skills import (
     collect_skill_sample_files,
     load_default_skills,
@@ -92,7 +94,14 @@ class TestLoadDefaultSkills:
             in instructions
         )
         assert "python3 /home/user/project/.tools/screenshot_helper.py" in instructions
-        assert 'pkill -f "Rscript" || true' in instructions
+
+    def test_visual_qa_skill_stops_only_the_recorded_app_process(self):
+        instructions = load_visual_qa_skills()[0].instructions
+
+        assert "printf '%s\\n' \"$!\" > /tmp/shinygen_app.pid" in instructions
+        assert "read -r app_pid < /tmp/shinygen_app.pid" in instructions
+        assert 'kill "$app_pid"' in instructions
+        assert "pkill -f" not in instructions
 
     def test_visual_qa_skill_teaches_human_preference_calibration(self):
         skills = load_visual_qa_skills()
@@ -129,6 +138,50 @@ class TestLoadDefaultSkills:
         )
 
         assert load_default_skills("shiny_python")[0].name == "shiny-for-python"
+
+
+class TestEnsureSandboxScreenshot:
+    def test_auto_screenshot_cleanup_stops_only_the_recorded_app_process(self):
+        class FakeSandbox:
+            def __init__(self):
+                self.commands: list[list[str]] = []
+                self.screenshot_exists = False
+
+            async def exec(self, command, **_kwargs):
+                self.commands.append(command)
+                shell_command = command[-1] if command[:2] == ["sh", "-lc"] else ""
+
+                if shell_command.startswith("find "):
+                    screenshot = (
+                        "/home/user/project/screenshot.png\n"
+                        if self.screenshot_exists
+                        else ""
+                    )
+                    return SimpleNamespace(returncode=0, stdout=screenshot)
+                if command == [
+                    "test",
+                    "-f",
+                    "/home/user/project/.tools/screenshot_helper.py",
+                ]:
+                    return SimpleNamespace(returncode=0, stdout="")
+                if "screenshot_helper.py" in shell_command:
+                    self.screenshot_exists = True
+                return SimpleNamespace(returncode=0, stdout="")
+
+        sandbox = FakeSandbox()
+
+        captured = asyncio.run(
+            _ensure_sandbox_screenshot(sandbox, "shiny_python")  # type: ignore[arg-type]
+        )
+
+        assert captured is True
+        shell_commands = "\n".join(
+            command[-1] for command in sandbox.commands if command[:2] == ["sh", "-lc"]
+        )
+        assert "printf '%s\\n' \"$!\" > /tmp/shinygen_auto_app.pid" in shell_commands
+        assert "read -r app_pid < /tmp/shinygen_auto_app.pid" in shell_commands
+        assert 'kill "$app_pid"' in shell_commands
+        assert "pkill -f" not in shell_commands
 
 
 class TestBuildGenerationTask:

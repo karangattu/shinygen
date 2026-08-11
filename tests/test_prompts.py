@@ -60,6 +60,15 @@ class TestBuildSystemPrompt:
         assert "7 seconds" in prompt
         assert "tail -n 80 /tmp/app.log" in prompt
 
+    def test_screenshot_workflow_stops_only_the_recorded_app_process(self):
+        for framework in ("shiny_python", "shiny_r"):
+            prompt = build_system_prompt(framework, screenshot=True)
+
+            assert "printf '%s\\n' \"$!\" > /tmp/shinygen_app.pid" in prompt
+            assert "read -r app_pid < /tmp/shinygen_app.pid" in prompt
+            assert 'kill "$app_pid"' in prompt
+            assert "pkill -f" not in prompt
+
     def test_no_screenshot_omits_visual_qa(self):
         prompt = build_system_prompt("shiny_python")
         assert "VISUAL SELF-EVALUATION" not in prompt
