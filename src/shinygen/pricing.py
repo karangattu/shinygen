@@ -134,10 +134,17 @@ _PRICING: dict[str, tuple[float, float]] = {
     "claude-opus-4-1": (15.00, 75.00),
     "claude-opus-4": (15.00, 75.00),
     "claude-sonnet-5": (3.00, 15.00),
+    "claude-3-7-sonnet": (3.00, 15.00),
+    "claude-3-5-sonnet": (3.00, 15.00),
     "claude-haiku-4-5": (1.00, 5.00),
+    "claude-3-5-haiku": (0.80, 4.00),
     "claude-haiku-3-5": (0.80, 4.00),
     "claude-3-opus": (15.00, 75.00),
     "claude-3-haiku": (0.25, 1.25),
+    # Google Gemini models
+    "gemini-3.7-flash": (0.15, 0.60),
+    "gemini-3.7-pro": (1.25, 5.00),
+    "gemini-3.7": (1.25, 5.00),
     # OpenAI models
     "gpt-5.5": (5.00, 30.00),
     "gpt-5.5-2026-04-23": (5.00, 30.00),
@@ -183,6 +190,7 @@ _PRICING: dict[str, tuple[float, float]] = {
 _CACHE_MULTIPLIERS: dict[str, tuple[float, float]] = {
     "anthropic": (1.25, 0.10),
     "openai": (1.00, 0.10),
+    "google": (1.00, 0.25),
     # OpenCode Go publishes absolute cache-read prices per model (see
     # _CACHE_READ_PRICE_OVERRIDES). The multiplier here only applies when
     # an override is missing for a particular model.

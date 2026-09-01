@@ -24,7 +24,9 @@ on:
         options:
           - claude-opus-4-8
           - claude-sonnet-5
+          - claude-3-7-sonnet
           - claude-haiku-4-5
+          - gemini-3.7-flash
           - gpt-5.5
           - gpt-5.6-sol
           - gpt-5.6-terra
@@ -225,6 +227,7 @@ jobs:
       OUTPUT_DIR: gha_runs/run-${{ github.run_id }}/${{ needs.prepare.outputs.benchmark_slug }}/${{ inputs.framework }}/${{ inputs.model }}-${{ matrix.arm.name }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
       SHINYGEN_SANDBOX_PYTHON_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-python:latest
       SHINYGEN_SANDBOX_R_IMAGE: ghcr.io/${{ github.repository_owner }}/shinygen-sandbox-r:latest
@@ -252,6 +255,7 @@ jobs:
           missing=0
           needs_anthropic=0
           needs_openai=0
+          needs_gemini=0
           needs_opencode_go=0
 
           if [[ "${{ inputs.enable_judges }}" == "true" ]]; then
@@ -264,6 +268,9 @@ jobs:
                 openai/*)
                   needs_openai=1
                   ;;
+                google/*|gemini/*)
+                  needs_gemini=1
+                  ;;
               esac
             done <<< "${BENCHMARK_JUDGE_MODELS}"
           fi
@@ -274,6 +281,9 @@ jobs:
               ;;
             gpt-*)
               needs_openai=1
+              ;;
+            gemini-*)
+              needs_gemini=1
               ;;
             glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*)
               needs_opencode_go=1
@@ -286,6 +296,10 @@ jobs:
           fi
           if [[ "${needs_openai}" -eq 1 && -z "${OPENAI_API_KEY:-}" ]]; then
             echo "Missing required secret: OPENAI_API_KEY" >&2
+            missing=1
+          fi
+          if [[ "${needs_gemini}" -eq 1 && -z "${GEMINI_API_KEY:-}" ]]; then
+            echo "Missing required secret: GEMINI_API_KEY" >&2
             missing=1
           fi
           if [[ "${needs_opencode_go}" -eq 1 && -z "${OPENCODE_GO_API_KEY:-}" ]]; then

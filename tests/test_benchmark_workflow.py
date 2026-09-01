@@ -262,3 +262,19 @@ def test_local_batch_uses_same_pinned_judge_as_benchmark_workflow():
     assert batch_config
     for entry in batch_config:
         assert entry["judge_model"] == "openai/gpt-5.6-luna"
+
+
+def test_benchmark_workflows_support_gemini_flash_37():
+    for path in (WORKFLOW_PATH, QUICK_WORKFLOW_PATH, MULTI_WORKFLOW_PATH):
+        workflow = path.read_text(encoding="utf-8")
+        assert "gemini-3.7-flash" in workflow
+        assert "GEMINI_API_KEY" in workflow
+        assert "needs_gemini" in workflow
+
+
+def test_benchmark_workflows_support_latest_anthropic_models():
+    for path in (WORKFLOW_PATH, QUICK_WORKFLOW_PATH, MULTI_WORKFLOW_PATH):
+        workflow = path.read_text(encoding="utf-8")
+        assert "claude-opus-4-8" in workflow
+        assert "claude-sonnet-5" in workflow
+        assert "claude-haiku-4-5" in workflow
