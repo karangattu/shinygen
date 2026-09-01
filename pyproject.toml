@@ -30,6 +30,7 @@ dependencies = [
     "inspect-swe>=0.2.70",
     "anthropic>=0.109.2",
     "openai>=2.42.0",
+    "google-genai>=1.0.0",
     "zstandard>=0.25.0",
 ]
 

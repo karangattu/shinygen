@@ -1,6 +1,7 @@
 """Tests for shinygen.config"""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -300,8 +301,10 @@ class TestCheckAPIKey:
     def test_gemini_key_present(self):
         with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}, clear=True):
             check_api_key("gemini_cli")
-        with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}, clear=True):
+            assert os.environ.get("GOOGLE_API_KEY") == "test-key"
+        with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key-2"}, clear=True):
             check_api_key("gemini_cli")
+            assert os.environ.get("GEMINI_API_KEY") == "test-key-2"
 
     def test_opencode_go_key_missing(self):
         with patch.dict("os.environ", {}, clear=True):
@@ -361,3 +364,9 @@ class TestPreflightChecks:
             # No API key required for LM Studio, so this should pass cleanly.
             preflight_checks("opencode", "openai/google/gemma-4-26b-a4b-qat")
         mock_docker.assert_not_called()
+
+
+def test_pyproject_contains_google_genai_dependency():
+    pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    content = pyproject_path.read_text(encoding="utf-8")
+    assert "google-genai" in content

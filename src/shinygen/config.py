@@ -429,12 +429,17 @@ def check_api_key(agent: str, model_id: str | None = None) -> None:
                 "  export OPENAI_API_KEY='sk-...'"
             )
     elif agent == "gemini_cli":
-        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get(
+            "GOOGLE_API_KEY"
+        )
+        if not gemini_key:
             raise APIKeyMissingError(
                 "GEMINI_API_KEY environment variable is not set.\n"
                 "Get your API key from https://aistudio.google.com/ and run:\n"
                 "  export GEMINI_API_KEY='...'"
             )
+        os.environ.setdefault("GEMINI_API_KEY", gemini_key)
+        os.environ.setdefault("GOOGLE_API_KEY", gemini_key)
     elif agent in {"opencode", "native_react_solver"}:
         if not model_id:
             raise APIKeyMissingError(
