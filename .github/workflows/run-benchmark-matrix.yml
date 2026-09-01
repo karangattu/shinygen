@@ -67,24 +67,20 @@ env:
     claude-sonnet-5
     claude-haiku-4-5
     gemini-3.7-flash
-    gpt-5.4
-    gpt-5.4-mini
-    gpt-5.4-nano
-    gpt-5.5
     gpt-5.6-sol
     gpt-5.6-terra
     gpt-5.6-luna
-    glm-5.1
+    glm-5.3
     glm-5.2
-    kimi-k2.6
+    kimi-k3
     kimi-k2.7-code
     mimo-v2.5
     mimo-v2.5-pro
-    minimax-m2.5
     minimax-m2.7
     minimax-m3
+    qwen3.8-max
     qwen3.7-max
-    qwen3.6-plus
+    qwen3.7-plus
     deepseek-v4-pro
     deepseek-v4-flash
   BENCHMARK_EXPECTED_ARMS: |
@@ -187,47 +183,39 @@ jobs:
             name: claude-haiku-4-5
           - idx: "03"
             name: claude-sonnet-5
-          - idx: "20"
-            name: claude-opus-4-8
           - idx: "04"
-            name: gpt-5.4
+            name: claude-opus-4-8
           - idx: "05"
-            name: gpt-5.4-mini
-          - idx: "06"
-            name: gpt-5.4-nano
-          - idx: "07"
-            name: gpt-5.5
-          - idx: "23"
             name: gpt-5.6-sol
-          - idx: "24"
+          - idx: "06"
             name: gpt-5.6-terra
-          - idx: "25"
+          - idx: "07"
             name: gpt-5.6-luna
           - idx: "08"
-            name: glm-5.1
+            name: glm-5.3
           - idx: "09"
             name: glm-5.2
+          - idx: "10"
+            name: kimi-k3
           - idx: "11"
-            name: kimi-k2.6
-          - idx: "22"
             name: kimi-k2.7-code
           - idx: "12"
             name: mimo-v2.5
           - idx: "13"
             name: mimo-v2.5-pro
           - idx: "14"
-            name: minimax-m2.5
-          - idx: "15"
             name: minimax-m2.7
-          - idx: "21"
+          - idx: "15"
             name: minimax-m3
           - idx: "16"
-            name: qwen3.7-max
+            name: qwen3.8-max
           - idx: "17"
-            name: qwen3.6-plus
+            name: qwen3.7-max
           - idx: "18"
-            name: deepseek-v4-pro
+            name: qwen3.7-plus
           - idx: "19"
+            name: deepseek-v4-pro
+          - idx: "20"
             name: deepseek-v4-flash
         # Control / treatment axis: each (framework, model) cell runs twice,
         # once with the bundled shinygen skill (`skills`) and once vanilla
@@ -505,24 +493,22 @@ jobs:
       BENCHMARK_EXPECTED_MODELS: |
         claude-opus-4-8
         claude-sonnet-5
-        gpt-5.4
-        gpt-5.4-mini
-        gpt-5.4-nano
-        gpt-5.5
+        claude-haiku-4-5
+        gemini-3.7-flash
         gpt-5.6-sol
         gpt-5.6-terra
         gpt-5.6-luna
-        glm-5.1
+        glm-5.3
         glm-5.2
-        kimi-k2.6
+        kimi-k3
         kimi-k2.7-code
         mimo-v2.5
         mimo-v2.5-pro
-        minimax-m2.5
         minimax-m2.7
         minimax-m3
+        qwen3.8-max
         qwen3.7-max
-        qwen3.6-plus
+        qwen3.7-plus
         deepseek-v4-pro
         deepseek-v4-flash
       BENCHMARK_EXPECTED_ARMS: |

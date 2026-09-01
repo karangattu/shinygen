@@ -129,7 +129,7 @@ class TestExtractGenerationUsageRows:
             total_cost = None
 
         class MockStats:
-            model_usage = {"openai/gpt-5.4": MockUsage()}
+            model_usage = {"openai/gpt-5.6-luna": MockUsage()}
 
         class MockLog:
             stats = MockStats()
@@ -270,7 +270,7 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an app",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             output_dir=tmp_path,
             max_iterations=1,
         )
@@ -320,9 +320,9 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an app",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             output_dir=tmp_path,
-            judge_model="openai/gpt-5.4",
+            judge_model="openai/gpt-5.6-luna",
             max_iterations=2,
             quality_threshold=9.0,
         )
@@ -354,7 +354,7 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an ED operations dashboard",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             framework="shiny_python",
             output_dir=tmp_path,
             judge_model=None,
@@ -428,7 +428,7 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an ED operations dashboard",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             framework="shiny_python",
             output_dir=tmp_path,
             judge_model="anthropic/claude-opus-4-8",
@@ -478,7 +478,7 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an ED operations dashboard",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             framework="shiny_python",
             output_dir=tmp_path,
             judge_model=None,
@@ -519,7 +519,7 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an ED operations dashboard",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             framework="shiny_python",
             output_dir=tmp_path,
             judge_model=None,
@@ -561,7 +561,7 @@ class TestNoJudgeRuntimeRefinement:
 
         result = generate_and_refine(
             prompt="Build an ED operations dashboard",
-            model="gpt-5.4",
+            model="gpt-5.6-luna",
             framework="shiny_python",
             output_dir=tmp_path,
             judge_model=None,
@@ -602,7 +602,7 @@ class TestWriteRunSummary:
         )
         result.usage.add(
             stage="generate",
-            model="openai/gpt-5.4",
+            model="openai/gpt-5.6-luna",
             input_tokens=2_000,
             output_tokens=500,
             elapsed=1.2,
@@ -621,8 +621,8 @@ class TestWriteRunSummary:
             output_path=tmp_path,
             result=result,
             prompt="Build an Asheville Airbnb dashboard",
-            requested_model="gpt-5.4",
-            resolved_model_id="openai/gpt-5.4",
+            requested_model="gpt-5.6-luna",
+            resolved_model_id="openai/gpt-5.6-luna",
             agent="codex_cli",
             framework_key="shiny_python",
             artifact_name="app.py",
@@ -634,8 +634,8 @@ class TestWriteRunSummary:
 
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         assert summary["prompt"] == "Build an Asheville Airbnb dashboard"
-        assert summary["model"]["requested"] == "gpt-5.4"
-        assert summary["model"]["resolved_id"] == "openai/gpt-5.4"
+        assert summary["model"]["requested"] == "gpt-5.6-luna"
+        assert summary["model"]["resolved_id"] == "openai/gpt-5.6-luna"
         assert summary["model"]["agent"] == "codex_cli"
         assert summary["framework"] == "shiny_python"
         assert summary["artifact_name"] == "app.py"

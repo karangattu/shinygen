@@ -42,9 +42,9 @@ class TestResolveModel:
         assert model_id == "anthropic/claude-sonnet-5"
 
     def test_full_openai_id(self):
-        agent, model_id = resolve_model("openai/gpt-5.4")
+        agent, model_id = resolve_model("openai/gpt-5.6-luna")
         assert agent == "codex_cli"
-        assert model_id == "openai/gpt-5.4"
+        assert model_id == "openai/gpt-5.6-luna"
 
     def test_exact_anthropic_model_name_without_provider(self):
         agent, model_id = resolve_model("claude-sonnet-5")
@@ -60,29 +60,6 @@ class TestResolveModel:
         agent, model_id = resolve_model("claude-opus-4-8")
         assert agent == "claude_code"
         assert model_id == "anthropic/claude-opus-4-8"
-
-    def test_exact_openai_mini_model_name_without_provider(self):
-        agent, model_id = resolve_model("gpt-5.4-mini")
-        assert agent == "codex_cli"
-        assert model_id == "openai/gpt-5.4-mini-2026-03-17"
-
-    def test_exact_openai_nano_model_name_without_provider(self):
-        agent, model_id = resolve_model("gpt-5.4-nano")
-        assert agent == "codex_cli"
-        assert model_id == "openai/gpt-5.4-nano"
-
-    @pytest.mark.parametrize(
-        ("alias", "expected_model_id"),
-        [
-            ("gpt55", "openai/gpt-5.5"),
-            ("gpt-5.5", "openai/gpt-5.5"),
-            ("gpt-5.5-2026-04-23", "openai/gpt-5.5-2026-04-23"),
-        ],
-    )
-    def test_openai_gpt55_aliases_resolve_to_codex_cli(self, alias, expected_model_id):
-        agent, model_id = resolve_model(alias)
-        assert agent == "codex_cli"
-        assert model_id == expected_model_id
 
     @pytest.mark.parametrize(
         ("alias", "expected_model_id"),
@@ -101,9 +78,9 @@ class TestResolveModel:
         assert model_id == expected_model_id
 
     def test_opencode_go_alias_resolves_to_opencode(self):
-        agent, model_id = resolve_model("opencode-go/kimi-k2.6")
+        agent, model_id = resolve_model("opencode-go/kimi-k3")
         assert agent == "opencode"
-        assert model_id == "openai-api/opencode-go/kimi-k2.6"
+        assert model_id == "openai-api/opencode-go/kimi-k3"
 
     def test_opencode_go_short_alias_resolves_to_openai_api_provider(self):
         agent, model_id = resolve_model("deepseek-v4-flash")
@@ -127,20 +104,23 @@ class TestResolveModel:
     @pytest.mark.parametrize(
         "alias",
         [
+            "glm-5.3",
+            "glm-5.3-flash",
             "glm-5.2",
-            "glm-5.1",
-            "kimi-k2.6",
+            "kimi-k3",
             "kimi-k2.7-code",
+            "kimi-k2.6",
             "mimo-v2.5",
             "mimo-v2.5-pro",
-            "mimo-v2-pro",
-            "mimo-v2-omni",
-            "minimax-m2.5",
+            "minimax-m3",
             "minimax-m2.7",
+            "qwen3.8-max",
+            "qwen3.8-flash",
             "qwen3.7-max",
-            "qwen3.6-plus",
+            "qwen3.7-plus",
             "deepseek-v4-pro",
             "deepseek-v4-flash",
+            "grok-4.6",
         ],
     )
     def test_all_documented_opencode_go_aliases_resolve(self, alias):
@@ -149,9 +129,9 @@ class TestResolveModel:
         assert model_id.endswith(alias)
 
     def test_full_openai_api_id_uses_opencode(self):
-        agent, model_id = resolve_model("openai-api/opencode-go/qwen3.6-plus")
+        agent, model_id = resolve_model("openai-api/opencode-go/qwen3.7-max")
         assert agent == "opencode"
-        assert model_id == "openai-api/opencode-go/qwen3.6-plus"
+        assert model_id == "openai-api/opencode-go/qwen3.7-max"
 
     @pytest.mark.parametrize(
         ("alias", "expected_model_id"),
@@ -188,7 +168,7 @@ class TestResolveModel:
         assert model_id2 == "openai/qwen/qwen3.6-27b"
         assert is_lmstudio_model(model_id2)
 
-        assert not is_lmstudio_model("openai/gpt-5.4")
+        assert not is_lmstudio_model("openai/gpt-5.6-luna")
 
     def test_any_explicit_lmstudio_model_uses_opencode(self):
         from shinygen.config import is_lmstudio_model

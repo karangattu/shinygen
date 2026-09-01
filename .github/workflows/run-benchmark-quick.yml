@@ -19,7 +19,7 @@ on:
       model:
         description: "Single generation model to benchmark"
         required: true
-        default: gpt-5.4-mini
+        default: gpt-5.6-luna
         type: choice
         options:
           - claude-opus-4-8
@@ -27,28 +27,24 @@ on:
           - claude-3-7-sonnet
           - claude-haiku-4-5
           - gemini-3.7-flash
-          - gpt-5.5
           - gpt-5.6-sol
           - gpt-5.6-terra
           - gpt-5.6-luna
-          - gpt-5.4
-          - gpt-5.4-mini
-          - gpt-5.4-nano
+          - deepseek-v4-pro
+          - deepseek-v4-flash
+          - glm-5.3
           - glm-5.2
-          - glm-5.1
-
-          - kimi-k2.6
+          - kimi-k3
           - kimi-k2.7-code
           - mimo-v2.5
           - mimo-v2.5-pro
-          - minimax-m2.5
-          - minimax-m2.7
           - minimax-m3
+          - minimax-m2.7
+          - qwen3.8-max
+          - qwen3.8-flash
           - qwen3.7-max
           - qwen3.7-plus
-          - qwen3.6-plus
-          - deepseek-v4-pro
-          - deepseek-v4-flash
+          - grok-4.6
       dataset:
         description: "Bundled CSV dataset from test_data_csv_files/"
         required: true

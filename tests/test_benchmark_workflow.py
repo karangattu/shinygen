@@ -164,10 +164,14 @@ def test_benchmark_workflow_runs_all_opus_generations_for_comparison():
     assert "name: claude-opus-4-6" not in workflow
 
 
-def test_benchmark_workflow_includes_gpt55_in_generation_matrix():
+def test_benchmark_workflow_includes_gpt56_in_generation_matrix():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "name: gpt-5.5" in workflow
+    assert "name: gpt-5.6-sol" in workflow
+    assert "name: gpt-5.6-terra" in workflow
+    assert "name: gpt-5.6-luna" in workflow
+    assert "name: gpt-5.5" not in workflow
+    assert "name: gpt-5.4" not in workflow
 
 
 def test_benchmark_workflows_include_all_documented_opencode_go_models():
@@ -175,23 +179,24 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
     quick_workflow = QUICK_WORKFLOW_PATH.read_text(encoding="utf-8")
 
     for model in [
+        "glm-5.3",
         "glm-5.2",
-        "glm-5.1",
-        "kimi-k2.6",
+        "kimi-k3",
         "kimi-k2.7-code",
         "mimo-v2.5",
         "mimo-v2.5-pro",
-        "minimax-m2.5",
         "minimax-m2.7",
+        "minimax-m3",
+        "qwen3.8-max",
         "qwen3.7-max",
-        "qwen3.6-plus",
+        "qwen3.7-plus",
         "deepseek-v4-pro",
         "deepseek-v4-flash",
     ]:
         assert f"name: {model}" in matrix_workflow
         assert f"- {model}" in quick_workflow
 
-    assert "- qwen3.7-plus" in quick_workflow
+    assert "- grok-4.6" in quick_workflow
     assert "OPENCODE_GO_API_KEY" in matrix_workflow
     assert "OPENCODE_GO_API_KEY" in quick_workflow
 

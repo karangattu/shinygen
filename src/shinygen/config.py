@@ -33,14 +33,6 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "claude-haiku-4-5": ("claude_code", "anthropic/claude-haiku-4-5"),
     "claude-3-5-haiku": ("claude_code", "anthropic/claude-3-5-haiku-20241022"),
     "claude-3.5-haiku": ("claude_code", "anthropic/claude-3-5-haiku-20241022"),
-    "gpt55": ("codex_cli", "openai/gpt-5.5"),
-    "gpt-5.5": ("codex_cli", "openai/gpt-5.5"),
-    "gpt-5.5-2026-04-23": ("codex_cli", "openai/gpt-5.5-2026-04-23"),
-    "gpt54": ("codex_cli", "openai/gpt-5.4"),
-    "gpt-5.4": ("codex_cli", "openai/gpt-5.4"),
-    "gpt54-mini": ("codex_cli", "openai/gpt-5.4-mini-2026-03-17"),
-    "gpt-5.4-mini": ("codex_cli", "openai/gpt-5.4-mini-2026-03-17"),
-    "gpt-5.4-nano": ("codex_cli", "openai/gpt-5.4-nano"),
     "sol": ("codex_cli", "openai/gpt-5.6-sol"),
     "gpt56-sol": ("codex_cli", "openai/gpt-5.6-sol"),
     "gpt-5.6-sol": ("codex_cli", "openai/gpt-5.6-sol"),
@@ -91,27 +83,30 @@ OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 
 # OpenCode Go models that expose OpenAI-compatible chat completions endpoints.
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
+    "glm-5.3",
+    "glm-5.3-flash",
     "glm-5.2",
-    "glm-5.1",
-    "kimi-k2.6",
+    "kimi-k3",
     "kimi-k2.7-code",
+    "kimi-k2.6",
     "deepseek-v4-pro",
     "deepseek-v4-flash",
-    "mimo-v2-pro",
-    "mimo-v2-omni",
+    "deepseek-v4-flash-vision-exp",
     "mimo-v2.5-pro",
     "mimo-v2.5",
-    "qwen3.6-plus",
+    "qwen3.8-flash",
+    "grok-4.6",
+    "grok-4.5",
+    "hy4-preview",
+    "hy3",
+    "longcat-2.0",
 )
 
-# OpenCode Go MiniMax models expose an Anthropic-compatible messages endpoint.
-# Keep a distinct resolved-id marker so generation can route these through
-# Inspect's Anthropic provider with the OpenCode Go base URL/API key without
-# mutating the normal Anthropic environment used by the judge.
+# OpenCode Go MiniMax & Qwen Max/Plus models that expose Anthropic-compatible messages endpoint.
 OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
-    "minimax-m2.5",
-    "minimax-m2.7",
     "minimax-m3",
+    "minimax-m2.7",
+    "qwen3.8-max",
     "qwen3.7-max",
     "qwen3.7-plus",
 )
