@@ -362,14 +362,14 @@ class TestBuildGenerationTask:
         task = build_generation_task(
             user_prompt="Build a dashboard",
             agent="gemini_cli",
-            model_id="google/gemini-2.5-pro",
+            model_id="google/gemini-3.7-flash",
             framework_key="shiny_python",
             docker_context_dir=tmp_path,
             web_fetch=True,
         )
 
         assert task.solver is sentinel_agent
-        assert captured["model"] == "google/gemini-2.5-pro"
+        assert captured["model"] == "google/gemini-3.7-flash"
         assert captured["web_search"] is True
         assert captured["version"] == "auto"
 

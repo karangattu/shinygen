@@ -156,11 +156,9 @@ class TestResolveModel:
     @pytest.mark.parametrize(
         ("alias", "expected_model_id"),
         [
-            ("gemini-2.5-pro", "google/gemini-2.5-pro"),
-            ("gemini-2.5-flash", "google/gemini-2.5-flash"),
-            ("gemini-2.0-flash", "google/gemini-2.0-flash"),
-            ("gemini-1.5-pro", "google/gemini-1.5-pro"),
-            ("gemini-1.5-flash", "google/gemini-1.5-flash"),
+            ("gemini-3.7", "google/gemini-3.7"),
+            ("gemini-3.7-pro", "google/gemini-3.7-pro"),
+            ("gemini-3.7-flash", "google/gemini-3.7-flash"),
         ],
     )
     def test_gemini_aliases_resolve_to_gemini_cli(self, alias, expected_model_id):
@@ -169,9 +167,9 @@ class TestResolveModel:
         assert model_id == expected_model_id
 
     def test_full_google_id_uses_gemini_cli(self):
-        agent, model_id = resolve_model("google/gemini-2.5-pro")
+        agent, model_id = resolve_model("google/gemini-3.7-flash")
         assert agent == "gemini_cli"
-        assert model_id == "google/gemini-2.5-pro"
+        assert model_id == "google/gemini-3.7-flash"
 
     def test_unknown_raises(self):
         with pytest.raises(ValueError, match="Unknown model"):
@@ -352,7 +350,7 @@ class TestCheckAPIKey:
     def test_opencode_google_model_requires_gemini_key(self):
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(APIKeyMissingError, match="GEMINI_API_KEY"):
-                check_api_key("opencode", "google/gemini-2.5-pro")
+                check_api_key("opencode", "google/gemini-3.7-flash")
 
     def test_build_lmstudio_model(self):
         from inspect_ai.model import GenerateConfig
