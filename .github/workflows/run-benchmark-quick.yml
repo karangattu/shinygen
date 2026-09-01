@@ -22,9 +22,8 @@ on:
         default: gpt-5.6-luna
         type: choice
         options:
-          - claude-opus-4-8
+          - claude-opus-5
           - claude-sonnet-5
-          - claude-3-7-sonnet
           - claude-haiku-4-5
           - gemini-3.7-flash
           - gpt-5.6-sol
@@ -33,6 +32,7 @@ on:
           - deepseek-v4-pro
           - deepseek-v4-flash
           - glm-5.3
+          - glm-5.3-flash
           - glm-5.2
           - kimi-k3
           - kimi-k2.7-code

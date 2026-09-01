@@ -159,7 +159,8 @@ def test_benchmark_workflow_uses_sandbox_screenshots_without_runner_browser_inst
 def test_benchmark_workflow_runs_all_opus_generations_for_comparison():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "name: claude-opus-4-8" in workflow
+    assert "name: claude-opus-5" in workflow
+    assert "name: claude-opus-4-8" not in workflow
     assert "name: claude-opus-4-7" not in workflow
     assert "name: claude-opus-4-6" not in workflow
 
@@ -196,6 +197,7 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
         assert f"name: {model}" in matrix_workflow
         assert f"- {model}" in quick_workflow
 
+    assert "- glm-5.3-flash" in quick_workflow
     assert "- grok-4.6" in quick_workflow
     assert "OPENCODE_GO_API_KEY" in matrix_workflow
     assert "OPENCODE_GO_API_KEY" in quick_workflow
@@ -280,6 +282,6 @@ def test_benchmark_workflows_support_gemini_flash_37():
 def test_benchmark_workflows_support_latest_anthropic_models():
     for path in (WORKFLOW_PATH, QUICK_WORKFLOW_PATH, MULTI_WORKFLOW_PATH):
         workflow = path.read_text(encoding="utf-8")
-        assert "claude-opus-4-8" in workflow
+        assert "claude-opus-5" in workflow
         assert "claude-sonnet-5" in workflow
         assert "claude-haiku-4-5" in workflow

@@ -30,7 +30,7 @@ class TestResolveModel:
     def test_claude_opus_alias_resolves_to_latest_release(self):
         agent, model_id = resolve_model("claude-opus")
         assert agent == "claude_code"
-        assert model_id == "anthropic/claude-opus-4-8"
+        assert model_id == "anthropic/claude-opus-5"
 
     def test_known_alias_case_insensitive(self):
         agent, _ = resolve_model("Claude-Opus")
@@ -52,14 +52,14 @@ class TestResolveModel:
         assert model_id == "anthropic/claude-sonnet-5"
 
     def test_exact_anthropic_opus_model_name_without_provider(self):
-        agent, model_id = resolve_model("claude-opus-4-8")
+        agent, model_id = resolve_model("claude-opus-5")
         assert agent == "claude_code"
-        assert model_id == "anthropic/claude-opus-4-8"
+        assert model_id == "anthropic/claude-opus-5"
 
-    def test_exact_anthropic_opus_4_8_model_name_without_provider(self):
-        agent, model_id = resolve_model("claude-opus-4-8")
+    def test_exact_anthropic_haiku_model_name_without_provider(self):
+        agent, model_id = resolve_model("claude-haiku-4-5")
         assert agent == "claude_code"
-        assert model_id == "anthropic/claude-opus-4-8"
+        assert model_id == "anthropic/claude-haiku-4-5"
 
     @pytest.mark.parametrize(
         ("alias", "expected_model_id"),

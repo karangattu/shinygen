@@ -63,7 +63,7 @@ env:
     shiny_python
     shiny_r
   BENCHMARK_EXPECTED_MODELS: |
-    claude-opus-4-8
+    claude-opus-5
     claude-sonnet-5
     claude-haiku-4-5
     gemini-3.7-flash
@@ -184,7 +184,7 @@ jobs:
           - idx: "03"
             name: claude-sonnet-5
           - idx: "04"
-            name: claude-opus-4-8
+            name: claude-opus-5
           - idx: "05"
             name: gpt-5.6-sol
           - idx: "06"
@@ -491,7 +491,7 @@ jobs:
         shiny_python
         shiny_r
       BENCHMARK_EXPECTED_MODELS: |
-        claude-opus-4-8
+        claude-opus-5
         claude-sonnet-5
         claude-haiku-4-5
         gemini-3.7-flash

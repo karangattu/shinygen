@@ -20,19 +20,12 @@ PACKAGE_DIR = Path(__file__).parent
 # ---------------------------------------------------------------------------
 
 MODEL_ALIASES: dict[str, tuple[str, str]] = {
-    "claude-opus": ("claude_code", "anthropic/claude-opus-4-8"),
-    "claude-opus-4-8": ("claude_code", "anthropic/claude-opus-4-8"),
-    "claude-3-opus": ("claude_code", "anthropic/claude-3-opus-20240229"),
+    "claude-opus": ("claude_code", "anthropic/claude-opus-5"),
+    "claude-opus-5": ("claude_code", "anthropic/claude-opus-5"),
     "claude-sonnet": ("claude_code", "anthropic/claude-sonnet-5"),
     "claude-sonnet-5": ("claude_code", "anthropic/claude-sonnet-5"),
-    "claude-3-7-sonnet": ("claude_code", "anthropic/claude-3-7-sonnet-20250219"),
-    "claude-3.7-sonnet": ("claude_code", "anthropic/claude-3-7-sonnet-20250219"),
-    "claude-3-5-sonnet": ("claude_code", "anthropic/claude-3-5-sonnet-20241022"),
-    "claude-3.5-sonnet": ("claude_code", "anthropic/claude-3-5-sonnet-20241022"),
     "claude-haiku": ("claude_code", "anthropic/claude-haiku-4-5"),
     "claude-haiku-4-5": ("claude_code", "anthropic/claude-haiku-4-5"),
-    "claude-3-5-haiku": ("claude_code", "anthropic/claude-3-5-haiku-20241022"),
-    "claude-3.5-haiku": ("claude_code", "anthropic/claude-3-5-haiku-20241022"),
     "sol": ("codex_cli", "openai/gpt-5.6-sol"),
     "gpt56-sol": ("codex_cli", "openai/gpt-5.6-sol"),
     "gpt-5.6-sol": ("codex_cli", "openai/gpt-5.6-sol"),

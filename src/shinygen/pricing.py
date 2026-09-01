@@ -129,6 +129,7 @@ class Timer:
 # format: model_short_name -> (input_price_per_mtok, output_price_per_mtok)
 _PRICING: dict[str, tuple[float, float]] = {
     # Anthropic models
+    "claude-opus-5": (5.00, 25.00),
     "claude-opus-4-8": (5.00, 25.00),
     "claude-opus-4-5": (5.00, 25.00),
     "claude-opus-4-1": (15.00, 75.00),
