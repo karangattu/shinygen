@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DOCKER_DIR = ROOT / "src" / "shinygen" / "dockerfiles"
 
@@ -34,9 +33,7 @@ def test_r_image_keeps_leaflet_but_removes_build_toolchain():
 
 
 def test_python_image_preinstalls_every_documented_dashboard_dependency():
-    requirements = (DOCKER_DIR / "requirements-python.txt").read_text(
-        encoding="utf-8"
-    )
+    requirements = (DOCKER_DIR / "requirements-python.txt").read_text(encoding="utf-8")
 
     for package in (
         "shiny",
@@ -69,9 +66,11 @@ def test_image_build_smoke_tests_preinstalled_framework_dependencies():
         encoding="utf-8"
     )
 
-    assert "import shiny, shinywidgets, plotly, pandas, geopandas, playwright" in workflow
     assert (
-        'library(shiny); library(bslib); library(leaflet); library(sf); library(plotly)'
+        "import shiny, shinywidgets, plotly, pandas, geopandas, playwright" in workflow
+    )
+    assert (
+        "library(shiny); library(bslib); library(leaflet); library(sf); library(plotly)"
         in workflow
     )
 

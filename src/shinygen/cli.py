@@ -212,9 +212,11 @@ def _print_generation_result(result: GenerationResult) -> None:
     click.echo(f"  Passed:     {result.passed}")
 
     usage = result.usage
-    click.echo(f"  Time:       {usage.total_time_seconds:.1f}s"
-               f" (generate: {usage.generation_time_seconds:.1f}s,"
-               f" judge: {usage.judge_time_seconds:.1f}s)")
+    click.echo(
+        f"  Time:       {usage.total_time_seconds:.1f}s"
+        f" (generate: {usage.generation_time_seconds:.1f}s,"
+        f" judge: {usage.judge_time_seconds:.1f}s)"
+    )
     if usage.total_input_tokens or usage.total_output_tokens:
         token_parts = [
             f"{usage.total_input_tokens:,} input",
@@ -242,8 +244,10 @@ def _print_generation_result(result: GenerationResult) -> None:
                 iter_judge[it] = iter_judge.get(it, 0.0) + c
             if it not in iter_tokens:
                 iter_tokens[it] = {
-                    "input": 0, "output": 0,
-                    "cache_write": 0, "cache_read": 0,
+                    "input": 0,
+                    "output": 0,
+                    "cache_write": 0,
+                    "cache_read": 0,
                 }
             iter_tokens[it]["input"] += int(d.get("input_tokens", 0) or 0)
             iter_tokens[it]["output"] += int(d.get("output_tokens", 0) or 0)
@@ -277,7 +281,11 @@ def _print_generation_result(result: GenerationResult) -> None:
 
         total_generate = usage.generation_cost or 0.0
         total_judge = usage.judge_cost or 0.0
-        total_cost = usage.total_cost if usage.total_cost is not None else (total_generate + total_judge)
+        total_cost = (
+            usage.total_cost
+            if usage.total_cost is not None
+            else (total_generate + total_judge)
+        )
         click.echo(
             f"    [total]      generate: ${total_generate:.4f}, "
             f"judge: ${total_judge:.4f}, cumulative: ${total_cost:.4f}"

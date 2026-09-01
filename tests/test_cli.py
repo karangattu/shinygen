@@ -18,7 +18,9 @@ def test_generate_cli_csv_file_loaded(tmp_path, monkeypatch):
 
     def fake_generate(**kwargs):
         captured.update(kwargs)
-        return GenerationResult(app_dir=Path("output"), score=5.0, iterations=1, passed=True)
+        return GenerationResult(
+            app_dir=Path("output"), score=5.0, iterations=1, passed=True
+        )
 
     monkeypatch.setattr(api, "generate", fake_generate)
 
@@ -50,7 +52,9 @@ def test_generate_cli_csv_file_overrides_data_file(tmp_path, monkeypatch):
 
     def fake_generate(**kwargs):
         captured.update(kwargs)
-        return GenerationResult(app_dir=Path("output"), score=5.0, iterations=1, passed=True)
+        return GenerationResult(
+            app_dir=Path("output"), score=5.0, iterations=1, passed=True
+        )
 
     monkeypatch.setattr(api, "generate", fake_generate)
 
@@ -78,10 +82,20 @@ def test_generate_cli_csv_file_overrides_data_file(tmp_path, monkeypatch):
 def test_batch_cli_runs_jobs(tmp_path, monkeypatch):
     config_path = tmp_path / "batch.json"
     config_path.write_text(
-        json.dumps([
-            {"prompt": "app1", "model": "claude-sonnet", "output_dir": str(tmp_path / "out1")},
-            {"prompt": "app2", "model": "gpt54", "output_dir": str(tmp_path / "out2")},
-        ]),
+        json.dumps(
+            [
+                {
+                    "prompt": "app1",
+                    "model": "claude-sonnet",
+                    "output_dir": str(tmp_path / "out1"),
+                },
+                {
+                    "prompt": "app2",
+                    "model": "gpt54",
+                    "output_dir": str(tmp_path / "out2"),
+                },
+            ]
+        ),
         encoding="utf-8",
     )
 
@@ -116,14 +130,16 @@ def test_batch_cli_resolves_relative_paths(tmp_path, monkeypatch):
 
     config_path = tmp_path / "batch.json"
     config_path.write_text(
-        json.dumps([
-            {
-                "prompt": "app1",
-                "model": "claude-sonnet",
-                "output_dir": "./out1",
-                "csv_file": "./data/sales.csv",
-            }
-        ]),
+        json.dumps(
+            [
+                {
+                    "prompt": "app1",
+                    "model": "claude-sonnet",
+                    "output_dir": "./out1",
+                    "csv_file": "./data/sales.csv",
+                }
+            ]
+        ),
         encoding="utf-8",
     )
 
@@ -132,7 +148,9 @@ def test_batch_cli_resolves_relative_paths(tmp_path, monkeypatch):
     def fake_batch(jobs):
         captured.extend(jobs)
         return BatchResult(
-            results=[GenerationResult(app_dir=Path(jobs[0]["output_dir"]), passed=True)],
+            results=[
+                GenerationResult(app_dir=Path(jobs[0]["output_dir"]), passed=True)
+            ],
             succeeded=1,
             failed=0,
         )
@@ -171,7 +189,9 @@ def test_batch_cli_rejects_non_array(tmp_path):
 
 def test_generate_cli_rejects_invalid_port(tmp_path, monkeypatch):
     def fake_generate(**kwargs):
-        return GenerationResult(app_dir=Path("output"), score=5.0, iterations=1, passed=True)
+        return GenerationResult(
+            app_dir=Path("output"), score=5.0, iterations=1, passed=True
+        )
 
     monkeypatch.setattr(api, "generate", fake_generate)
 
@@ -189,7 +209,9 @@ def test_generate_cli_rejects_invalid_port(tmp_path, monkeypatch):
         ["generate", "--prompt", "build app", "--port", "70000"],
     )
     assert result.exit_code != 0
-    assert "70000 is not in the range" in result.output or "Invalid value" in result.output
+    assert (
+        "70000 is not in the range" in result.output or "Invalid value" in result.output
+    )
 
     result = runner.invoke(
         main,
@@ -203,7 +225,9 @@ def test_generate_cli_accepts_valid_port(tmp_path, monkeypatch):
 
     def fake_generate(**kwargs):
         captured.update(kwargs)
-        return GenerationResult(app_dir=Path("output"), score=5.0, iterations=1, passed=True)
+        return GenerationResult(
+            app_dir=Path("output"), score=5.0, iterations=1, passed=True
+        )
 
     monkeypatch.setattr(api, "generate", fake_generate)
 
@@ -215,4 +239,3 @@ def test_generate_cli_accepts_valid_port(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert captured["port"] == 8080
-

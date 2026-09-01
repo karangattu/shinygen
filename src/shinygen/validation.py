@@ -87,18 +87,12 @@ def _collect_plotly_symbols(tree: ast.AST) -> dict[str, set[str]]:
             if node.module == "plotly":
                 for alias in node.names:
                     if alias.name == "express":
-                        symbols["express_aliases"].add(
-                            alias.asname or alias.name
-                        )
+                        symbols["express_aliases"].add(alias.asname or alias.name)
                     elif alias.name in {"graph_objects", "graph_objs"}:
-                        symbols["graph_aliases"].add(
-                            alias.asname or alias.name
-                        )
+                        symbols["graph_aliases"].add(alias.asname or alias.name)
             elif node.module == "plotly.express":
                 for alias in node.names:
-                    symbols["express_functions"].add(
-                        alias.asname or alias.name
-                    )
+                    symbols["express_functions"].add(alias.asname or alias.name)
             elif node.module in {"plotly.graph_objects", "plotly.graph_objs"}:
                 for alias in node.names:
                     if alias.name == "Figure":
@@ -106,9 +100,7 @@ def _collect_plotly_symbols(tree: ast.AST) -> dict[str, set[str]]:
             elif node.module == "plotly.subplots":
                 for alias in node.names:
                     if alias.name == "make_subplots":
-                        symbols["subplot_names"].add(
-                            alias.asname or alias.name
-                        )
+                        symbols["subplot_names"].add(alias.asname or alias.name)
 
     return symbols
 
@@ -254,21 +246,16 @@ def _has_plotly_render_plot_mismatch(tree: ast.AST) -> bool:
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             decorators = {
-                _decorator_chain(decorator)
-                for decorator in node.decorator_list
+                _decorator_chain(decorator) for decorator in node.decorator_list
             }
-            if (
-                ("render", "plot") in decorators
-                and _function_returns_plotly_figure(
-                    node,
-                    symbols=symbols,
-                    plotly_helpers=plotly_helpers,
-                )
+            if ("render", "plot") in decorators and _function_returns_plotly_figure(
+                node,
+                symbols=symbols,
+                plotly_helpers=plotly_helpers,
             ):
                 return True
             if any(
-                decorator
-                and decorator[-1] in {"render_plotly", "render_widget"}
+                decorator and decorator[-1] in {"render_plotly", "render_widget"}
                 for decorator in decorators
             ):
                 plotly_renderers.add(node.name)
@@ -278,9 +265,8 @@ def _has_plotly_render_plot_mismatch(tree: ast.AST) -> bool:
                 chain = (node.func.id,)
             if chain and chain[-1] == "output_plot" and node.args:
                 first_arg = node.args[0]
-                if (
-                    isinstance(first_arg, ast.Constant)
-                    and isinstance(first_arg.value, str)
+                if isinstance(first_arg, ast.Constant) and isinstance(
+                    first_arg.value, str
                 ):
                     output_plot_ids.add(first_arg.value)
 
@@ -316,17 +302,12 @@ def validate_framework_artifact(
         # Check for banned frameworks
         banned_frameworks = {
             "Streamlit": (
-                "import streamlit" in lower
-                or "streamlit run app.py" in lower
+                "import streamlit" in lower or "streamlit run app.py" in lower
             ),
             "Dash": "import dash" in lower or "from dash" in lower,
-            "Gradio": (
-                "import gradio" in lower or "import gradio as gr" in lower
-            ),
+            "Gradio": ("import gradio" in lower or "import gradio as gr" in lower),
             "Flask": "from flask import" in lower or "import flask" in lower,
-            "FastAPI": (
-                "from fastapi import" in lower or "import fastapi" in lower
-            ),
+            "FastAPI": ("from fastapi import" in lower or "import fastapi" in lower),
         }
         for name, present in banned_frameworks.items():
             if present:

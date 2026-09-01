@@ -48,6 +48,7 @@ class TestWaitForPort:
     def test_wait_for_port_success(self):
         import socket
         import threading
+
         from shinygen.screenshot_helper import wait_for_port
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -75,6 +76,7 @@ class TestWaitForPort:
 
     def test_wait_for_port_failure(self):
         import socket
+
         from shinygen.screenshot_helper import wait_for_port
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

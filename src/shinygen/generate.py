@@ -19,7 +19,7 @@ from inspect_ai.model import ChatMessageSystem, ChatMessageUser
 from inspect_ai.scorer import Score, Target, scorer
 from inspect_ai.solver import TaskState
 from inspect_ai.tool import Skill
-from inspect_swe import claude_code, codex_cli
+from inspect_swe import claude_code, codex_cli, gemini_cli, opencode
 
 if TYPE_CHECKING:
     from inspect_ai.util import SandboxEnvironment
@@ -31,6 +31,7 @@ from .config import (
     SANDBOX_IMAGE_ENV_DEFAULTS,
     SANDBOX_WORK_DIR,
     is_lmstudio_model,
+    is_opencode_go_model,
     sandbox_time_limit_for_framework,
 )
 from .prompts import build_system_prompt, build_user_prompt
@@ -574,22 +575,32 @@ def build_generation_task(
             config_overrides=CODEX_CONFIG_OVERRIDES,
             disallowed_tools=codex_disallowed_tools,
         )
+    elif agent == "opencode":
+        solver = opencode(
+            cwd=SANDBOX_WORK_DIR,
+            attempts=1,
+            model=model_id,
+            skills=resolved_skills or None,
+            version="auto",
+        )
+    elif agent == "gemini_cli":
+        solver = gemini_cli(
+            cwd=SANDBOX_WORK_DIR,
+            attempts=1,
+            model=model_id,
+            skills=resolved_skills or None,
+            web_search=web_fetch,
+            version="auto",
+        )
     elif agent == "native_react_solver":
         if model_id is None:
             raise ValueError("model_id is required for native_react_solver")
-        # We drive OpenCode Go models with our own native ReAct solver — same shape as
-        # claude_code / codex_cli but talking directly to the OpenCode Go
-        # endpoint. This avoids the mini bridge's litellm cost-tracking
-        # crash, the Anthropic-SDK ``/v1`` double-prefix bug, and Kimi's
-        # rejection of dropped ``reasoning_content`` fields.
         from .native_solver import native_react_solver
 
         extra_instructions: str | None = None
         if use_skills:
             from .skills import load_skill_context_text
 
-            # ponytail: local models get the actionable skill overview without
-            # 100KB of references; restore them if local prompt speed improves.
             skill_context = load_skill_context_text(
                 framework_key,
                 include_references=not is_lmstudio_model(model_id or ""),
@@ -609,34 +620,14 @@ def build_generation_task(
             screenshot=screenshot,
             extra_instructions=extra_instructions,
         )
-        # Fail fast for the open-weights tier: the prior 25-min ceiling
-        # burned wall-clock on stalled providers without producing
-        # better apps. 10 minutes is plenty for a single dashboard
-        # when the harness isn't sleeping on a slow proxy.
-        if is_lmstudio_model(model_id or ""):
-            # ponytail: local 27B models can emit ~5 tokens/sec; 20 minutes
-            # covers one complete app plus the existing validation repair.
-            time_limit = max(
-                sandbox_time_limit_for_framework(framework_key),
-                20 * 60,
-            )
-        else:
-            time_limit = min(
-                sandbox_time_limit_for_framework(framework_key),
-                OPENCODE_GO_TIME_LIMIT,
-            )
-        return Task(
-            dataset=dataset,
-            solver=solver,
-            scorer=app_created_scorer(screenshot=screenshot),
-            sandbox=("docker", str(docker_context_dir / compose_file)),
-            time_limit=time_limit,
-            working_limit=time_limit,
-        )
     else:
         raise ValueError(f"Unknown generation agent: {agent}")
 
     time_limit = sandbox_time_limit_for_framework(framework_key)
+    if model_id and is_opencode_go_model(model_id):
+        time_limit = min(time_limit, OPENCODE_GO_TIME_LIMIT)
+    elif model_id and is_lmstudio_model(model_id):
+        time_limit = max(time_limit, 20 * 60)
 
     return Task(
         dataset=dataset,

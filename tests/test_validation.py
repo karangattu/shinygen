@@ -20,9 +20,7 @@ def server(input, output, session):
 
 app = App(app_ui, server)
 """
-        valid, reason = validate_framework_artifact(
-            "shiny_python", "app.py", code
-        )
+        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
         assert valid, f"Expected valid, got: {reason}"
 
     def test_invalid_syntax(self):
@@ -58,9 +56,7 @@ ui.page_opts(title="My App")
 def txt():
     return f"n = {input.n()}"
 """
-        valid, reason = validate_framework_artifact(
-            "shiny_python", "app.py", code
-        )
+        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
         assert valid, f"Expected valid, got: {reason}"
 
     def test_rejects_plotly_figure_in_render_plot(self):
@@ -80,9 +76,7 @@ def server(input, output, session):
 
 app = App(app_ui, server)
 """
-        valid, reason = validate_framework_artifact(
-            "shiny_python", "app.py", code
-        )
+        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
         assert not valid
         assert "plotly" in reason.lower()
         assert "render.plot" in reason.lower()
@@ -104,9 +98,7 @@ def server(input, output, session):
 
 app = App(app_ui, server)
 """
-        valid, reason = validate_framework_artifact(
-            "shiny_python", "app.py", code
-        )
+        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
         assert not valid
         assert "output_widget" in reason
 
@@ -127,9 +119,7 @@ def server(input, output, session):
 
 app = App(app_ui, server)
 """
-        valid, reason = validate_framework_artifact(
-            "shiny_python", "app.py", code
-        )
+        valid, reason = validate_framework_artifact("shiny_python", "app.py", code)
         assert valid, f"Expected valid, got: {reason}"
 
 
@@ -164,7 +154,9 @@ print(x)
 
 class TestUnknownFramework:
     def test_unknown_framework_returns_failure(self):
-        valid, reason = validate_framework_artifact("unknown_framework", "app.py", "code")
+        valid, reason = validate_framework_artifact(
+            "unknown_framework", "app.py", "code"
+        )
         assert not valid
         assert "unknown framework" in reason.lower()
         assert "unknown_framework" in reason

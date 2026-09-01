@@ -100,26 +100,26 @@ class TestResolveModel:
         assert agent == "codex_cli"
         assert model_id == expected_model_id
 
-    def test_opencode_go_alias_resolves_to_native_react_solver(self):
+    def test_opencode_go_alias_resolves_to_opencode(self):
         agent, model_id = resolve_model("opencode-go/kimi-k2.6")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "openai-api/opencode-go/kimi-k2.6"
 
     def test_opencode_go_short_alias_resolves_to_openai_api_provider(self):
         agent, model_id = resolve_model("deepseek-v4-flash")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "openai-api/opencode-go/deepseek-v4-flash"
 
     def test_opencode_go_minimax_alias_resolves_to_anthropic_provider_marker(self):
         agent, model_id = resolve_model("minimax-m2.7")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "anthropic/opencode-go/minimax-m2.7"
         assert is_opencode_go_anthropic_model(model_id)
         assert opencode_go_anthropic_model_name(model_id) == "minimax-m2.7"
 
     def test_opencode_go_qwen37_max_alias_resolves_to_anthropic_provider_marker(self):
         agent, model_id = resolve_model("qwen3.7-max")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "anthropic/opencode-go/qwen3.7-max"
         assert is_opencode_go_anthropic_model(model_id)
         assert opencode_go_anthropic_model_name(model_id) == "qwen3.7-max"
@@ -145,13 +145,33 @@ class TestResolveModel:
     )
     def test_all_documented_opencode_go_aliases_resolve(self, alias):
         agent, model_id = resolve_model(alias)
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id.endswith(alias)
 
-    def test_full_openai_api_id_uses_native_react_solver(self):
+    def test_full_openai_api_id_uses_opencode(self):
         agent, model_id = resolve_model("openai-api/opencode-go/qwen3.6-plus")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "openai-api/opencode-go/qwen3.6-plus"
+
+    @pytest.mark.parametrize(
+        ("alias", "expected_model_id"),
+        [
+            ("gemini-2.5-pro", "google/gemini-2.5-pro"),
+            ("gemini-2.5-flash", "google/gemini-2.5-flash"),
+            ("gemini-2.0-flash", "google/gemini-2.0-flash"),
+            ("gemini-1.5-pro", "google/gemini-1.5-pro"),
+            ("gemini-1.5-flash", "google/gemini-1.5-flash"),
+        ],
+    )
+    def test_gemini_aliases_resolve_to_gemini_cli(self, alias, expected_model_id):
+        agent, model_id = resolve_model(alias)
+        assert agent == "gemini_cli"
+        assert model_id == expected_model_id
+
+    def test_full_google_id_uses_gemini_cli(self):
+        agent, model_id = resolve_model("google/gemini-2.5-pro")
+        assert agent == "gemini_cli"
+        assert model_id == "google/gemini-2.5-pro"
 
     def test_unknown_raises(self):
         with pytest.raises(ValueError, match="Unknown model"):
@@ -161,22 +181,22 @@ class TestResolveModel:
         from shinygen.config import is_lmstudio_model
 
         agent, model_id = resolve_model("gemma-4-26b-a4b")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "openai/google/gemma-4-26b-a4b-qat"
         assert is_lmstudio_model(model_id)
 
         agent2, model_id2 = resolve_model("qwen3.6-27b")
-        assert agent2 == "native_react_solver"
+        assert agent2 == "opencode"
         assert model_id2 == "openai/qwen/qwen3.6-27b"
         assert is_lmstudio_model(model_id2)
 
         assert not is_lmstudio_model("openai/gpt-5.4")
 
-    def test_any_explicit_lmstudio_model_uses_native_solver(self):
+    def test_any_explicit_lmstudio_model_uses_opencode(self):
         from shinygen.config import is_lmstudio_model
 
         agent, model_id = resolve_model("lmstudio/qwen3.5-9b")
-        assert agent == "native_react_solver"
+        assert agent == "opencode"
         assert model_id == "lmstudio/qwen3.5-9b"
         assert is_lmstudio_model(model_id)
 
@@ -294,14 +314,25 @@ class TestCheckAPIKey:
         with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}):
             check_api_key("codex_cli")  # should not raise
 
+    def test_gemini_key_missing(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(APIKeyMissingError, match="GEMINI_API_KEY"):
+                check_api_key("gemini_cli")
+
+    def test_gemini_key_present(self):
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}, clear=True):
+            check_api_key("gemini_cli")
+        with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}, clear=True):
+            check_api_key("gemini_cli")
+
     def test_opencode_go_key_missing(self):
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(APIKeyMissingError, match="OPENCODE_GO_API_KEY"):
-                check_api_key("native_react_solver", "openai-api/opencode-go/kimi-k2.6")
+                check_api_key("opencode", "openai-api/opencode-go/kimi-k2.6")
 
     def test_opencode_go_key_present(self):
         with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
-            check_api_key("native_react_solver", "openai-api/opencode-go/kimi-k2.6")
+            check_api_key("opencode", "openai-api/opencode-go/kimi-k2.6")
 
     def test_prepare_model_environment_sets_opencode_go_base_url(self):
         with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
@@ -310,13 +341,18 @@ class TestCheckAPIKey:
 
     def test_lmstudio_key_not_required(self):
         with patch.dict("os.environ", {}, clear=True):
-            check_api_key("native_react_solver", "openai/google/gemma-4-26b-a4b-qat")
-            check_api_key("native_react_solver", "openai/qwen/qwen3.6-27b")
+            check_api_key("opencode", "openai/google/gemma-4-26b-a4b-qat")
+            check_api_key("opencode", "openai/qwen/qwen3.6-27b")
 
-    def test_native_openai_model_requires_openai_key(self):
+    def test_opencode_openai_model_requires_openai_key(self):
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(APIKeyMissingError, match="OPENAI_API_KEY"):
-                check_api_key("native_react_solver", "openai/gpt-5.6-luna")
+                check_api_key("opencode", "openai/gpt-5.6-luna")
+
+    def test_opencode_google_model_requires_gemini_key(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(APIKeyMissingError, match="GEMINI_API_KEY"):
+                check_api_key("opencode", "google/gemini-2.5-pro")
 
     def test_build_lmstudio_model(self):
         from inspect_ai.model import GenerateConfig
@@ -345,5 +381,5 @@ class TestPreflightChecks:
         """LM Studio models run on the host and must not require Docker."""
         with patch("shinygen.config.check_docker") as mock_docker:
             # No API key required for LM Studio, so this should pass cleanly.
-            preflight_checks("native_react_solver", "openai/google/gemma-4-26b-a4b-qat")
+            preflight_checks("opencode", "openai/google/gemma-4-26b-a4b-qat")
         mock_docker.assert_not_called()

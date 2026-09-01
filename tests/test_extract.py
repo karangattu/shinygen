@@ -198,7 +198,7 @@ class TestFindAppCodeInMessages:
                     "  output$result <- renderText('ok')\n"
                     "}\n\n"
                     "shinyApp(ui, server)\n"
-                    "EOF\""
+                    'EOF"'
                 ),
             }
         ]

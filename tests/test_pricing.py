@@ -49,7 +49,10 @@ class TestGetPricing:
         assert get_pricing("openai/google/gemma-4-26b-a4b-qat") == (0.0, 0.0)
         assert get_pricing("openai/qwen/qwen3.6-27b") == (0.0, 0.0)
         assert get_pricing("openai/gemma-4-12b-it-qat") == (0.0, 0.0)
-        assert calculate_cost("openai/google/gemma-4-26b-a4b-qat", 1_000_000, 1_000_000) == 0.0
+        assert (
+            calculate_cost("openai/google/gemma-4-26b-a4b-qat", 1_000_000, 1_000_000)
+            == 0.0
+        )
         assert get_pricing("lmstudio/qwen3.5-9b") == (0.0, 0.0)
 
 

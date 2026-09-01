@@ -42,35 +42,47 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "luna": ("codex_cli", "openai/gpt-5.6-luna"),
     "gpt56-luna": ("codex_cli", "openai/gpt-5.6-luna"),
     "gpt-5.6-luna": ("codex_cli", "openai/gpt-5.6-luna"),
-    "gemma-4-26b-a4b": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
+    "gemma-4-26b-a4b": ("opencode", "openai/google/gemma-4-26b-a4b-qat"),
     "openai/gemma-4-26b-a4b": (
-        "native_react_solver",
+        "opencode",
         "openai/google/gemma-4-26b-a4b-qat",
     ),
-    "gemma-4-26b-a4b-qat": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
+    "gemma-4-26b-a4b-qat": ("opencode", "openai/google/gemma-4-26b-a4b-qat"),
     "google/gemma-4-26b-a4b-qat": (
-        "native_react_solver",
+        "opencode",
         "openai/google/gemma-4-26b-a4b-qat",
     ),
     "openai/google/gemma-4-26b-a4b-qat": (
-        "native_react_solver",
+        "opencode",
         "openai/google/gemma-4-26b-a4b-qat",
     ),
-    "qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
-    "openai/qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
-    "qwen/qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
-    "openai/qwen/qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
-    "gemma-4-e4b": ("native_react_solver", "openai/google/gemma-4-e4b"),
-    "google/gemma-4-e4b": ("native_react_solver", "openai/google/gemma-4-e4b"),
-    "openai/google/gemma-4-e4b": ("native_react_solver", "openai/google/gemma-4-e4b"),
-    "qwen3.6-35b-a3b": ("native_react_solver", "openai/qwen/qwen3.6-35b-a3b"),
-    "qwen/qwen3.6-35b-a3b": ("native_react_solver", "openai/qwen/qwen3.6-35b-a3b"),
+    "qwen3.6-27b": ("opencode", "openai/qwen/qwen3.6-27b"),
+    "openai/qwen3.6-27b": ("opencode", "openai/qwen/qwen3.6-27b"),
+    "qwen/qwen3.6-27b": ("opencode", "openai/qwen/qwen3.6-27b"),
+    "openai/qwen/qwen3.6-27b": ("opencode", "openai/qwen/qwen3.6-27b"),
+    "gemma-4-e4b": ("opencode", "openai/google/gemma-4-e4b"),
+    "google/gemma-4-e4b": ("opencode", "openai/google/gemma-4-e4b"),
+    "openai/google/gemma-4-e4b": ("opencode", "openai/google/gemma-4-e4b"),
+    "qwen3.6-35b-a3b": ("opencode", "openai/qwen/qwen3.6-35b-a3b"),
+    "qwen/qwen3.6-35b-a3b": ("opencode", "openai/qwen/qwen3.6-35b-a3b"),
     "openai/qwen/qwen3.6-35b-a3b": (
-        "native_react_solver",
+        "opencode",
         "openai/qwen/qwen3.6-35b-a3b",
     ),
-    "gemma-4-12b-it-qat": ("native_react_solver", "openai/gemma-4-12b-it-qat"),
-    "openai/gemma-4-12b-it-qat": ("native_react_solver", "openai/gemma-4-12b-it-qat"),
+    "gemma-4-12b-it-qat": ("opencode", "openai/gemma-4-12b-it-qat"),
+    "openai/gemma-4-12b-it-qat": ("opencode", "openai/gemma-4-12b-it-qat"),
+    "gemini-2.5-pro": ("gemini_cli", "google/gemini-2.5-pro"),
+    "gemini-2.5-pro-preview": ("gemini_cli", "google/gemini-2.5-pro"),
+    "gemini-2.5-flash": ("gemini_cli", "google/gemini-2.5-flash"),
+    "gemini-2.0-flash": ("gemini_cli", "google/gemini-2.0-flash"),
+    "gemini-2.0-flash-exp": ("gemini_cli", "google/gemini-2.0-flash-exp"),
+    "gemini-1.5-pro": ("gemini_cli", "google/gemini-1.5-pro"),
+    "gemini-1.5-flash": ("gemini_cli", "google/gemini-1.5-flash"),
+    "google/gemini-2.5-pro": ("gemini_cli", "google/gemini-2.5-pro"),
+    "google/gemini-2.5-flash": ("gemini_cli", "google/gemini-2.5-flash"),
+    "google/gemini-2.0-flash": ("gemini_cli", "google/gemini-2.0-flash"),
+    "google/gemini-1.5-pro": ("gemini_cli", "google/gemini-1.5-pro"),
+    "google/gemini-1.5-flash": ("gemini_cli", "google/gemini-1.5-flash"),
 }
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
@@ -111,7 +123,7 @@ def _register_opencode_go_aliases() -> None:
             f"opencode-go/{model_name}",
             f"opencode-go-{model_name}",
         ):
-            MODEL_ALIASES.setdefault(alias, ("native_react_solver", inspect_model_id))
+            MODEL_ALIASES.setdefault(alias, ("opencode", inspect_model_id))
 
     for model_name in OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS:
         inspect_model_id = f"anthropic/opencode-go/{model_name}"
@@ -120,7 +132,7 @@ def _register_opencode_go_aliases() -> None:
             f"opencode-go/{model_name}",
             f"opencode-go-{model_name}",
         ):
-            MODEL_ALIASES.setdefault(alias, ("native_react_solver", inspect_model_id))
+            MODEL_ALIASES.setdefault(alias, ("opencode", inspect_model_id))
 
 
 _register_opencode_go_aliases()
@@ -174,18 +186,16 @@ FRAMEWORK_ALIASES: dict[str, str] = {
 WEB_SEARCH_TOOL_NAME: dict[str, str] = {
     "claude_code": "WebSearch",
     "codex_cli": "web_search",
+    "gemini_cli": "google_web_search",
+    "opencode": "web_search",
 }
 
-# Agent → skill directory path inside sandbox (per each CLI's documented
-# discovery rules). Codex CLI scans `.agents/skills` per
-# https://developers.openai.com/codex/skills. Claude Code uses `.claude/skills`.
-# Note: inspect_swe's codex_cli solver internally installs skills under
-# `$CODEX_HOME/skills` (i.e. `.codex/skills`), which is NOT one of Codex's
-# documented scan paths. shinygen.generate also stages each framework skill into
-# `.agents/skills/<name>/` via Sample.files to guarantee discovery.
+# Agent → skill directory path inside sandbox
 AGENT_SKILLS_DIR: dict[str, str] = {
     "claude_code": ".claude/skills",
     "codex_cli": ".agents/skills",
+    "gemini_cli": ".gemini/skills",
+    "opencode": ".config/opencode/skills",
 }
 
 # Framework → compose file
@@ -259,14 +269,16 @@ def resolve_model(alias: str) -> tuple[str, str]:
     if key in MODEL_ALIASES:
         return MODEL_ALIASES[key]
     if key.startswith("lmstudio/") and key != "lmstudio/":
-        return ("native_react_solver", key)
+        return ("opencode", key)
     # Allow passing a full model ID directly — infer agent from prefix
     if key.startswith("anthropic/"):
         return ("claude_code", alias)
     if key.startswith("openai/"):
         return ("codex_cli", alias)
-    if key.startswith("openai-api/"):
-        return ("native_react_solver", alias)
+    if key.startswith("google/") or key.startswith("gemini/"):
+        return ("gemini_cli", alias)
+    if key.startswith("openai-api/") or key.startswith("opencode/"):
+        return ("opencode", alias)
     raise ValueError(
         f"Unknown model '{alias}'. Choose from: "
         f"{', '.join(sorted(MODEL_ALIASES.keys()))}"
@@ -426,21 +438,36 @@ def check_api_key(agent: str, model_id: str | None = None) -> None:
                 "Get your API key from https://platform.openai.com/api-keys and run:\n"
                 "  export OPENAI_API_KEY='sk-...'"
             )
-    elif agent == "native_react_solver":
+    elif agent == "gemini_cli":
+        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+            raise APIKeyMissingError(
+                "GEMINI_API_KEY environment variable is not set.\n"
+                "Get your API key from https://aistudio.google.com/ and run:\n"
+                "  export GEMINI_API_KEY='...'"
+            )
+    elif agent in {"opencode", "native_react_solver"}:
         if not model_id:
             raise APIKeyMissingError(
-                "native_react_solver requires a resolved Inspect model ID so shinygen "
+                f"{agent} requires a resolved Inspect model ID so shinygen "
                 "can determine which provider API key is needed."
             )
-        # These calls terminate in the claude_code/codex_cli branches above;
-        # neither branch recurses back into native_react_solver.
         if model_id.startswith("anthropic/"):
             check_api_key("claude_code")
         elif model_id.startswith("openai/"):
             check_api_key("codex_cli")
+        elif model_id.startswith("google/") or model_id.startswith("gemini/"):
+            check_api_key("gemini_cli")
+        elif is_opencode_go_model(model_id):
+            if not os.environ.get("OPENCODE_GO_API_KEY"):
+                raise APIKeyMissingError(
+                    "OPENCODE_GO_API_KEY environment variable is not set.\n"
+                    "Subscribe to OpenCode Go, copy your API key from "
+                    "https://opencode.ai/auth, and run:\n"
+                    "  export OPENCODE_GO_API_KEY='sk-...'"
+                )
         else:
             raise APIKeyMissingError(
-                f"No API key mapping is configured for native model '{model_id}'."
+                f"No API key mapping is configured for model '{model_id}'."
             )
 
 

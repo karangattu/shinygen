@@ -316,80 +316,73 @@ class TestBuildGenerationTask:
 
         assert captured["model_config"] == "inspect-generic"
 
-    def test_opencode_go_openai_model_uses_native_react_solver(
+    def test_opencode_go_openai_model_uses_opencode_solver(
         self,
         tmp_path,
         monkeypatch,
     ):
-        """OpenCode Go (OpenAI-compatible) routes to the native ReAct
-        solver."""
         captured = {}
         sentinel_agent = object()
 
-        def fake_native_react(**kwargs):
+        def fake_opencode(**kwargs):
             captured.update(kwargs)
             return sentinel_agent
 
-        monkeypatch.setattr(
-            "shinygen.native_solver.native_react_solver", fake_native_react
-        )
+        monkeypatch.setattr("shinygen.generate.opencode", fake_opencode)
 
         task = build_generation_task(
             user_prompt="Build a dashboard",
-            agent="native_react_solver",
+            agent="opencode",
             model_id="openai-api/opencode-go/deepseek-v4-flash",
             framework_key="shiny_python",
             docker_context_dir=tmp_path,
         )
 
         assert task.solver is sentinel_agent
-        assert captured["model_id"] == ("openai-api/opencode-go/deepseek-v4-flash")
-        assert captured["screenshot"] is False
+        assert captured["model"] == "openai-api/opencode-go/deepseek-v4-flash"
+        assert captured["version"] == "auto"
         # Fail-fast 10-min ceiling for the open-weights tier.
         assert task.time_limit == 600
         assert task.working_limit == 600
 
-    def test_opencode_go_minimax_model_uses_native_react_solver(
+    def test_gemini_cli_model_uses_gemini_cli_solver(
         self,
         tmp_path,
         monkeypatch,
     ):
-        """OpenCode Go MiniMax (Anthropic-compatible) also routes to the
-        native ReAct solver."""
         captured = {}
         sentinel_agent = object()
 
-        def fake_native_react(**kwargs):
+        def fake_gemini_cli(**kwargs):
             captured.update(kwargs)
             return sentinel_agent
 
-        monkeypatch.setattr(
-            "shinygen.native_solver.native_react_solver", fake_native_react
-        )
+        monkeypatch.setattr("shinygen.generate.gemini_cli", fake_gemini_cli)
 
         task = build_generation_task(
             user_prompt="Build a dashboard",
-            agent="native_react_solver",
-            model_id="anthropic/opencode-go/minimax-m2.7",
+            agent="gemini_cli",
+            model_id="google/gemini-2.5-pro",
             framework_key="shiny_python",
             docker_context_dir=tmp_path,
+            web_fetch=True,
         )
 
         assert task.solver is sentinel_agent
-        assert captured["model_id"] == ("anthropic/opencode-go/minimax-m2.7")
+        assert captured["model"] == "google/gemini-2.5-pro"
+        assert captured["web_search"] is True
+        assert captured["version"] == "auto"
 
     def test_lmstudio_model_gets_local_generation_time_limit(
         self,
         tmp_path,
         monkeypatch,
     ):
-        monkeypatch.setattr(
-            "shinygen.native_solver.native_react_solver", lambda **kwargs: object()
-        )
+        monkeypatch.setattr("shinygen.generate.opencode", lambda **kwargs: object())
 
         task = build_generation_task(
             user_prompt="Build a dashboard",
-            agent="native_react_solver",
+            agent="opencode",
             model_id="lmstudio/qwen3.5-9b",
             framework_key="shiny_python",
             docker_context_dir=tmp_path,
