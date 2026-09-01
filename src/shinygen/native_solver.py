@@ -53,7 +53,6 @@ from inspect_ai.util import sandbox
 
 from .config import (
     OPENCODE_GO_BASE_URL,
-    is_lmstudio_model,
     is_opencode_go_anthropic_model,
     is_opencode_go_model,
     opencode_go_anthropic_model_name,
@@ -153,7 +152,9 @@ def _build_direct_artifact_instructions(
     )
 
     if extra_instructions and extra_instructions.strip():
-        instructions = f"{instructions}\n\nAdditional guidance:\n{extra_instructions.strip()}"
+        instructions = (
+            f"{instructions}\n\nAdditional guidance:\n{extra_instructions.strip()}"
+        )
 
     return instructions
 
@@ -435,9 +436,7 @@ def _collect_host_data_context(work_dir: Path) -> str:
         return ""
 
     parts: list[str] = ["Files in working directory:"]
-    file_names = sorted(
-        p.name for p in work_dir.iterdir() if p.is_file()
-    )
+    file_names = sorted(p.name for p in work_dir.iterdir() if p.is_file())
     parts.extend(file_names)
 
     for csv_path in sorted(work_dir.glob("*.csv")):
@@ -768,9 +767,7 @@ def _build_opencode_go_model(model_id: str) -> Model:
     SDK's ``/v1`` double-prefix issue for MiniMax models.
     """
     api_key = os.environ.get("OPENCODE_GO_API_KEY", "sk-none")
-    base = os.environ.get(
-        "OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL
-    ).rstrip("/")
+    base = os.environ.get("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL).rstrip("/")
 
     if is_opencode_go_anthropic_model(model_id):
         # The Anthropic SDK appends "/v1/messages" to ``base_url``; strip

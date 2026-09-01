@@ -18,8 +18,8 @@ from inspect_ai.tool import Skill, read_skills
 
 from .config import FRAMEWORKS, PACKAGE_DIR
 
-# Local skills (Shiny for R and visual QA). The Shiny for Python skill is
-# downloaded from posit-dev/py-shiny by _default_skill_dir().
+# Bundled skills (visual QA). Framework skills (Shiny for Python and Shiny for R)
+# are downloaded from their respective upstream repos by _default_skill_dir().
 BUNDLED_SKILLS_DIR = PACKAGE_DIR / "skills"
 
 PY_SHINY_SKILL_REF = "main"
@@ -27,6 +27,10 @@ PY_SHINY_SKILL_ARCHIVE_URL = (
     "https://codeload.github.com/posit-dev/py-shiny/tar.gz/{ref}"
 )
 PY_SHINY_SKILL_REPO_PATH = PurePosixPath("shiny/.agents/skills/shiny-for-python")
+
+R_SHINY_SKILL_REF = "main"
+R_SHINY_SKILL_ARCHIVE_URL = "https://codeload.github.com/rstudio/shiny/tar.gz/{ref}"
+R_SHINY_SKILL_REPO_PATH = PurePosixPath("inst/skills/shiny-for-r")
 
 logger = logging.getLogger(__name__)
 
@@ -41,22 +45,23 @@ def _skills_cache_dir() -> Path:
     return cache_home / "shinygen" / "skills"
 
 
-@lru_cache
-def _fetch_py_shiny_skill(ref: str, archive_url: str, cache_dir: str) -> Path:
-    """Fetch the official py-shiny app-authoring skill once per process.
-
-    A successful download replaces the persistent cache. If GitHub is
-    temporarily unavailable, the most recently downloaded copy is used.
-    """
+def _fetch_github_skill(
+    skill_name: str,
+    repo_slug: str,
+    ref: str,
+    archive_url: str,
+    repo_path: PurePosixPath,
+    cache_dir: str,
+) -> Path:
     cache_key = quote(ref, safe="").replace("%", "_")
-    target = Path(cache_dir) / "py-shiny" / cache_key / "shiny-for-python"
+    target = Path(cache_dir) / repo_slug / cache_key / skill_name
     target.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         with tempfile.TemporaryDirectory(
-            prefix=".py-shiny-skill-", dir=target.parent
+            prefix=f".{skill_name}-skill-", dir=target.parent
         ) as temp_dir:
-            staged = Path(temp_dir) / "shiny-for-python"
+            staged = Path(temp_dir) / skill_name
             request = Request(archive_url, headers={"User-Agent": "shinygen"})
             with urlopen(request, timeout=30) as response:
                 with tarfile.open(fileobj=response, mode="r|gz") as archive:
@@ -65,14 +70,12 @@ def _fetch_py_shiny_skill(ref: str, archive_url: str, cache_dir: str) -> Path:
                         if len(parts) < 2:
                             continue
                         try:
-                            relative = PurePosixPath(*parts[1:]).relative_to(
-                                PY_SHINY_SKILL_REPO_PATH
-                            )
+                            relative = PurePosixPath(*parts[1:]).relative_to(repo_path)
                         except ValueError:
                             continue
                         if ".." in relative.parts:
                             raise ValueError(
-                                f"unsafe path in py-shiny archive: {member.name}"
+                                f"unsafe path in {repo_slug} archive: {member.name}"
                             )
 
                         destination = staged.joinpath(*relative.parts)
@@ -87,9 +90,7 @@ def _fetch_py_shiny_skill(ref: str, archive_url: str, cache_dir: str) -> Path:
                                 shutil.copyfileobj(source, output)
 
             if not (staged / "SKILL.md").is_file():
-                raise ValueError(
-                    f"archive does not contain {PY_SHINY_SKILL_REPO_PATH}/SKILL.md"
-                )
+                raise ValueError(f"archive does not contain {repo_path}/SKILL.md")
 
             if target.exists():
                 shutil.rmtree(target)
@@ -97,16 +98,41 @@ def _fetch_py_shiny_skill(ref: str, archive_url: str, cache_dir: str) -> Path:
     except (OSError, tarfile.TarError, ValueError) as exc:
         if (target / "SKILL.md").is_file():
             logger.warning(
-                "Could not refresh the py-shiny skill from %s; using cached copy: %s",
+                "Could not refresh the %s skill from %s; using cached copy: %s",
+                skill_name,
                 archive_url,
                 exc,
             )
             return target
         raise RuntimeError(
-            f"Could not download the Shiny for Python skill from {archive_url}"
+            f"Could not download the {skill_name} skill from {archive_url}"
         ) from exc
 
     return target
+
+
+@lru_cache
+def _fetch_py_shiny_skill(ref: str, archive_url: str, cache_dir: str) -> Path:
+    return _fetch_github_skill(
+        skill_name="shiny-for-python",
+        repo_slug="py-shiny",
+        ref=ref,
+        archive_url=archive_url,
+        repo_path=PY_SHINY_SKILL_REPO_PATH,
+        cache_dir=cache_dir,
+    )
+
+
+@lru_cache
+def _fetch_r_shiny_skill(ref: str, archive_url: str, cache_dir: str) -> Path:
+    return _fetch_github_skill(
+        skill_name="shiny-for-r",
+        repo_slug="shiny",
+        ref=ref,
+        archive_url=archive_url,
+        repo_path=R_SHINY_SKILL_REPO_PATH,
+        cache_dir=cache_dir,
+    )
 
 
 def _default_skill_dir(framework_key: str) -> Path:
@@ -117,6 +143,19 @@ def _default_skill_dir(framework_key: str) -> Path:
             PY_SHINY_SKILL_ARCHIVE_URL.format(ref=quote(ref, safe="")),
         )
         return _fetch_py_shiny_skill(ref, archive_url, str(_skills_cache_dir()))
+
+    if framework_key == "shiny_r":
+        ref = (
+            os.environ.get("SHINYGEN_R_SHINY_SKILL_REF")
+            or os.environ.get("SHINYGEN_SHINY_R_SKILL_REF")
+            or R_SHINY_SKILL_REF
+        )
+        archive_url = (
+            os.environ.get("SHINYGEN_R_SHINY_SKILL_ARCHIVE_URL")
+            or os.environ.get("SHINYGEN_SHINY_R_SKILL_ARCHIVE_URL")
+            or R_SHINY_SKILL_ARCHIVE_URL.format(ref=quote(ref, safe=""))
+        )
+        return _fetch_r_shiny_skill(ref, archive_url, str(_skills_cache_dir()))
 
     fw = FRAMEWORKS[framework_key]
     return BUNDLED_SKILLS_DIR / fw["skill_dir"]

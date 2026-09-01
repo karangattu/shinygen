@@ -3,9 +3,10 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
 from shinygen.config import (
     FRAMEWORKS,
-    MODEL_ALIASES,
     APIKeyMissingError,
     DockerNotAvailableError,
     check_api_key,
@@ -13,13 +14,11 @@ from shinygen.config import (
     find_free_port,
     is_opencode_go_anthropic_model,
     opencode_go_anthropic_model_name,
-    prepare_model_environment,
     preflight_checks,
+    prepare_model_environment,
     resolve_framework,
     resolve_model,
 )
-
-import pytest
 
 
 class TestResolveModel:
@@ -320,8 +319,9 @@ class TestCheckAPIKey:
                 check_api_key("native_react_solver", "openai/gpt-5.6-luna")
 
     def test_build_lmstudio_model(self):
-        from shinygen.config import _build_lmstudio_model
         from inspect_ai.model import GenerateConfig
+
+        from shinygen.config import _build_lmstudio_model
 
         with patch("inspect_ai.model.get_model") as mock_get_model:
             _build_lmstudio_model("openai/google/gemma-4-26b-a4b-qat")

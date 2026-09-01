@@ -43,10 +43,19 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "gpt56-luna": ("codex_cli", "openai/gpt-5.6-luna"),
     "gpt-5.6-luna": ("codex_cli", "openai/gpt-5.6-luna"),
     "gemma-4-26b-a4b": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
-    "openai/gemma-4-26b-a4b": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
+    "openai/gemma-4-26b-a4b": (
+        "native_react_solver",
+        "openai/google/gemma-4-26b-a4b-qat",
+    ),
     "gemma-4-26b-a4b-qat": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
-    "google/gemma-4-26b-a4b-qat": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
-    "openai/google/gemma-4-26b-a4b-qat": ("native_react_solver", "openai/google/gemma-4-26b-a4b-qat"),
+    "google/gemma-4-26b-a4b-qat": (
+        "native_react_solver",
+        "openai/google/gemma-4-26b-a4b-qat",
+    ),
+    "openai/google/gemma-4-26b-a4b-qat": (
+        "native_react_solver",
+        "openai/google/gemma-4-26b-a4b-qat",
+    ),
     "qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
     "openai/qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
     "qwen/qwen3.6-27b": ("native_react_solver", "openai/qwen/qwen3.6-27b"),
@@ -56,7 +65,10 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
     "openai/google/gemma-4-e4b": ("native_react_solver", "openai/google/gemma-4-e4b"),
     "qwen3.6-35b-a3b": ("native_react_solver", "openai/qwen/qwen3.6-35b-a3b"),
     "qwen/qwen3.6-35b-a3b": ("native_react_solver", "openai/qwen/qwen3.6-35b-a3b"),
-    "openai/qwen/qwen3.6-35b-a3b": ("native_react_solver", "openai/qwen/qwen3.6-35b-a3b"),
+    "openai/qwen/qwen3.6-35b-a3b": (
+        "native_react_solver",
+        "openai/qwen/qwen3.6-35b-a3b",
+    ),
     "gemma-4-12b-it-qat": ("native_react_solver", "openai/gemma-4-12b-it-qat"),
     "openai/gemma-4-12b-it-qat": ("native_react_solver", "openai/gemma-4-12b-it-qat"),
 }
@@ -140,7 +152,7 @@ FRAMEWORKS: dict[str, dict[str, str]] = {
             'Rscript -e \'install.packages(c("package_name"), '
             'repos = "https://cloud.r-project.org")\''
         ),
-        "skill_dir": "shiny-bslib",
+        "skill_dir": "shiny-for-r",
     },
 }
 

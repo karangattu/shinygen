@@ -322,7 +322,7 @@ This formula ensures models that get the dashboard right in the first iteration 
 ### Injecting Custom Skills
 
 "Skills" represent styling guides, code templates, and coding standards injected into the agent's workspace.
-- **Standard Skills**: For Python, `shinygen` fetches the official `shiny-for-python` app-authoring skill from [`posit-dev/py-shiny`](https://github.com/posit-dev/py-shiny/tree/main/shiny/.agents/skills/shiny-for-python) at runtime and caches the latest successful download. The R `shiny-bslib` skill remains bundled locally. Set `SHINYGEN_PY_SHINY_SKILL_REF` to use a py-shiny tag or commit instead of `main`.
+- **Standard Skills**: `shinygen` dynamically fetches the official app-authoring skills at runtime and caches the latest successful download: `shiny-for-python` from [`posit-dev/py-shiny`](https://github.com/posit-dev/py-shiny/tree/main/shiny/.agents/skills/shiny-for-python) and `shiny-for-r` from [`rstudio/shiny`](https://github.com/rstudio/shiny/tree/main/inst/skills/shiny-for-r). Set `SHINYGEN_PY_SHINY_SKILL_REF` or `SHINYGEN_R_SHINY_SKILL_REF` to use specific tags or commits instead of `main`.
 - **Custom Skills**: You can inject your own guidelines (e.g. company styling themes, database query layers) using `--skills-dir <path>`.
 
 ### Creating a Custom Skill Directory

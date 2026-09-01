@@ -49,6 +49,36 @@ def py_shiny_skill_archive(tmp_path, monkeypatch):
     monkeypatch.setenv("SHINYGEN_SKILLS_CACHE_DIR", str(tmp_path / "cache"))
 
 
+@pytest.fixture(autouse=True)
+def r_shiny_skill_archive(tmp_path, monkeypatch):
+    """Serve an upstream-shaped r-shiny skill archive without network I/O."""
+    archive_path = tmp_path / "r-shiny.tar.gz"
+    files = {
+        "shiny-main/inst/skills/shiny-for-r/SKILL.md": (
+            "---\n"
+            "name: shiny-for-r\n"
+            "description: Official Shiny for R app-authoring guidance.\n"
+            "---\n\n"
+            "# Shiny for R\n\n"
+            "Read [layouts](references/layouts.md).\n"
+        ),
+        "shiny-main/inst/skills/shiny-for-r/references/layouts.md": (
+            "# Layouts\n\nUse modern bslib layout APIs.\n"
+        ),
+        "shiny-main/.claude/skills/r-shiny-release/SKILL.md": (
+            "---\nname: r-shiny-release\ndescription: Release r-shiny.\n---\n"
+        ),
+    }
+    with tarfile.open(archive_path, "w:gz") as archive:
+        for name, content in files.items():
+            payload = content.encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+
+    monkeypatch.setenv("SHINYGEN_R_SHINY_SKILL_ARCHIVE_URL", archive_path.as_uri())
+
+
 class TestLoadDefaultSkills:
     @pytest.mark.parametrize(
         ("framework_key", "expected_name", "expected_reference"),
@@ -58,7 +88,7 @@ class TestLoadDefaultSkills:
                 "shiny-for-python",
                 "layouts.md",
             ),
-            ("shiny_r", "shiny-bslib", "page-layouts.md"),
+            ("shiny_r", "shiny-for-r", "layouts.md"),
         ],
     )
     def test_loads_framework_skill_as_agent_skill(
@@ -122,12 +152,25 @@ class TestLoadDefaultSkills:
         assert "# Shiny for Python" in instructions
         assert "Use current Shiny layout APIs." in instructions
 
+    def test_shiny_r_context_comes_from_upstream_skill(self):
+        instructions = load_skill_context_text("shiny_r")
+
+        assert "# Shiny for R" in instructions
+        assert "Use modern bslib layout APIs." in instructions
+
     def test_stages_only_the_upstream_app_authoring_skill(self):
         files = collect_skill_sample_files("shiny_python")
 
         assert ".agents/skills/shiny-for-python/SKILL.md" in files
         assert ".agents/skills/shiny-for-python/references/layouts.md" in files
         assert not any("py-shiny-release" in path for path in files)
+
+    def test_stages_only_the_upstream_r_app_authoring_skill(self):
+        files = collect_skill_sample_files("shiny_r")
+
+        assert ".agents/skills/shiny-for-r/SKILL.md" in files
+        assert ".agents/skills/shiny-for-r/references/layouts.md" in files
+        assert not any("r-shiny-release" in path for path in files)
 
     def test_uses_cached_python_skill_when_refresh_fails(self, monkeypatch):
         assert load_default_skills("shiny_python")[0].name == "shiny-for-python"
@@ -138,6 +181,16 @@ class TestLoadDefaultSkills:
         )
 
         assert load_default_skills("shiny_python")[0].name == "shiny-for-python"
+
+    def test_uses_cached_r_skill_when_refresh_fails(self, monkeypatch):
+        assert load_default_skills("shiny_r")[0].name == "shiny-for-r"
+
+        monkeypatch.setenv(
+            "SHINYGEN_R_SHINY_SKILL_ARCHIVE_URL",
+            "file:///archive-that-does-not-exist.tar.gz",
+        )
+
+        assert load_default_skills("shiny_r")[0].name == "shiny-for-r"
 
 
 class TestEnsureSandboxScreenshot:
@@ -392,11 +445,17 @@ class TestBuildGenerationTask:
         assert staged == []
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
+    @pytest.mark.parametrize(
+        ("framework_key", "expected_skill_name"),
+        [("shiny_python", "shiny-for-python"), ("shiny_r", "shiny-for-r")],
+    )
     def test_passes_skills_to_solver_instead_of_sample_files(
         self,
         tmp_path,
         monkeypatch,
         agent,
+        framework_key,
+        expected_skill_name,
     ):
         captured = {}
         sentinel_solver = object()
@@ -410,11 +469,11 @@ class TestBuildGenerationTask:
         else:
             monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
 
-        skills = load_default_skills("shiny_python")
+        skills = load_default_skills(framework_key)
         task = build_generation_task(
             user_prompt="Build a dashboard",
             agent=agent,
-            framework_key="shiny_python",
+            framework_key=framework_key,
             docker_context_dir=tmp_path,
             data_files={"sales.csv": "x,y\n1,2\n"},
             skills=skills,
@@ -431,16 +490,25 @@ class TestBuildGenerationTask:
             # inspect_swe writes to `$CODEX_HOME/skills` only.
             staged = [k for k in sample_files if k.startswith(".agents/skills/")]
             assert staged, "expected bundled skill files staged for codex_cli"
+            assert any(
+                k.startswith(f".agents/skills/{expected_skill_name}/") for k in staged
+            )
             assert any(k.endswith("/SKILL.md") for k in staged)
         else:
             assert sample_files == {"sales.csv": "x,y\n1,2\n"}
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
+    @pytest.mark.parametrize(
+        ("framework_key", "expected_skill_name"),
+        [("shiny_python", "shiny-for-python"), ("shiny_r", "shiny-for-r")],
+    )
     def test_screenshot_skills_arm_adds_visual_qa_skill_only_when_enabled(
         self,
         tmp_path,
         monkeypatch,
         agent,
+        framework_key,
+        expected_skill_name,
     ):
         captured = {}
         sentinel_solver = object()
@@ -454,11 +522,11 @@ class TestBuildGenerationTask:
         else:
             monkeypatch.setattr("shinygen.generate.codex_cli", fake_solver)
 
-        skills = load_default_skills("shiny_python")
+        skills = load_default_skills(framework_key)
         task = build_generation_task(
             user_prompt="Build a dashboard",
             agent=agent,
-            framework_key="shiny_python",
+            framework_key=framework_key,
             docker_context_dir=tmp_path,
             skills=skills,
             use_skills=True,
@@ -467,7 +535,7 @@ class TestBuildGenerationTask:
 
         assert task.solver is sentinel_solver
         skill_names = [skill.name for skill in captured["skills"]]
-        assert skill_names == ["shiny-for-python", "visual-qa"]
+        assert skill_names == [expected_skill_name, "visual-qa"]
 
         sample_files = task.dataset[0].files or {}
         assert ".tools/screenshot_helper.py" in sample_files
@@ -475,7 +543,8 @@ class TestBuildGenerationTask:
         if agent == "codex_cli":
             assert all(not key.startswith("/") for key in staged)
             assert any(
-                key.startswith(".agents/skills/shiny-for-python/") for key in staged
+                key.startswith(f".agents/skills/{expected_skill_name}/")
+                for key in staged
             )
             assert any(key.startswith(".agents/skills/visual-qa/") for key in staged)
         else:
