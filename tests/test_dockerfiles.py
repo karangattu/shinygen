@@ -12,8 +12,8 @@ DOCKERFILES = (
 def test_agent_cli_versions_are_current_and_consistent():
     for dockerfile in DOCKERFILES:
         contents = dockerfile.read_text(encoding="utf-8")
-        assert "ARG CLAUDE_VERSION=2.1.227" in contents
-        assert "ARG CODEX_VERSION=rust-v0.147.0" in contents
+        assert "ARG CLAUDE_VERSION=2.1.257" in contents
+        assert "ARG CODEX_VERSION=rust-v0.152.0" in contents
 
 
 def test_agent_cli_smoke_checks_fail_the_image_build_on_broken_binaries():
