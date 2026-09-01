@@ -1,7 +1,7 @@
 ---
 title: "shinygen"
 subtitle: "Generate, evaluate, and refine Shiny apps using LLM agents in Docker sandboxes"
-jupyter: python3
+jupyter: shinygen
 format:
   html:
     theme:
@@ -32,9 +32,8 @@ format:
 
 ::: {.feature-card}
 #### {{< fa robot >}} Multiple LLM Agents
-Leverages **Claude Code** (via Anthropic) and **Codex CLI** (via OpenAI) to autonomously write clean and professional app layouts.
+Leverages **Claude Code** (via Anthropic), **Codex CLI** (via OpenAI), **Gemini CLI** (via Google), and **OpenCode** (via OpenCode Go) to autonomously write clean and professional app layouts.
 :::
-
 ::: {.feature-card}
 #### {{< fa brands docker >}} Docker Isolation
 Generations run in isolated containers using [Inspect AI](https://inspect.ai-safety-institute.org.uk/), protecting your host system from side-effects.
@@ -108,7 +107,7 @@ import polars as pl
 
 reqs = pl.DataFrame({
     "Requirement": ["Python", "Docker", "API Key"],
-    "Details": ["3.10+ (Recommended: 3.12)", "Docker Desktop daemon running", "ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENCODE_GO_API_KEY"],
+    "Details": ["3.10+ (Recommended: 3.12)", "Docker Desktop daemon running", "ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OPENCODE_GO_API_KEY"],
 })
 
 (
@@ -117,7 +116,7 @@ reqs = pl.DataFrame({
     .cols_align(align="left")
     .opt_stylize(style=1, color="blue")
     .tab_source_note(
-        md("`export ANTHROPIC_API_KEY='sk-ant-...'`, `export OPENAI_API_KEY='sk-...'`, or `export OPENCODE_GO_API_KEY='sk-...'`")
+        md("`export ANTHROPIC_API_KEY='sk-ant-...'`, `export OPENAI_API_KEY='sk-...'`, `export GEMINI_API_KEY='...'`, or `export OPENCODE_GO_API_KEY='sk-...'`")
     )
 )
 ```
@@ -163,7 +162,7 @@ result = shinygen.generate(
     framework="shiny-python",
     data_csv="./trials_data.csv",
     screenshot=True,
-    judge_model="anthropic/claude-sonnet-4-6",
+    judge_model="openai/gpt-5.6-luna",
     max_iterations=3,
 )
 
@@ -183,15 +182,15 @@ Evaluate multiple models or prompts sequentially. Create a JSON config file mapp
     "output_dir": "./batch/sonnet",
     "csv_file": "./trials_data.csv",
     "screenshot": true,
-    "judge_model": "anthropic/claude-sonnet-4-6"
+    "judge_model": "openai/gpt-5.6-luna"
   },
   {
     "prompt": "Create a clinical trials dashboard with enrollment trends",
-    "model": "gpt54",
-    "output_dir": "./batch/gpt54",
+    "model": "gpt-5.6-luna",
+    "output_dir": "./batch/gpt56",
     "csv_file": "./trials_data.csv",
     "screenshot": true,
-    "judge_model": "anthropic/claude-sonnet-4-6"
+    "judge_model": "openai/gpt-5.6-luna"
   }
 ]
 ```
@@ -374,8 +373,8 @@ You can benchmark skill effectiveness using the control/treatment flags:
 
 `shinygen` routes across three distinct tiers of LLMs:
 
-1. **Frontier Models**: Run in Docker containers (e.g., Claude Code, Codex CLI).
-2. **OpenCode Go Models**: Routed via Inspect's message bridge proxies. API calls are authenticated using `OPENCODE_GO_API_KEY` and target `https://opencode.ai/zen/go/v1`.
+1. **Frontier Models**: Run in Docker containers (Claude Code, Codex CLI, Gemini CLI).
+2. **OpenCode Go Models**: Routed via the OpenCode agent in Docker containers. API calls are authenticated using `OPENCODE_GO_API_KEY` and target `https://opencode.ai/zen/go/v1`.
 3. **Local Models via LM Studio**: Run unmetered local evaluations (e.g., `gemma-4-26b-a4b` or `qwen3.6-27b`):
    - Runs **entirely on the host** (Docker check is bypassed).
    - Bypasses API key verification.
@@ -393,31 +392,55 @@ import polars as pl
 
 models = pl.DataFrame({
     "Alias": [
-        "`claude-opus`", "`claude-sonnet`", "`claude-haiku-4-5`",
-        "`gpt55`", "`gpt54`", "`gpt54-mini`", "`gpt56-sol`", "`gpt56-terra`", "`gpt56-luna`",
-        "`opencode-go/kimi-k2.6`", "`opencode-go/deepseek-v4-flash`", "`opencode-go/qwen3.6-plus`",
-        "`opencode-go/minimax-m3`", "`opencode-go/qwen3.7-max`",
+        "`claude-opus-5`", "`claude-sonnet-5`", "`claude-haiku-4-5`",
+        "`gpt-5.6-sol`", "`gpt-5.6-terra`", "`gpt-5.6-luna`",
+        "`gemini-3.7-flash`", "`gemini-3.7-pro`", "`gemini-3.7`",
+        "`glm-5.3`", "`glm-5.3-flash`", "`glm-5.2`",
+        "`kimi-k3`", "`kimi-k2.7-code`",
+        "`deepseek-v4-pro`", "`deepseek-v4-flash`",
+        "`mimo-v2.5-pro`", "`mimo-v2.5`",
+        "`minimax-m3`", "`minimax-m2.7`",
+        "`qwen3.8-max`", "`qwen3.8-flash`", "`qwen3.7-max`", "`qwen3.7-plus`",
+        "`grok-4.6`",
         "`gemma-4-26b-a4b`", "`qwen3.6-27b`"
     ],
     "Agent": [
         "Claude Code", "Claude Code", "Claude Code",
-        "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI", "Codex CLI",
-        "Native ReAct", "Native ReAct", "Native ReAct",
-        "Native ReAct", "Native ReAct",
-        "Native ReAct", "Native ReAct"
+        "Codex CLI", "Codex CLI", "Codex CLI",
+        "Gemini CLI", "Gemini CLI", "Gemini CLI",
+        "OpenCode", "OpenCode", "OpenCode",
+        "OpenCode", "OpenCode",
+        "OpenCode", "OpenCode",
+        "OpenCode", "OpenCode",
+        "OpenCode", "OpenCode",
+        "OpenCode", "OpenCode", "OpenCode", "OpenCode",
+        "OpenCode",
+        "OpenCode", "OpenCode"
     ],
     "Model ID": [
-        "`claude-opus-4-8`", "`claude-sonnet-4-6`", "`claude-haiku-4-5`",
-        "`gpt-5.5`", "`gpt-5.4`", "`gpt-5.4-mini-2026-03-17`", "`gpt-5.6-sol`", "`gpt-5.6-terra`", "`gpt-5.6-luna`",
-        "`openai-api/opencode-go/kimi-k2.6`", "`openai-api/opencode-go/deepseek-v4-flash`", "`openai-api/opencode-go/qwen3.6-plus`",
-        "`anthropic/opencode-go/minimax-m3`", "`anthropic/opencode-go/qwen3.7-max`",
-        "`openai/gemma-4-26b-a4b`", "`openai/qwen3.6-27b`"
+        "`anthropic/claude-opus-5`", "`anthropic/claude-sonnet-5`", "`anthropic/claude-haiku-4-5`",
+        "`openai/gpt-5.6-sol`", "`openai/gpt-5.6-terra`", "`openai/gpt-5.6-luna`",
+        "`google/gemini-3.7-flash`", "`google/gemini-3.7-pro`", "`google/gemini-3.7`",
+        "`openai-api/opencode-go/glm-5.3`", "`openai-api/opencode-go/glm-5.3-flash`", "`openai-api/opencode-go/glm-5.2`",
+        "`openai-api/opencode-go/kimi-k3`", "`openai-api/opencode-go/kimi-k2.7-code`",
+        "`openai-api/opencode-go/deepseek-v4-pro`", "`openai-api/opencode-go/deepseek-v4-flash`",
+        "`openai-api/opencode-go/mimo-v2.5-pro`", "`openai-api/opencode-go/mimo-v2.5`",
+        "`anthropic/opencode-go/minimax-m3`", "`anthropic/opencode-go/minimax-m2.7`",
+        "`anthropic/opencode-go/qwen3.8-max`", "`openai-api/opencode-go/qwen3.8-flash`", "`anthropic/opencode-go/qwen3.7-max`", "`anthropic/opencode-go/qwen3.7-plus`",
+        "`openai-api/opencode-go/grok-4.6`",
+        "`openai/google/gemma-4-26b-a4b-qat`", "`openai/qwen/qwen3.6-27b`"
     ],
     "Provider": [
         "Anthropic", "Anthropic", "Anthropic",
-        "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenAI", "OpenAI",
+        "OpenAI", "OpenAI", "OpenAI",
+        "Google", "Google", "Google",
         "OpenCode Go", "OpenCode Go", "OpenCode Go",
+        "OpenCode Go", "OpenCode Go",
+        "OpenCode Go", "OpenCode Go",
+        "OpenCode Go", "OpenCode Go",
         "OpenCode Go (Anthropic Bridge)", "OpenCode Go (Anthropic Bridge)",
+        "OpenCode Go (Anthropic Bridge)", "OpenCode Go", "OpenCode Go (Anthropic Bridge)", "OpenCode Go (Anthropic Bridge)",
+        "OpenCode Go",
         "Local (LM Studio)", "Local (LM Studio)"
     ],
 })
@@ -443,9 +466,16 @@ from great_tables import GT, md
 import polars as pl
 
 costs = pl.DataFrame({
-    "Model": ["`claude-opus`", "`claude-sonnet`", "`gpt55`", "`gpt54`", "`gpt54-mini`", "`gpt56-sol`", "`gpt56-terra`", "`gpt56-luna`"],
-    "Input": [5.00, 3.00, 5.00, 2.50, 0.75, 5.00, 2.50, 1.00],
-    "Output": [25.00, 15.00, 30.00, 15.00, 4.50, 30.00, 15.00, 6.00],
+    "Model": [
+        "`claude-opus-5`", "`claude-sonnet-5`", "`claude-haiku-4-5`",
+        "`gemini-3.7-flash`", "`gemini-3.7-pro`",
+        "`gpt-5.6-sol`", "`gpt-5.6-terra`", "`gpt-5.6-luna`",
+        "`deepseek-v4-pro`", "`deepseek-v4-flash`",
+        "`glm-5.3`", "`glm-5.3-flash`",
+        "`kimi-k3`", "`minimax-m3`", "`qwen3.8-max`"
+    ],
+    "Input": [5.00, 3.00, 1.00, 0.15, 1.25, 5.00, 2.50, 1.00, 1.74, 0.14, 1.40, 0.20, 0.95, 0.60, 2.50],
+    "Output": [25.00, 15.00, 5.00, 0.60, 5.00, 30.00, 15.00, 6.00, 3.48, 0.28, 4.40, 0.80, 4.00, 2.40, 7.50],
 })
 
 (
@@ -504,8 +534,9 @@ Set the following variables in your terminal or a `.env` file at the project roo
 | Environment Variable | Purpose | Example |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | Authenticate Anthropic models (e.g. Claude Sonnet/Opus) | `export ANTHROPIC_API_KEY='sk-ant-...'` |
-| `OPENAI_API_KEY` | Authenticate OpenAI models (e.g. GPT-5.4) | `export OPENAI_API_KEY='sk-...'` |
-| `OPENCODE_GO_API_KEY` | Authenticate OpenCode Go proxied models | `export OPENCODE_GO_API_KEY='sk-...'` |
+| `OPENAI_API_KEY` | Authenticate OpenAI models (e.g. GPT-5.6) | `export OPENAI_API_KEY='sk-...'` |
+| `GEMINI_API_KEY` | Authenticate Google Gemini models (e.g. Gemini 3.7 Flash) | `export GEMINI_API_KEY='AIzaSy...'` |
+| `OPENCODE_GO_API_KEY` | Authenticate OpenCode Go models | `export OPENCODE_GO_API_KEY='sk-...'` |
 | `LMSTUDIO_BASE_URL` | Base URL endpoint for local LM Studio servers | `export LMSTUDIO_BASE_URL='http://localhost:1234/v1'` |
 
 ---
