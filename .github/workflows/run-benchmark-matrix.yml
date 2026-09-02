@@ -71,18 +71,17 @@ env:
     gpt-5.6-terra
     gpt-5.6-luna
     glm-5.3
-    glm-5.2
+    glm-5.3-flash
     kimi-k3
     kimi-k2.7-code
     mimo-v2.5
     mimo-v2.5-pro
-    minimax-m2.7
     minimax-m3
     qwen3.8-max
-    qwen3.7-max
-    qwen3.7-plus
+    qwen3.8-flash
     deepseek-v4-pro
     deepseek-v4-flash
+    grok-4.5
   BENCHMARK_EXPECTED_ARMS: |
     skills
     vanilla
@@ -194,7 +193,7 @@ jobs:
           - idx: "08"
             name: glm-5.3
           - idx: "09"
-            name: glm-5.2
+            name: glm-5.3-flash
           - idx: "10"
             name: kimi-k3
           - idx: "11"
@@ -204,19 +203,17 @@ jobs:
           - idx: "13"
             name: mimo-v2.5-pro
           - idx: "14"
-            name: minimax-m2.7
-          - idx: "15"
             name: minimax-m3
-          - idx: "16"
+          - idx: "15"
             name: qwen3.8-max
+          - idx: "16"
+            name: qwen3.8-flash
           - idx: "17"
-            name: qwen3.7-max
-          - idx: "18"
-            name: qwen3.7-plus
-          - idx: "19"
             name: deepseek-v4-pro
-          - idx: "20"
+          - idx: "18"
             name: deepseek-v4-flash
+          - idx: "19"
+            name: grok-4.5
         # Control / treatment axis: each (framework, model) cell runs twice,
         # once with the bundled shinygen skill (`skills`) and once vanilla
         # (`vanilla`). Both arms keep web search enabled so the comparison
@@ -499,18 +496,17 @@ jobs:
         gpt-5.6-terra
         gpt-5.6-luna
         glm-5.3
-        glm-5.2
+        glm-5.3-flash
         kimi-k3
         kimi-k2.7-code
         mimo-v2.5
         mimo-v2.5-pro
-        minimax-m2.7
         minimax-m3
         qwen3.8-max
-        qwen3.7-max
-        qwen3.7-plus
+        qwen3.8-flash
         deepseek-v4-pro
         deepseek-v4-flash
+        grok-4.5
       BENCHMARK_EXPECTED_ARMS: |
         skills
         vanilla

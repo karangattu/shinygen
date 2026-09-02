@@ -33,17 +33,13 @@ on:
           - deepseek-v4-flash
           - glm-5.3
           - glm-5.3-flash
-          - glm-5.2
           - kimi-k3
           - kimi-k2.7-code
           - mimo-v2.5
           - mimo-v2.5-pro
           - minimax-m3
-          - minimax-m2.7
           - qwen3.8-max
           - qwen3.8-flash
-          - qwen3.7-max
-          - qwen3.7-plus
           - grok-4.5
       dataset:
         description: "Bundled CSV dataset from test_data_csv_files/"

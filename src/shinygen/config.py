@@ -78,10 +78,8 @@ OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "glm-5.3",
     "glm-5.3-flash",
-    "glm-5.2",
     "kimi-k3",
     "kimi-k2.7-code",
-    "kimi-k2.6",
     "deepseek-v4-pro",
     "deepseek-v4-flash",
     "deepseek-v4-flash-vision-exp",
@@ -90,17 +88,13 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "qwen3.8-flash",
     "grok-4.5",
     "hy4-preview",
-    "hy3",
     "longcat-2.0",
 )
 
-# OpenCode Go MiniMax & Qwen Max/Plus models that expose Anthropic-compatible messages endpoint.
+# OpenCode Go MiniMax & Qwen Max models that expose Anthropic-compatible messages endpoint.
 OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
     "minimax-m3",
-    "minimax-m2.7",
     "qwen3.8-max",
-    "qwen3.7-max",
-    "qwen3.7-plus",
 )
 
 
@@ -259,6 +253,8 @@ def resolve_model(alias: str) -> tuple[str, str]:
         return MODEL_ALIASES[key]
     if key.startswith("lmstudio/") and key != "lmstudio/":
         return ("opencode", key)
+    if is_opencode_go_model(key):
+        return ("opencode", alias)
     # Allow passing a full model ID directly — infer agent from prefix
     if key.startswith("anthropic/"):
         return ("claude_code", alias)

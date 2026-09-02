@@ -89,36 +89,31 @@ class TestResolveModel:
         assert model_id == "openai-api/opencode-go/deepseek-v4-flash"
 
     def test_opencode_go_minimax_alias_resolves_to_anthropic_provider_marker(self):
-        agent, model_id = resolve_model("minimax-m2.7")
+        agent, model_id = resolve_model("minimax-m3")
         assert agent == "opencode"
-        assert model_id == "anthropic/opencode-go/minimax-m2.7"
+        assert model_id == "anthropic/opencode-go/minimax-m3"
         assert is_opencode_go_anthropic_model(model_id)
-        assert opencode_go_anthropic_model_name(model_id) == "minimax-m2.7"
+        assert opencode_go_anthropic_model_name(model_id) == "minimax-m3"
 
-    def test_opencode_go_qwen37_max_alias_resolves_to_anthropic_provider_marker(self):
-        agent, model_id = resolve_model("qwen3.7-max")
+    def test_opencode_go_qwen38_max_alias_resolves_to_anthropic_provider_marker(self):
+        agent, model_id = resolve_model("qwen3.8-max")
         assert agent == "opencode"
-        assert model_id == "anthropic/opencode-go/qwen3.7-max"
+        assert model_id == "anthropic/opencode-go/qwen3.8-max"
         assert is_opencode_go_anthropic_model(model_id)
-        assert opencode_go_anthropic_model_name(model_id) == "qwen3.7-max"
+        assert opencode_go_anthropic_model_name(model_id) == "qwen3.8-max"
 
     @pytest.mark.parametrize(
         "alias",
         [
             "glm-5.3",
             "glm-5.3-flash",
-            "glm-5.2",
             "kimi-k3",
             "kimi-k2.7-code",
-            "kimi-k2.6",
             "mimo-v2.5",
             "mimo-v2.5-pro",
             "minimax-m3",
-            "minimax-m2.7",
             "qwen3.8-max",
             "qwen3.8-flash",
-            "qwen3.7-max",
-            "qwen3.7-plus",
             "deepseek-v4-pro",
             "deepseek-v4-flash",
             "grok-4.5",
@@ -129,10 +124,10 @@ class TestResolveModel:
         assert agent == "opencode"
         assert model_id.endswith(alias)
 
-    def test_full_openai_api_id_uses_opencode(self):
-        agent, model_id = resolve_model("openai-api/opencode-go/qwen3.7-max")
+    def test_full_anthropic_opencode_id_uses_opencode(self):
+        agent, model_id = resolve_model("anthropic/opencode-go/qwen3.8-max")
         assert agent == "opencode"
-        assert model_id == "openai-api/opencode-go/qwen3.7-max"
+        assert model_id == "anthropic/opencode-go/qwen3.8-max"
 
     @pytest.mark.parametrize(
         ("alias", "expected_model_id"),

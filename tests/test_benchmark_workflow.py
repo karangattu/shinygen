@@ -181,24 +181,25 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
 
     for model in [
         "glm-5.3",
-        "glm-5.2",
+        "glm-5.3-flash",
         "kimi-k3",
         "kimi-k2.7-code",
         "mimo-v2.5",
         "mimo-v2.5-pro",
-        "minimax-m2.7",
         "minimax-m3",
         "qwen3.8-max",
-        "qwen3.7-max",
-        "qwen3.7-plus",
+        "qwen3.8-flash",
         "deepseek-v4-pro",
         "deepseek-v4-flash",
+        "grok-4.5",
     ]:
         assert f"name: {model}" in matrix_workflow
         assert f"- {model}" in quick_workflow
 
-    assert "- glm-5.3-flash" in quick_workflow
-    assert "- grok-4.5" in quick_workflow
+    for outdated in ["glm-5.2", "minimax-m2.7", "qwen3.7-max", "qwen3.7-plus"]:
+        assert f"name: {outdated}" not in matrix_workflow
+        assert f"- {outdated}" not in quick_workflow
+
     assert "OPENCODE_GO_API_KEY" in matrix_workflow
     assert "OPENCODE_GO_API_KEY" in quick_workflow
 
