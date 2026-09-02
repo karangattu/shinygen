@@ -121,7 +121,7 @@ class TestResolveModel:
             "qwen3.7-plus",
             "deepseek-v4-pro",
             "deepseek-v4-flash",
-            "grok-4.6",
+            "grok-4.5",
         ],
     )
     def test_all_documented_opencode_go_aliases_resolve(self, alias):

@@ -198,7 +198,7 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
         assert f"- {model}" in quick_workflow
 
     assert "- glm-5.3-flash" in quick_workflow
-    assert "- grok-4.6" in quick_workflow
+    assert "- grok-4.5" in quick_workflow
     assert "OPENCODE_GO_API_KEY" in matrix_workflow
     assert "OPENCODE_GO_API_KEY" in quick_workflow
 

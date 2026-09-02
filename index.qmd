@@ -401,7 +401,7 @@ models = pl.DataFrame({
         "`mimo-v2.5-pro`", "`mimo-v2.5`",
         "`minimax-m3`", "`minimax-m2.7`",
         "`qwen3.8-max`", "`qwen3.8-flash`", "`qwen3.7-max`", "`qwen3.7-plus`",
-        "`grok-4.6`",
+        "`grok-4.5`",
         "`gemma-4-26b-a4b`", "`qwen3.6-27b`"
     ],
     "Agent": [
@@ -427,7 +427,7 @@ models = pl.DataFrame({
         "`openai-api/opencode-go/mimo-v2.5-pro`", "`openai-api/opencode-go/mimo-v2.5`",
         "`anthropic/opencode-go/minimax-m3`", "`anthropic/opencode-go/minimax-m2.7`",
         "`anthropic/opencode-go/qwen3.8-max`", "`openai-api/opencode-go/qwen3.8-flash`", "`anthropic/opencode-go/qwen3.7-max`", "`anthropic/opencode-go/qwen3.7-plus`",
-        "`openai-api/opencode-go/grok-4.6`",
+        "`openai-api/opencode-go/grok-4.5`",
         "`openai/google/gemma-4-26b-a4b-qat`", "`openai/qwen/qwen3.6-27b`"
     ],
     "Provider": [

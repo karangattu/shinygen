@@ -88,7 +88,6 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "mimo-v2.5-pro",
     "mimo-v2.5",
     "qwen3.8-flash",
-    "grok-4.6",
     "grok-4.5",
     "hy4-preview",
     "hy3",

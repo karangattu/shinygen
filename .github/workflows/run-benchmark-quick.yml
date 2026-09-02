@@ -44,7 +44,7 @@ on:
           - qwen3.8-flash
           - qwen3.7-max
           - qwen3.7-plus
-          - grok-4.6
+          - grok-4.5
       dataset:
         description: "Bundled CSV dataset from test_data_csv_files/"
         required: true
