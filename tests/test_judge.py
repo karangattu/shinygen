@@ -3,13 +3,16 @@
 import json
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
 from shinygen.judge import (
-    JUDGE_SYSTEM,
+    VISUAL_QA_DOCUMENTS,
+    VISUAL_QA_SKILL_DIR,
     JudgeResult,
     _build_judge_message,
+    _build_judge_system,
     _judge_with_openai,
     _retry_with_backoff,
     judge_app_with_api,
@@ -109,18 +112,32 @@ class TestJudgeResult:
 
 
 class TestJudgePrompt:
-    def test_visual_ux_rubric_requires_design_best_practices(self):
-        for phrase in [
-            "visual hierarchy",
-            "spacing and alignment",
-            "typography",
-            "contrast and readability",
-            "responsive",
-            "accessibility basics",
-            "chart and table legibility",
-            "empty, loading, and error states",
-        ]:
-            assert phrase in JUDGE_SYSTEM
+    def test_visual_qa_documents_are_embedded_in_full(self):
+        prompt = _build_judge_system()
+        for name in VISUAL_QA_DOCUMENTS:
+            assert (VISUAL_QA_SKILL_DIR / name).read_text(encoding="utf-8") in prompt
+        assert "{visual_qa_skill}" not in prompt
+
+    def test_skill_changes_are_read_on_next_evaluation(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("shinygen.judge.VISUAL_QA_SKILL_DIR", tmp_path)
+        for name in VISUAL_QA_DOCUMENTS:
+            path = tmp_path / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"Original {name}", encoding="utf-8")
+        first = _build_judge_system()
+        (tmp_path / "SKILL.md").write_text("Revised visual policy", encoding="utf-8")
+        second = _build_judge_system()
+        assert "Original SKILL.md" in first
+        assert "Original SKILL.md" not in second
+        assert "Revised visual policy" in second
+
+    def test_missing_skill_reference_fails_instead_of_using_stale_rubric(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr("shinygen.judge.VISUAL_QA_SKILL_DIR", tmp_path)
+        (tmp_path / "SKILL.md").write_text("Skill present", encoding="utf-8")
+        with pytest.raises(FileNotFoundError):
+            _build_judge_system()
 
     def test_judge_message_requests_design_principle_based_evaluation(self):
         message = _build_judge_message("print('hello')")
@@ -130,15 +147,23 @@ class TestJudgePrompt:
         assert "lower confidence" in message
 
     def test_visual_ux_rubric_is_calibrated_to_human_dashboard_preferences(self):
+        prompt = _build_judge_system()
         for phrase in [
-            "human-perceived visual quality",
             "one-screen usefulness",
             "conventional Shiny",
             "prominent primary visualization",
             "Clean alone is not enough",
             "stuck loading indicators",
         ]:
-            assert phrase in JUDGE_SYSTEM
+            assert phrase in prompt
+
+    def test_secondary_views_do_not_override_landing_judgment(self):
+        message = _build_judge_message(
+            "app", [Path("01-main.png"), Path("02-detail.png")]
+        )
+        assert "landing view independently first" in message
+        assert "01-main.png" in message and "02-detail.png" in message
+        assert "deserves credit for that breadth" not in message
 
 
 class TestOpenAIJudgeRequest:
@@ -193,6 +218,7 @@ class TestOpenAIJudgeRequest:
         assert captured["reasoning_effort"] == "high"
         assert captured["max_completion_tokens"] == 2048
         assert "max_tokens" not in captured
+        assert captured["messages"][0]["content"] == _build_judge_system()
 
 
 class TestJudgeAppWithApi:
@@ -203,9 +229,13 @@ class TestJudgeAppWithApi:
         assert "unknown/model-id" in str(exc_info.value)
 
     def test_anthropic_prefix_accepted(self, monkeypatch):
+        captured = {}
+
         class FakeAnthropicClient:
             class Messages:
                 def create(self, **kwargs):
+                    captured.update(kwargs)
+
                     class FakeContent:
                         text = json.dumps(
                             {
@@ -237,6 +267,7 @@ class TestJudgeAppWithApi:
             "print('hello')", "anthropic/claude-sonnet-5", None, ""
         )
         assert result.composite == 7.0
+        assert captured["system"] == _build_judge_system()
 
     def test_openai_prefix_accepted(self, monkeypatch):
         class FakeUsage:
