@@ -14,8 +14,8 @@ User empathy is the foundation of effective dashboard design. It requires design
 
 Avoid the temptation to display every possible metric. A cluttered dashboard defeats the purpose of rapid data scanning.
 
-- **The Rule of 3-4 KPIs**: Limit the top-level metric row to 3 or 4 high-value Key Performance Indicators (KPIs) that represent the overall health of the system.
-- **Deltas & Trends**: Never display bare numbers. Always pair KPIs with descriptive trend indicators (e.g., "+15% vs prior period").
+- **Prioritize KPIs**: Three or four high-value KPIs can be a useful starting point. Use fewer or more only when the audience's task and available space justify them; their presence is not a scoring bonus.
+- **Context for numbers**: Provide units, scope, and relevant comparisons. Add deltas or trends only when the data supports a meaningful baseline; never fabricate a prior period to satisfy a design rule.
 - **Secondary Metrics Subordination**: Place secondary metrics lower in the visual hierarchy or hide them inside collapsible accordions or tabs to prevent clutter.
 
 ## 3. Visual Hierarchy & The 5-Second Rule
@@ -24,5 +24,5 @@ An effective visual hierarchy guides the user's eye naturally from the most crit
 
 - **The F-Pattern and Z-Pattern Flow**: Users scan screens starting from top-left to bottom-right. Place crucial brand titles, filters, and high-level KPIs at the top and left, followed by visualization charts in the middle, and detailed data tables at the bottom.
 - **Scale, Size & Weight**: Use distinct font sizes and weights to visually separate page headers, card titles, value box metrics, and supporting text.
-- **Generous Spacing (The 1-rem Rule)**: Ensure consistent, comfortable gaps (at least `1rem` or `16px`) between components. Crammed dashboards look amateurish and are hard to read.
-- **Restrained Visual Elements**: Limit visual noise. Do not place more than 2 medium/large visualization cards in a single row.
+- **Purposeful Spacing**: Use consistent gaps that support grouping and readability at the intended viewport. Extra whitespace is not inherently better when it separates related comparisons.
+- **Restrained Visual Elements**: Size and group charts around the question they answer. Choose the number per row from legibility and comparison needs rather than a fixed quota.
