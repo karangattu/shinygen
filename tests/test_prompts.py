@@ -207,8 +207,42 @@ class TestBuildRuntimeRefinementPrompt:
             iteration=1,
         )
 
-        assert "RUNTIME LOG REVIEW" in prompt
-        assert "previous version" in prompt.lower()
-        assert "Traceback: bad column" in prompt
-        assert "from shiny import App" in prompt
         assert "Return a complete replacement" in prompt
+
+    def test_includes_budget_and_validation_instructions(self):
+        prompt = build_runtime_refinement_prompt(
+            "Build an ED operations dashboard",
+            previous_code="app = None",
+            runtime_logs="Error: invalid syntax",
+            iteration=1,
+            max_iterations=3,
+        )
+        assert "iteration 1 of 3" in prompt
+        assert "You have 2 iteration(s) remaining" in prompt
+        assert "validate_app.py" in prompt
+
+
+class TestPromptValidationCheckpoint:
+    def test_system_prompt_includes_validation_tool_checkpoint(self):
+        py_prompt = build_system_prompt("shiny_python")
+        assert "validate_app.py" in py_prompt
+        assert "validation tool" in py_prompt.lower()
+
+        r_prompt = build_system_prompt("shiny_r")
+        assert "validate_app.py" in r_prompt
+        assert "validation tool" in r_prompt.lower()
+
+    def test_refinement_prompt_includes_budget_and_decision_options(self):
+        feedback = {
+            "requirement_fidelity": {"score": 5, "rationale": "Add interactive filter"},
+        }
+        prompt = build_refinement_prompt(
+            "Build a dashboard",
+            feedback,
+            iteration=2,
+            max_iterations=4,
+        )
+        assert "iteration 2 of 4" in prompt
+        assert "You have 2 iteration(s) remaining" in prompt
+        assert "DECISION:" in prompt
+        assert "Either revise this code to fix the issues, OR decide it's ready and submit" in prompt

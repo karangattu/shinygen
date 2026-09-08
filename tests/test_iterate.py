@@ -14,6 +14,7 @@ from shinygen.iterate import (
     GenerationResult,
     _copy_agent_screenshot_artifact,
     _copy_output_screenshots,
+    _copy_project_tree,
     _extract_generation_usage_rows,
     _generation_extra_config,
     _recover_code_from_eval_logs,
@@ -61,7 +62,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ok")
+        self.wfile.write(b"<!doctype html><html><body><div class='shiny-app'>ok</div></body></html>")
 
     def log_message(self, format, *args):
         pass
@@ -665,6 +666,13 @@ class TestWriteRunSummary:
         assert summary["usage"]["iterations"][0]["generation_output_tokens"] == 500
         assert summary["usage"]["iterations"][0]["judge_input_tokens"] == 600
         assert summary["usage"]["iterations"][0]["judge_output_tokens"] == 200
+        assert "manifest" in summary
+        assert summary["manifest"]["prompt_hash"] is not None
+        assert summary["manifest"]["replicate"] == "1"
+        assert summary["functional_valid"] == result.functional_valid
+        assert summary["attempts"]["first_attempt_valid"] == result.first_attempt_valid
+        assert summary["attempts"]["repair_attempted"] == result.repair_attempted
+        assert summary["attempts"]["repair_succeeded"] == result.repair_succeeded
 
 
 class TestCopyAgentScreenshotArtifact:
@@ -1036,3 +1044,141 @@ class TestCopyOutputScreenshots:
 
         assert copied == [screenshot_path]
         assert screenshot_path.read_bytes() == b"agent"
+
+
+class TestCopyProjectTree:
+    def test_copies_tree_excluding_harness_artifacts(self, tmp_path):
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "app.py").write_text("app code", encoding="utf-8")
+        (src / "utils.py").write_text("def helper(): pass", encoding="utf-8")
+        (src / "sub").mkdir()
+        (src / "sub" / "style.css").write_text("body { margin: 0; }", encoding="utf-8")
+
+        tools_dir = src / ".tools"
+        tools_dir.mkdir()
+        (tools_dir / "validate_app.py").write_text("validation", encoding="utf-8")
+
+        git_dir = src / ".git"
+        git_dir.mkdir()
+        (git_dir / "HEAD").write_text("ref: refs/heads/main", encoding="utf-8")
+
+        dest = tmp_path / "dest"
+        _copy_project_tree(src, dest)
+
+        assert (dest / "app.py").read_text(encoding="utf-8") == "app code"
+        assert (dest / "utils.py").read_text(encoding="utf-8") == "def helper(): pass"
+        assert (dest / "sub" / "style.css").read_text(encoding="utf-8") == "body { margin: 0; }"
+        assert not (dest / ".tools").exists()
+        assert not (dest / ".git").exists()
+
+
+class TestWholeProjectPreservationInGenerateAndRefine:
+    def test_preserves_supporting_files_in_output_dir(self, tmp_path, monkeypatch):
+        _install_fake_shiny_runtime(tmp_path, monkeypatch)
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+
+        def fake_run_gen(*args, **kwargs):
+            proj_dir = tmp_path / "mock_agent_project"
+            proj_dir.mkdir(parents=True, exist_ok=True)
+            (proj_dir / "app.py").write_text(
+                "from shiny import App, ui\napp = App(None, None)", encoding="utf-8"
+            )
+            (proj_dir / "utils.py").write_text(
+                "def data_loader(): return 42", encoding="utf-8"
+            )
+            (proj_dir / "assets").mkdir(parents=True, exist_ok=True)
+            (proj_dir / "assets" / "styles.css").write_text(
+                "h1 { color: red; }", encoding="utf-8"
+            )
+            return (
+                (proj_dir / "app.py").read_text(encoding="utf-8"),
+                [],
+                False,
+                proj_dir,
+            )
+
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_run_gen)
+
+        output_dir = tmp_path / "final_output"
+        result = generate_and_refine(
+            prompt="Build an app with modular structure",
+            model="lmstudio/test-model",
+            output_dir=output_dir,
+            use_skills=False,
+            max_iterations=1,
+        )
+
+        assert result.passed is True
+        assert (output_dir / "app.py").exists()
+        assert (output_dir / "utils.py").exists()
+        assert (output_dir / "assets" / "styles.css").exists()
+        assert "data_loader" in (output_dir / "utils.py").read_text(encoding="utf-8")
+
+
+class TestScoreSeparationAndAttemptMetrics:
+    def test_unjudged_run_separates_functional_from_quality_score(
+        self, tmp_path, monkeypatch
+    ):
+        _install_fake_shiny_runtime(tmp_path, monkeypatch)
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+        monkeypatch.setattr(
+            "shinygen.iterate._run_generation",
+            lambda *a, **k: (
+                "from shiny import App, ui\napp = App(None, None)",
+                [],
+                False,
+            ),
+        )
+
+        result = generate_and_refine(
+            prompt="Build a dashboard",
+            model="lmstudio/test-model",
+            output_dir=tmp_path / "out",
+            use_skills=False,
+            max_iterations=1,
+        )
+
+        assert result.passed is True
+        assert result.functional_valid is True
+        assert result.score == 1.0
+        assert result.quality_score is None
+        assert result.value_score is None
+        assert result.stop_reason == "functional_passed"
+        assert result.first_attempt_valid is True
+        assert result.repair_attempted is False
+
+    def test_repair_attempted_and_succeeded_metrics(
+        self, tmp_path, monkeypatch
+    ):
+        _install_fake_shiny_runtime(tmp_path, monkeypatch)
+        monkeypatch.setattr("shinygen.iterate.preflight_checks", lambda *a, **k: None)
+
+        turns = [
+            'raise TypeError("broken on turn 1")\n',
+            "from shiny import App, ui\napp = App(None, None)\n",
+        ]
+        turn_count = 0
+
+        def fake_turn(*args, **kwargs):
+            nonlocal turn_count
+            code = turns[turn_count]
+            turn_count += 1
+            return code, [], False
+
+        monkeypatch.setattr("shinygen.iterate._run_generation", fake_turn)
+
+        result = generate_and_refine(
+            prompt="Build a dashboard",
+            model="lmstudio/test-model",
+            output_dir=tmp_path / "out_repair",
+            use_skills=False,
+            max_iterations=2,
+        )
+
+        assert result.passed is True
+        assert result.functional_valid is True
+        assert result.first_attempt_valid is False
+        assert result.repair_attempted is True
+        assert result.repair_succeeded is True
+        assert result.stop_reason == "functional_passed"

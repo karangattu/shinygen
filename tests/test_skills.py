@@ -488,7 +488,9 @@ class TestBuildGenerationTask:
             )
             assert any(k.endswith("/SKILL.md") for k in staged)
         else:
-            assert sample_files == {"sales.csv": "x,y\n1,2\n"}
+            assert not any(k.startswith(".agents/skills/") for k in sample_files)
+            assert ".tools/validate_app.py" in sample_files
+            assert sample_files.get("sales.csv") == "x,y\n1,2\n"
 
     @pytest.mark.parametrize("agent", ["claude_code", "codex_cli"])
     @pytest.mark.parametrize(

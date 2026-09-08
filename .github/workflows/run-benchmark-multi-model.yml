@@ -112,6 +112,15 @@ on:
         description: "Minimum quality score"
         required: true
         default: "5.0"
+      enable_screenshot:
+        description: "Enable screenshot mode"
+        required: false
+        default: false
+        type: boolean
+      replicate:
+        description: "Replicate ID for seed/variance tracking"
+        required: false
+        default: "1"
 
 concurrency:
   group: benchmark-multi-${{ github.workflow }}-${{ inputs.framework }}-${{ github.run_id }}
@@ -126,6 +135,7 @@ env:
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '5.0' }}
   SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "0"
   SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "0"
+  SHINYGEN_REPLICATE: ${{ inputs.replicate || '1' }}
 
 jobs:
   prepare:
@@ -516,13 +526,14 @@ jobs:
           set -euo pipefail
           mkdir -p "${OUTPUT_DIR}"
 
+          screenshot_flag="$([[ "${{ inputs.enable_screenshot }}" == "true" ]] && echo "--screenshot" || echo "--no-screenshot")"
           shinygen generate \
             --prompt "${BENCHMARK_PROMPT}" \
             --model "${{ matrix.model }}" \
             --framework "${{ inputs.framework }}" \
             --output "${OUTPUT_DIR}" \
             --csv-file "${BENCHMARK_DATASET}" \
-            --no-screenshot \
+            ${screenshot_flag} \
             --max-iterations "${BENCHMARK_MAX_ITERATIONS}" \
             --quality-threshold "${BENCHMARK_QUALITY_THRESHOLD}" \
             --web-fetch \
@@ -681,6 +692,9 @@ jobs:
                       "arm": summary.get("arm"),
                       "use_skills": summary.get("use_skills"),
                       "passed": summary.get("passed"),
+                      "functional_valid": summary.get("functional_valid"),
+                      "quality_score": summary.get("quality_score"),
+                      "stop_reason": summary.get("stop_reason"),
                       "iterations": summary.get("iterations"),
                       "total_cost": usage.get("total_cost"),
                       "generation_cost": usage.get("generation_cost"),
@@ -712,14 +726,22 @@ jobs:
               f"Arm: {os.environ['BENCHMARK_ARM']}",
               f"Run ID: {os.environ['GHA_RUN_ID']} (attempt {os.environ['GHA_RUN_ATTEMPT']})",
               "",
-              "| Framework | Model | Passed | Iterations | Gen Time (s) | Total Time (s) | Total Cost | Input Tokens | Output Tokens | Artifact |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+              "| Framework | Model | Functional | Quality | Passed | Iterations | Gen Time (s) | Total Time (s) | Total Cost | Input Tokens | Output Tokens | Artifact |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
           ]
           for r in rows:
+              qs = (
+                  f"{r.get('quality_score'):.2f}"
+                  if isinstance(r.get("quality_score"), (int, float))
+                  else "n/a"
+              )
+              fn = "yes" if r.get("functional_valid") else ("no" if r.get("functional_valid") is not None else "n/a")
               lines.append(
-                  "| {f} | {m} | {p} | {it} | {gt} | {tt} | {tc} | {itok} | {otok} | {ad} |".format(
+                  "| {f} | {m} | {fn} | {qs} | {p} | {it} | {gt} | {tt} | {tc} | {itok} | {otok} | {ad} |".format(
                       f=r.get("framework") or "n/a",
                       m=r.get("model") or "n/a",
+                      fn=fn,
+                      qs=qs,
                       p="yes" if r.get("passed") else "no",
                       it=r.get("iterations") if r.get("iterations") is not None else "n/a",
                       gt=f"{r.get('generation_time'):.1f}s" if r.get('generation_time') is not None else "n/a",

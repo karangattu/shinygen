@@ -37,8 +37,10 @@ IMPORTANT WORKFLOW:
    geopandas, numpy, and playwright. Jump straight to creating the app.
 3. Create the file /home/user/project/app.py with the dashboard code.
    CRITICAL: The file MUST be app.py (NOT app.R). Use Python language syntax.
-4. Verify Python syntax: python -c "import ast; \
-ast.parse(open('/home/user/project/app.py').read()); print('OK')"
+4. Verify your app starts and runs cleanly:
+   Run the pre-staged validation tool:
+   python /home/user/project/.tools/validate_app.py
+   Inspect /tmp/app.log and fix errors if validation reports any issues.
 
 Produce clean, well-structured, production-quality Python code using Python \
 language syntax. Use Shiny Express or Core API with modern layout functions \
@@ -121,7 +123,10 @@ WORKFLOW:
    preloaded. Outside benchmarks, only install packages that are NOT in the list above:
    Run `install.packages(c("package1", "package2"), repos = "https://cloud.r-project.org")` only for packages that are actually missing.
 3. Write your R code to /home/user/project/app.R
-4. Verify: Rscript -e "parse('app.R'); cat('OK\\n')"
+4. Verify your app starts and runs cleanly:
+   Run the pre-staged validation tool:
+   python /home/user/project/.tools/validate_app.py
+   Inspect /tmp/app.log and fix errors if validation reports any issues.
 
 Do NOT spend time running install.packages() for packages that are already \
 installed. Jump straight to creating app.R.
@@ -344,6 +349,7 @@ def build_refinement_prompt(
     previous_code: str | None = None,
     runtime_logs: str | None = None,
     validation_passed: bool | None = None,
+    max_iterations: int | None = None,
 ) -> str:
     """Build a refinement prompt incorporating judge feedback.
 
@@ -356,6 +362,7 @@ def build_refinement_prompt(
             rather than regenerating from scratch.
         runtime_logs: Optional startup/server logs.
         validation_passed: Optional boolean indicating if startup passed.
+        max_iterations: Optional total iteration ceiling.
     """
     feedback_lines = []
     for criterion, entry in judge_feedback.items():
@@ -366,9 +373,14 @@ def build_refinement_prompt(
 
     feedback_text = "\n".join(feedback_lines)
 
+    budget_label = (
+        f"iteration {iteration} of {max_iterations}"
+        if max_iterations
+        else f"iteration {iteration}"
+    )
     parts = [
         original_prompt,
-        f"\n\n--- REFINEMENT (iteration {iteration}) ---\n",
+        f"\n\n--- REFINEMENT ({budget_label}) ---\n",
     ]
 
     if previous_code:
@@ -387,12 +399,22 @@ def build_refinement_prompt(
             f"```\n{trimmed_logs}\n```\n"
         )
 
+    remaining_budget = ""
+    if max_iterations is not None:
+        rem = max(0, max_iterations - iteration)
+        remaining_budget = f"You have {rem} iteration(s) remaining.\n"
+
     parts.append(
         f"\nThe previous version received the following scores. "
         f"Please improve the app to address the feedback:\n\n"
         f"{feedback_text}\n\n"
         f"Focus on improving the lowest-scoring areas while maintaining "
-        f"what already works well. Produce the complete, improved app file."
+        f"what already works well. Verify fixes using "
+        f"`python /home/user/project/.tools/validate_app.py` before final submission.\n\n"
+        f"DECISION:\n"
+        f"{remaining_budget}"
+        f"Either revise this code to fix the issues, OR decide it's ready and submit your current version. "
+        f"If you choose to submit, confirm the current code runs and state that you are submitting it."
     )
 
     return "".join(parts)
@@ -404,15 +426,27 @@ def build_runtime_refinement_prompt(
     previous_code: str,
     runtime_logs: str,
     iteration: int,
+    max_iterations: int | None = None,
 ) -> str:
     """Build a refinement prompt from startup/server logs for a broken app."""
     trimmed_logs = runtime_logs.strip() or "(no server output captured)"
     if len(trimmed_logs) > 8_000:
         trimmed_logs = trimmed_logs[-8_000:]
 
+    budget_label = (
+        f"iteration {iteration} of {max_iterations}"
+        if max_iterations
+        else f"iteration {iteration}"
+    )
+    remaining_budget = ""
+    if max_iterations is not None:
+        rem = max(0, max_iterations - iteration)
+        remaining_budget = f"You have {rem} iteration(s) remaining. "
+
     return (
         f"{original_prompt}\n\n"
-        f"--- RUNTIME LOG REVIEW (iteration {iteration}) ---\n"
+        f"--- RUNTIME LOG REVIEW ({budget_label}) ---\n"
+        f"{remaining_budget}"
         "The app did not pass startup validation. Fix the errors shown "
         "in the logs before final submission.\n\n"
         "Here is the previous version of the app that was run:\n\n"
@@ -422,5 +456,7 @@ def build_runtime_refinement_prompt(
         "Return a complete replacement app that preserves the requested "
         "dashboard, fixes any runtime/log issues, and adds defensive handling "
         "for empty data, missing columns, invalid filters, and render-time "
-        "exceptions. Save the final result as the required app artifact."
+        "exceptions. Before finishing, verify your fix by running:\n"
+        "python /home/user/project/.tools/validate_app.py\n"
+        "Save the final result as the required app artifact."
     )

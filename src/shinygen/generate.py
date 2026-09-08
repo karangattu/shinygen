@@ -395,7 +395,12 @@ def app_created_scorer(screenshot: bool = False):
         output_dir = f"/output/{sample_id}"
         try:
             await sb.exec(["mkdir", "-p", output_dir])
-            await sb.exec(["sh", "-c", f"cp -r {SANDBOX_WORK_DIR}/* {output_dir}/"])
+            await sb.exec([
+                "sh",
+                "-c",
+                f"cp -r {SANDBOX_WORK_DIR}/. {output_dir}/ 2>/dev/null || true; "
+                f"rm -rf {output_dir}/.tools {output_dir}/.agents {output_dir}/.git",
+            ])
         except Exception as exc:
             logger.warning("Failed to copy project files to output volume: %s", exc)
 
@@ -500,6 +505,9 @@ def build_generation_task(
     sample_files: dict[str, str] = {}
     if data_files:
         sample_files.update(data_files)
+
+    validate_script = (Path(__file__).parent / "validate_helper.py").read_text(encoding="utf-8")
+    sample_files[".tools/validate_app.py"] = validate_script
 
     # Inject visual self-evaluation tools when screenshot mode is on.
     # Vanilla (use_skills=False) runs still get the screenshot helper script

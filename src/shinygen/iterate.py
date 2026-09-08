@@ -4,6 +4,7 @@ Main orchestration loop: generate → extract → screenshot → judge → refin
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ import sys
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence, TypedDict, cast
 
@@ -61,6 +63,70 @@ def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").lower() in ("1", "true", "yes")
 
 
+def _get_git_commit() -> str | None:
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return os.environ.get("GITHUB_SHA")
+
+
+def _get_package_version() -> str:
+    try:
+        import importlib.metadata
+
+        return importlib.metadata.version("shinygen")
+    except Exception:
+        return "unknown"
+
+
+def _compute_dataset_hash(data_files: dict[str, str] | None) -> str | None:
+    if not data_files:
+        return None
+    hasher = hashlib.sha256()
+    for fname, content in sorted(data_files.items()):
+        hasher.update(fname.encode("utf-8"))
+        hasher.update(content.encode("utf-8"))
+    return hasher.hexdigest()
+
+
+def _copy_project_tree(src: Path, dest: Path) -> None:
+    """Copy project files from src to dest, ignoring harness and cache artifacts."""
+    if not src.is_dir():
+        return
+    dest.mkdir(parents=True, exist_ok=True)
+    ignore_names = {
+        ".tools",
+        ".agents",
+        ".git",
+        "__pycache__",
+        "eval_logs",
+        "results",
+        ".pytest_cache",
+    }
+    for root, dirs, files in os.walk(src):
+        dirs[:] = [d for d in dirs if d not in ignore_names]
+        rel_root = Path(root).relative_to(src)
+        target_root = dest / rel_root
+        target_root.mkdir(parents=True, exist_ok=True)
+        for f in files:
+            if f.startswith(".git") or f.endswith(".pyc"):
+                continue
+            src_file = Path(root) / f
+            dest_file = target_root / f
+            try:
+                shutil.copy2(src_file, dest_file)
+            except Exception as exc:
+                logger.debug("Failed copying %s to %s: %s", src_file, dest_file, exc)
+
+
 def _safe_data_filename(filename: str) -> str:
     """Validate a data-file name before writing it into a work directory."""
     if not isinstance(filename, str):
@@ -86,10 +152,15 @@ class GenerationResult:
     app_dir: Path | None = None
     source_code: str = ""
     score: float = 0.0
-    quality_score: float = 0.0
-    value_score: float = 0.0
+    quality_score: float | None = None
+    value_score: float | None = None
     iterations: int = 0
     passed: bool = False
+    functional_valid: bool = False
+    stop_reason: str = ""
+    first_attempt_valid: bool = False
+    repair_attempted: bool = False
+    repair_succeeded: bool = False
     judge_feedback: dict | None = None
     score_breakdown: dict | None = None
     screenshot_paths: list[Path] = field(default_factory=list)
@@ -111,10 +182,20 @@ def _write_run_summary(
     artifact_name: str,
     judge_models: list[str],
     data_file_names: list[str],
+    data_files: dict[str, str] | None = None,
     use_skills: bool = True,
     web_fetch: bool = True,
+    replicate: str | int | None = None,
 ) -> Path:
     """Persist structured run metadata for workflow artifacts."""
+    replicate_val = (
+        str(replicate)
+        if replicate is not None
+        else os.environ.get("SHINYGEN_REPLICATE", "1")
+    )
+    dataset_hash = _compute_dataset_hash(data_files)
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
     summary = {
         "prompt": prompt,
         "model": {
@@ -130,9 +211,16 @@ def _write_run_summary(
         "use_skills": use_skills,
         "web_fetch": web_fetch,
         "passed": result.passed,
+        "functional_valid": result.functional_valid,
         "score": result.score,
         "quality_score": result.quality_score,
         "value_score": result.value_score,
+        "stop_reason": result.stop_reason,
+        "attempts": {
+            "first_attempt_valid": result.first_attempt_valid,
+            "repair_attempted": result.repair_attempted,
+            "repair_succeeded": result.repair_succeeded,
+        },
         "score_breakdown": result.score_breakdown,
         "iterations": result.iterations,
         "error": result.error,
@@ -144,6 +232,18 @@ def _write_run_summary(
         },
         "judge_feedback": result.judge_feedback,
         "usage": result.usage.to_dict(),
+        "manifest": {
+            "git_commit": _get_git_commit(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "framework_version": _get_package_version(),
+            "prompt_hash": prompt_hash,
+            "dataset_hash": dataset_hash,
+            "replicate": replicate_val,
+            "timeouts": {
+                "runtime_validation": RUNTIME_VALIDATION_TIMEOUT,
+                "runtime_validation_startup_wait": RUNTIME_VALIDATION_STARTUP_WAIT,
+            },
+        },
     }
     summary_path = output_path / "run_summary.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -194,6 +294,7 @@ def _runtime_validation_command(
     """Return a shell command that starts an app and prints startup logs."""
     quoted_artifact = shlex.quote(artifact_name)
     log_path = "/tmp/shinygen_runtime_validation.log"
+    resp_path = "/tmp/shinygen_resp.html"
 
     if framework_key == "shiny_r":
         start_cmd = (
@@ -208,11 +309,15 @@ def _runtime_validation_command(
 
     return f"""
 set +e
-rm -f {log_path}
+rm -f {log_path} {resp_path}
 app_pid=""
 cleanup() {{
   if [ -n "${{app_pid:-}}" ] && kill -0 "$app_pid" 2>/dev/null; then
     kill "$app_pid" 2>/dev/null || true
+    sleep 0.5
+    if kill -0 "$app_pid" 2>/dev/null; then
+      kill -9 "$app_pid" 2>/dev/null || true
+    fi
     wait "$app_pid" 2>/dev/null || true
   fi
 }}
@@ -230,10 +335,12 @@ while [ "$elapsed" -lt {wait_seconds} ]; do
     exit "$status"
   fi
   if curl --silent --show-error --fail --max-time 1 \
-      "http://127.0.0.1:{port}/" > /dev/null 2>&1; then
-    echo "Startup validation: app responded on port {port}."
-    tail -n 160 {log_path} || true
-    exit 0
+      "http://127.0.0.1:{port}/" > {resp_path} 2>&1; then
+    if grep -Ei -q "shiny|html|<script|<body|<!doctype" {resp_path} 2>/dev/null; then
+      echo "Startup validation: app responded on port {port}."
+      tail -n 160 {log_path} || true
+      exit 0
+    fi
   fi
   sleep 1
   elapsed=$((elapsed + 1))
@@ -846,500 +953,575 @@ def generate_and_refine(
     current_prompt = prompt
     best_code: str | None = None
     best_score: float = 0.0
-    best_quality_score: float = 0.0
+    best_quality_score: float | None = None
+    best_value_score: float | None = None
     best_feedback: dict | None = None
     best_score_breakdown: dict | None = None
     best_runtime_valid: bool | None = None
     best_runtime_logs: str = ""
     best_screenshot_paths: list[Path] = []
+    best_project_dir: Path | None = None
+    first_attempt_valid: bool = False
+    repair_attempted: bool = False
+    repair_succeeded: bool = False
+    stop_reason: str = ""
+    previous_iteration_code: str | None = None
+    temp_dirs_to_clean: list[Path] = []
 
-    for iteration in range(1, max_iterations + 1):
-        logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
-        result.iterations = iteration
+    try:
+        for iteration in range(1, max_iterations + 1):
+            logger.info("=== Iteration %d / %d ===", iteration, max_iterations)
+            result.iterations = iteration
 
-        # --- Step 1: Generate (with retry on no-code-extracted) ---
-        from .prompts import build_truncation_retry_prompt
+            # --- Step 1: Generate (with retry on no-code-extracted) ---
+            from .prompts import build_truncation_retry_prompt
 
-        code: str | None = None
-        generation_usage_rows: list[_GenerationUsageRow] = []
-        # 3 attempts before any artifact exists: original prompt, direct-write
-        # retry on truncation, and one more direct-write attempt if needed.
-        # Once we already have a fallback app from an earlier iteration, avoid
-        # spending another full benchmark window on repeated no-code retries.
-        max_retries = 1 if best_code is not None else 3
-        prompt_for_attempt = current_prompt
-        hit_output_token_limit = False
-        for attempt in range(1, max_retries + 1):
-            if screenshot:
-                # Clear stale screenshots from previous attempts so the
-                # judge never sees images from a discarded iteration.
-                (output_path / AGENT_LAST_SCREENSHOT_NAME).unlink(missing_ok=True)
-                (output_path / "screenshot.png").unlink(missing_ok=True)
-                for stale in output_path.glob("screenshot_[0-9][0-9]_*.png"):
-                    stale.unlink(missing_ok=True)
+            code: str | None = None
+            generation_usage_rows: list[_GenerationUsageRow] = []
+            # 3 attempts before any artifact exists: original prompt, direct-write
+            # retry on truncation, and one more direct-write attempt if needed.
+            # Once we already have a fallback app from an earlier iteration, avoid
+            # spending another full benchmark window on repeated no-code retries.
+            max_retries = 1 if best_code is not None else 3
+            prompt_for_attempt = current_prompt
+            hit_output_token_limit = False
+            current_project_dir: Path | None = None
+            for attempt in range(1, max_retries + 1):
+                if screenshot:
+                    # Clear stale screenshots from previous attempts so the
+                    # judge never sees images from a discarded iteration.
+                    (output_path / AGENT_LAST_SCREENSHOT_NAME).unlink(missing_ok=True)
+                    (output_path / "screenshot.png").unlink(missing_ok=True)
+                    for stale in output_path.glob("screenshot_[0-9][0-9]_*.png"):
+                        stale.unlink(missing_ok=True)
 
-            with Timer() as gen_timer:
-                code, generation_usage_rows, hit_output_token_limit = _run_generation(
-                    prompt_for_attempt,
-                    agent,
-                    model_id,
-                    framework_key,
-                    data_files,
-                    skills,
-                    web_fetch,
-                    iteration,
-                    screenshot,
-                    output_path,
-                    use_skills=use_skills,
-                )
-            result.usage.add_time(
-                "generate",
-                gen_timer.elapsed,
-                iteration=iteration,
-                attempt=attempt,
-            )
-            for row in generation_usage_rows:
-                result.usage.add(
-                    stage="generate",
-                    model=str(row.get("model", model_id)),
-                    input_tokens=int(row.get("input_tokens", 0) or 0),
-                    output_tokens=int(row.get("output_tokens", 0) or 0),
-                    elapsed=0.0,
+                with Timer() as gen_timer:
+                    gen_res = _run_generation(
+                        prompt_for_attempt,
+                        agent,
+                        model_id,
+                        framework_key,
+                        data_files,
+                        skills,
+                        web_fetch,
+                        iteration,
+                        screenshot,
+                        output_path,
+                        use_skills=use_skills,
+                    )
+                if len(gen_res) == 4:
+                    code, generation_usage_rows, hit_output_token_limit, attempt_proj_dir = gen_res  # pyright: ignore[reportGeneralTypeIssues]
+                else:
+                    code, generation_usage_rows, hit_output_token_limit = gen_res  # pyright: ignore[reportGeneralTypeIssues]
+                    attempt_proj_dir = None
+                if attempt_proj_dir is not None:
+                    temp_dirs_to_clean.append(attempt_proj_dir)
+
+                result.usage.add_time(
+                    "generate",
+                    gen_timer.elapsed,
                     iteration=iteration,
-                    cost_override=row.get("cost_override"),
-                    cache_write_tokens=int(row.get("cache_write_tokens", 0) or 0),
-                    cache_read_tokens=int(row.get("cache_read_tokens", 0) or 0),
+                    attempt=attempt,
                 )
-            if code is not None:
-                if (
-                    hit_output_token_limit
-                    and screenshot
-                    and not (output_path / AGENT_LAST_SCREENSHOT_NAME).exists()
-                ):
+                for row in generation_usage_rows:
+                    result.usage.add(
+                        stage="generate",
+                        model=str(row.get("model", model_id)),
+                        input_tokens=int(row.get("input_tokens", 0) or 0),
+                        output_tokens=int(row.get("output_tokens", 0) or 0),
+                        elapsed=0.0,
+                        iteration=iteration,
+                        cost_override=row.get("cost_override"),
+                        cache_write_tokens=int(row.get("cache_write_tokens", 0) or 0),
+                        cache_read_tokens=int(row.get("cache_read_tokens", 0) or 0),
+                    )
+                if code is not None:
+                    if (
+                        hit_output_token_limit
+                        and screenshot
+                        and not (output_path / AGENT_LAST_SCREENSHOT_NAME).exists()
+                    ):
+                        logger.warning(
+                            "Iteration %d: Output token limit hit and screenshot missing, treating extraction as failed",
+                            iteration,
+                        )
+                        code = None
+                    else:
+                        current_project_dir = attempt_proj_dir
+                        break
+                if hit_output_token_limit and attempt < max_retries:
                     logger.warning(
-                        "Iteration %d: Output token limit hit and screenshot missing, treating extraction as failed",
+                        "Iteration %d: Output token limit hit before artifact creation; retrying with direct-write prompt",
                         iteration,
                     )
-                    code = None
-                else:
+                    prompt_for_attempt = build_truncation_retry_prompt(
+                        current_prompt,
+                        framework_key,
+                    )
+                if attempt < max_retries:
+                    logger.warning(
+                        "Iteration %d: No code extracted (attempt %d/%d), retrying...",
+                        iteration,
+                        attempt,
+                        max_retries,
+                    )
+
+            if code is None:
+                logger.warning("Iteration %d: No code extracted", iteration)
+                if best_code:
                     break
-            if hit_output_token_limit and attempt < max_retries:
-                logger.warning(
-                    "Iteration %d: Output token limit hit before artifact creation; retrying with direct-write prompt",
-                    iteration,
-                )
-                prompt_for_attempt = build_truncation_retry_prompt(
-                    current_prompt,
-                    framework_key,
-                )
-            if attempt < max_retries:
-                logger.warning(
-                    "Iteration %d: No code extracted (attempt %d/%d), retrying...",
-                    iteration,
-                    attempt,
-                    max_retries,
-                )
-
-        if code is None:
-            logger.warning("Iteration %d: No code extracted", iteration)
-            if best_code:
-                break
-            if iteration == max_iterations:
-                result.error = "Failed to extract app code from any iteration"
-                break
-            if hit_output_token_limit:
-                current_prompt = build_truncation_retry_prompt(
-                    current_prompt,
-                    framework_key,
-                )
-            continue
-
-        logger.info("Iteration %d: Extracted %d chars of code", iteration, len(code))
-
-        # --- Step 2: Write to temp dir for evaluation ---
-        eval_dir = Path(tempfile.mkdtemp(prefix=f"shinygen_eval_{iteration}_"))
-        (eval_dir / artifact_name).write_text(code, encoding="utf-8")
-
-        # Copy data files alongside
-        if data_files:
-            for fname, content in data_files.items():
-                (eval_dir / fname).write_text(content, encoding="utf-8")
-
-        # --- Step 3: Runtime Validation ---
-        runtime_valid, runtime_logs = _validate_generated_app_runtime(
-            eval_dir,
-            framework_key,
-            artifact_name,
-            effective_port,
-            model_id=model_id,
-        )
-        result.runtime_valid = runtime_valid
-        result.runtime_logs = runtime_logs
-        if runtime_valid:
-            logger.info(
-                "Iteration %d: Runtime validation passed; captured startup logs",
-                iteration,
-            )
-        else:
-            logger.warning(
-                "Iteration %d: Runtime validation failed; captured startup logs:\n%s",
-                iteration,
-                runtime_logs,
-            )
-
-        if not runtime_valid:
-            if best_runtime_valid is not True:
-                best_code = code
-                best_runtime_valid = False
-                best_runtime_logs = runtime_logs
-                best_score = 0.0
-                best_quality_score = 0.0
-
-            if iteration < max_iterations:
-                from .prompts import build_runtime_refinement_prompt
-
-                current_prompt = build_runtime_refinement_prompt(
-                    prompt,
-                    previous_code=code,
-                    runtime_logs=runtime_logs,
-                    iteration=iteration,
-                )
-                logger.info(
-                    "Preparing runtime-log refinement prompt for next iteration"
-                )
+                if iteration == max_iterations:
+                    result.error = "Failed to extract app code from any iteration"
+                    break
+                if hit_output_token_limit:
+                    current_prompt = build_truncation_retry_prompt(
+                        current_prompt,
+                        framework_key,
+                    )
                 continue
 
-            if best_runtime_valid is not True:
-                result.error = (
-                    "Failed runtime validation after "
-                    f"{iteration} iteration(s). See runtime_validation.logs_tail "
-                    "in run_summary.json for startup logs."
-                )
-            result.passed = False
-            break
+            logger.info("Iteration %d: Extracted %d chars of code", iteration, len(code))
 
-        # --- Step 3.5: Screenshots (host-side, for external judge) ---
-        screenshot_paths: list[Path] = []
-        if screenshot:
-            # When a judge is configured, honour SHINYGEN_STRICT_SANDBOX_SCREENSHOT
-            # so the judge never scores a host-rendered image. When there is no
-            # judge, the screenshot is an artifact for the user, not a judge
-            # input — so always allow the host-side fallback to produce one
-            # from the extracted code (e.g. when the agent was SIGTERM'd
-            # before it could take its own screenshot).
-            host_fallback = True if not judge_models else None
-            try:
-                screenshot_paths = _resolve_judge_screenshot_paths(
-                    output_path,
-                    eval_dir,
-                    framework_key,
-                    effective_port,
-                    allow_host_fallback=host_fallback,
-                )
+            # --- Step 2: Write to temp dir for evaluation ---
+            eval_dir = Path(tempfile.mkdtemp(prefix=f"shinygen_eval_{iteration}_"))
+            temp_dirs_to_clean.append(eval_dir)
+            if current_project_dir is not None and current_project_dir.exists():
+                _copy_project_tree(current_project_dir, eval_dir)
+            (eval_dir / artifact_name).write_text(code, encoding="utf-8")
+
+            # Copy data files alongside
+            if data_files:
+                for fname, content in data_files.items():
+                    (eval_dir / fname).write_text(content, encoding="utf-8")
+
+            # --- Step 3: Runtime Validation ---
+            runtime_valid, runtime_logs = _validate_generated_app_runtime(
+                eval_dir,
+                framework_key,
+                artifact_name,
+                effective_port,
+                model_id=model_id,
+            )
+            result.runtime_valid = runtime_valid
+            result.runtime_logs = runtime_logs
+            if iteration == 1:
+                first_attempt_valid = bool(runtime_valid)
+            else:
+                repair_attempted = True
+                if runtime_valid and not repair_succeeded:
+                    repair_succeeded = True
+
+            if runtime_valid:
                 logger.info(
-                    "Iteration %d: Captured %d screenshots",
+                    "Iteration %d: Runtime validation passed; captured startup logs",
                     iteration,
-                    len(screenshot_paths),
                 )
-            except RuntimeError as exc:
-                # Screenshots are only consumed by the judge. When there are
-                # no judges, a missing screenshot (e.g. the agent was
-                # SIGTERM'd before taking one) must not fail an otherwise
-                # successful run — the generated app is still usable.
-                if judge_models and _env_truthy(
-                    "SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE"
-                ):
-                    logger.error(
-                        "Iteration %d: %s Screenshot-backed judging is required; "
-                        "stopping without code-only judging.",
-                        iteration,
-                        exc,
+            else:
+                logger.warning(
+                    "Iteration %d: Runtime validation failed; captured startup logs:\n%s",
+                    iteration,
+                    runtime_logs,
+                )
+
+            if not runtime_valid:
+                if best_runtime_valid is not True:
+                    best_code = code
+                    best_runtime_valid = False
+                    best_runtime_logs = runtime_logs
+                    best_score = 0.0
+                    best_quality_score = None
+                    best_value_score = None
+                    best_project_dir = eval_dir
+
+                if iteration < max_iterations:
+                    from .prompts import build_runtime_refinement_prompt
+
+                    current_prompt = build_runtime_refinement_prompt(
+                        prompt,
+                        previous_code=code,
+                        runtime_logs=runtime_logs,
+                        iteration=iteration,
+                        max_iterations=max_iterations,
                     )
-                    result.error = str(exc)
+                    logger.info(
+                        "Preparing runtime-log refinement prompt for next iteration"
+                    )
+                    previous_iteration_code = code
+                    continue
+
+                if best_runtime_valid is not True:
+                    result.error = (
+                        "Failed runtime validation after "
+                        f"{iteration} iteration(s). See runtime_validation.logs_tail "
+                        "in run_summary.json for startup logs."
+                    )
+                result.passed = False
+                stop_reason = "runtime_failed"
+                break
+
+            # --- Step 3.5: Screenshots (host-side, for external judge) ---
+            screenshot_paths: list[Path] = []
+            if screenshot:
+                # When a judge is configured, honour SHINYGEN_STRICT_SANDBOX_SCREENSHOT
+                # so the judge never scores a host-rendered image. When there is no
+                # judge, the screenshot is an artifact for the user, not a judge
+                # input — so always allow the host-side fallback to produce one
+                # from the extracted code (e.g. when the agent was SIGTERM'd
+                # before it could take its own screenshot).
+                host_fallback = True if not judge_models else None
+                try:
+                    screenshot_paths = _resolve_judge_screenshot_paths(
+                        output_path,
+                        eval_dir,
+                        framework_key,
+                        effective_port,
+                        allow_host_fallback=host_fallback,
+                    )
+                    logger.info(
+                        "Iteration %d: Captured %d screenshots",
+                        iteration,
+                        len(screenshot_paths),
+                    )
+                except RuntimeError as exc:
+                    # Screenshots are only consumed by the judge. When there are
+                    # no judges, a missing screenshot (e.g. the agent was
+                    # SIGTERM'd before taking one) must not fail an otherwise
+                    # successful run — the generated app is still usable.
+                    if judge_models and _env_truthy(
+                        "SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE"
+                    ):
+                        logger.error(
+                            "Iteration %d: %s Screenshot-backed judging is required; "
+                            "stopping without code-only judging.",
+                            iteration,
+                            exc,
+                        )
+                        result.error = str(exc)
+                        if best_code is None:
+                            best_code = code
+                            best_runtime_valid = True
+                            best_runtime_logs = runtime_logs
+                            best_score = 0.0
+                            best_quality_score = None
+                            best_screenshot_paths = list(screenshot_paths)
+                            best_project_dir = eval_dir
+                        break
+                    if not judge_models:
+                        # No judging configured: the screenshot is cosmetic.
+                        # Don't retry, don't fail — just record it and move on.
+                        logger.warning(
+                            "Iteration %d: %s No judge configured, so the "
+                            "missing screenshot is non-fatal; proceeding.",
+                            iteration,
+                            exc,
+                        )
+                        screenshot_paths = []
+                    elif iteration == max_iterations:
+                        # Final iteration: don't hard-fail the whole run just
+                        # because the screenshot pipeline broke. Proceed with
+                        # code-only judging so we still get a usable result.
+                        logger.warning(
+                            "Iteration %d: %s Proceeding with code-only "
+                            "judging (no screenshot available).",
+                            iteration,
+                            exc,
+                        )
+                        screenshot_paths = []
+                    else:
+                        # Recoverable: next iteration will retry with a prompt
+                        # asking the agent to take its own screenshot.
+                        logger.warning(
+                            "Iteration %d: %s Retrying with screenshot-focused "
+                            "prompt for the next iteration.",
+                            iteration,
+                            exc,
+                        )
+                        current_prompt = (
+                            f"Your previous attempt failed: {exc}. "
+                            "Ensure your app runs locally without errors, and that you "
+                            "successfully run the screenshot tool before finishing."
+                        )
+                        previous_iteration_code = code
+                        continue
+
+            # --- Step 4: Judge ---
+            if judge_models:
+                try:
+                    from .judge import judge_app_with_models
+
+                    with Timer() as judge_timer:
+                        judge_result = judge_app_with_models(
+                            code,
+                            judge_models,
+                            screenshot_paths or None,
+                            prompt,
+                            "r" if framework_key == "shiny_r" else "python",
+                        )
+                    if not judge_result.scores:
+                        # A judge outage must not discard an app that already
+                        # passed runtime validation; preserve it for the caller.
+                        logger.warning(
+                            "All judges failed in iteration %d; preserving the "
+                            "runtime-valid app without a quality score",
+                            iteration,
+                        )
+                        if best_code is None:
+                            best_code = code
+                            best_runtime_valid = runtime_valid
+                            best_runtime_logs = runtime_logs
+                            best_score = 0.0
+                            best_quality_score = None
+                            best_screenshot_paths = list(screenshot_paths)
+                            best_project_dir = eval_dir
+                        result.runtime_valid = runtime_valid
+                        result.passed = False
+                        stop_reason = "judge_outage"
+                        break
+                    # Attribute token usage per judge so the cost breakdown stays
+                    # accurate when more than one judge runs. Fall back to the
+                    # merged totals if per-judge attribution is unavailable.
+                    if judge_result.per_judge:
+                        elapsed_share = judge_timer.elapsed / max(
+                            len(judge_result.per_judge), 1
+                        )
+                        for entry in judge_result.per_judge:
+                            if "error" in entry:
+                                continue
+                            result.usage.add(
+                                stage="judge",
+                                model=str(entry.get("model", judge_models[0])),
+                                input_tokens=int(entry.get("input_tokens", 0) or 0),
+                                output_tokens=int(entry.get("output_tokens", 0) or 0),
+                                elapsed=elapsed_share,
+                                iteration=iteration,
+                            )
+                    else:
+                        result.usage.add(
+                            stage="judge",
+                            model=judge_models[0],
+                            input_tokens=judge_result.input_tokens,
+                            output_tokens=judge_result.output_tokens,
+                            elapsed=judge_timer.elapsed,
+                            iteration=iteration,
+                        )
+                    quality_score = judge_result.composite
+                    value_score = calculate_value_score(
+                        quality_score=quality_score,
+                        iterations=iteration,
+                        generation_cost=result.usage.generation_cost,
+                    )
+                    score = value_score.value_score
+                    if len(judge_models) > 1:
+                        panel_breakdown = ", ".join(
+                            f"{entry.get('model')}={entry.get('composite', 0):.2f}"
+                            for entry in judge_result.per_judge
+                            if "error" not in entry
+                        )
+                        logger.info(
+                            "Iteration %d: Panel quality = %.2f, value score = %.2f "
+                            "(threshold = %.2f, cost penalty = %.2f, iteration penalty = %.2f) [%s]",
+                            iteration,
+                            quality_score,
+                            score,
+                            quality_threshold,
+                            value_score.cost_penalty,
+                            value_score.iteration_penalty,
+                            panel_breakdown or "no judges responded",
+                        )
+                    else:
+                        logger.info(
+                            "Iteration %d: Quality = %.2f, value score = %.2f "
+                            "(threshold = %.2f, cost penalty = %.2f, iteration penalty = %.2f)",
+                            iteration,
+                            quality_score,
+                            score,
+                            quality_threshold,
+                            value_score.cost_penalty,
+                            value_score.iteration_penalty,
+                        )
+
+                    if best_code is None or score > best_score:
+                        best_score = score
+                        best_quality_score = quality_score
+                        best_value_score = score
+                        best_code = code
+                        best_feedback = judge_result.feedback_dict()
+                        best_score_breakdown = value_score.to_dict()
+                        best_runtime_valid = True
+                        best_runtime_logs = runtime_logs
+                        best_screenshot_paths = list(screenshot_paths)
+                        best_project_dir = eval_dir
+
+                    if score >= quality_threshold:
+                        logger.info("Value threshold met! Accepting app.")
+                        result.score = score
+                        result.quality_score = quality_score
+                        result.value_score = score
+                        result.score_breakdown = value_score.to_dict()
+                        result.judge_feedback = judge_result.feedback_dict()
+                        result.runtime_valid = True
+                        result.runtime_logs = runtime_logs
+                        result.passed = True
+                        stop_reason = "judge_passed"
+                        break
+
+                    if (
+                        iteration > 1
+                        and previous_iteration_code
+                        and code.strip() == previous_iteration_code.strip()
+                    ):
+                        logger.info("Model submitted unchanged code on iteration %d", iteration)
+                        stop_reason = "model_submitted"
+                        break
+
+                    # Prepare refinement prompt for next iteration
+                    if iteration < max_iterations:
+                        from .prompts import build_refinement_prompt
+
+                        current_prompt = build_refinement_prompt(
+                            prompt,
+                            judge_result.feedback_dict(),
+                            iteration,
+                            previous_code=code,
+                            runtime_logs=runtime_logs,
+                            validation_passed=runtime_valid,
+                            max_iterations=max_iterations,
+                        )
+                        logger.info("Preparing refinement prompt for next iteration")
+                    else:
+                        stop_reason = "budget_exhausted"
+
+                except Exception as exc:
+                    logger.warning("Judge failed: %s", exc)
                     if best_code is None:
                         best_code = code
                         best_runtime_valid = True
                         best_runtime_logs = runtime_logs
                         best_score = 0.0
-                        best_quality_score = 0.0
+                        best_quality_score = None
+                        best_value_score = None
                         best_screenshot_paths = list(screenshot_paths)
-                    break
-                if not judge_models:
-                    # No judging configured: the screenshot is cosmetic.
-                    # Don't retry, don't fail — just record it and move on.
-                    logger.warning(
-                        "Iteration %d: %s No judge configured, so the "
-                        "missing screenshot is non-fatal; proceeding.",
-                        iteration,
-                        exc,
-                    )
-                    screenshot_paths = []
-                elif iteration == max_iterations:
-                    # Final iteration: don't hard-fail the whole run just
-                    # because the screenshot pipeline broke. Proceed with
-                    # code-only judging so we still get a usable result.
-                    logger.warning(
-                        "Iteration %d: %s Proceeding with code-only "
-                        "judging (no screenshot available).",
-                        iteration,
-                        exc,
-                    )
-                    screenshot_paths = []
-                else:
-                    # Recoverable: next iteration will retry with a prompt
-                    # asking the agent to take its own screenshot.
-                    logger.warning(
-                        "Iteration %d: %s Retrying with screenshot-focused "
-                        "prompt for the next iteration.",
-                        iteration,
-                        exc,
-                    )
-                    current_prompt = (
-                        f"Your previous attempt failed: {exc}. "
-                        "Ensure your app runs locally without errors, and that you "
-                        "successfully run the screenshot tool before finishing."
-                    )
-                    continue
+                        best_project_dir = eval_dir
+            else:
+                # No judge — accept the app as soon as it runs cleanly. The
+                # no-judge arm only iterates again when the app is actually
+                # broken, using the captured server logs as the fix signal.
+                best_code = code
+                best_runtime_valid = runtime_valid
+                best_runtime_logs = runtime_logs
+                best_score = 1.0 if runtime_valid else 0.0
+                best_quality_score = None
+                best_value_score = None
+                best_screenshot_paths = list(screenshot_paths)
+                best_project_dir = eval_dir
 
-        # --- Step 4: Judge ---
-        if judge_models:
-            try:
-                from .judge import judge_app_with_models
-
-                with Timer() as judge_timer:
-                    judge_result = judge_app_with_models(
-                        code,
-                        judge_models,
-                        screenshot_paths or None,
-                        prompt,
-                        "r" if framework_key == "shiny_r" else "python",
-                    )
-                if not judge_result.scores:
-                    # A judge outage must not discard an app that already
-                    # passed runtime validation; preserve it for the caller.
-                    logger.warning(
-                        "All judges failed in iteration %d; preserving the "
-                        "runtime-valid app without a quality score",
-                        iteration,
-                    )
-                    if best_code is None:
-                        best_code = code
-                        best_runtime_valid = runtime_valid
-                        best_runtime_logs = runtime_logs
-                        best_score = 0.0
-                        best_quality_score = 0.0
-                        best_screenshot_paths = list(screenshot_paths)
-                    result.runtime_valid = runtime_valid
-                    # Preserve the artifact, but do not count an unscored
-                    # judge outage as a quality pass.
-                    result.passed = False
-                    break
-                # Attribute token usage per judge so the cost breakdown stays
-                # accurate when more than one judge runs. Fall back to the
-                # merged totals if per-judge attribution is unavailable.
-                if judge_result.per_judge:
-                    elapsed_share = judge_timer.elapsed / max(
-                        len(judge_result.per_judge), 1
-                    )
-                    for entry in judge_result.per_judge:
-                        if "error" in entry:
-                            continue
-                        result.usage.add(
-                            stage="judge",
-                            model=str(entry.get("model", judge_models[0])),
-                            input_tokens=int(entry.get("input_tokens", 0) or 0),
-                            output_tokens=int(entry.get("output_tokens", 0) or 0),
-                            elapsed=elapsed_share,
-                            iteration=iteration,
-                        )
-                else:
-                    result.usage.add(
-                        stage="judge",
-                        model=judge_models[0],
-                        input_tokens=judge_result.input_tokens,
-                        output_tokens=judge_result.output_tokens,
-                        elapsed=judge_timer.elapsed,
-                        iteration=iteration,
-                    )
-                quality_score = judge_result.composite
-                value_score = calculate_value_score(
-                    quality_score=quality_score,
-                    iterations=iteration,
-                    generation_cost=result.usage.generation_cost,
-                )
-                score = value_score.value_score
-                if len(judge_models) > 1:
-                    panel_breakdown = ", ".join(
-                        f"{entry.get('model')}={entry.get('composite', 0):.2f}"
-                        for entry in judge_result.per_judge
-                        if "error" not in entry
-                    )
-                    logger.info(
-                        "Iteration %d: Panel quality = %.2f, value score = %.2f "
-                        "(threshold = %.2f, cost penalty = %.2f, iteration penalty = %.2f) [%s]",
-                        iteration,
-                        quality_score,
-                        score,
-                        quality_threshold,
-                        value_score.cost_penalty,
-                        value_score.iteration_penalty,
-                        panel_breakdown or "no judges responded",
-                    )
-                else:
-                    logger.info(
-                        "Iteration %d: Quality = %.2f, value score = %.2f "
-                        "(threshold = %.2f, cost penalty = %.2f, iteration penalty = %.2f)",
-                        iteration,
-                        quality_score,
-                        score,
-                        quality_threshold,
-                        value_score.cost_penalty,
-                        value_score.iteration_penalty,
-                    )
-
-                if best_code is None or score > best_score:
-                    best_score = score
-                    best_quality_score = quality_score
-                    best_code = code
-                    best_feedback = judge_result.feedback_dict()
-                    best_score_breakdown = value_score.to_dict()
-                    best_runtime_valid = True
-                    best_runtime_logs = runtime_logs
-                    best_screenshot_paths = list(screenshot_paths)
-
-                if score >= quality_threshold:
-                    logger.info("Value threshold met! Accepting app.")
-                    result.score = score
-                    result.quality_score = quality_score
-                    result.value_score = score
-                    result.score_breakdown = value_score.to_dict()
-                    result.judge_feedback = judge_result.feedback_dict()
-                    result.runtime_valid = True
-                    result.runtime_logs = runtime_logs
+                if runtime_valid:
                     result.passed = True
+                    result.score = best_score
+                    result.quality_score = None
+                    result.value_score = None
+                    stop_reason = "functional_passed"
                     break
 
-                # Prepare refinement prompt for next iteration
+                # App is broken — refine against the server logs if budget remains.
                 if iteration < max_iterations:
-                    from .prompts import build_refinement_prompt
+                    from .prompts import build_runtime_refinement_prompt
 
-                    current_prompt = build_refinement_prompt(
+                    current_prompt = build_runtime_refinement_prompt(
                         prompt,
-                        judge_result.feedback_dict(),
-                        iteration,
                         previous_code=code,
                         runtime_logs=runtime_logs,
-                        validation_passed=runtime_valid,
+                        iteration=iteration,
+                        max_iterations=max_iterations,
                     )
-                    logger.info("Preparing refinement prompt for next iteration")
+                    logger.info(
+                        "Preparing runtime-log refinement prompt for next iteration"
+                    )
+                    previous_iteration_code = code
+                    continue
 
-            except Exception as exc:
-                logger.warning("Judge failed: %s", exc)
-                if best_code is None:
-                    best_code = code
-                    best_runtime_valid = True
-                    best_runtime_logs = runtime_logs
-                    best_score = 0.0
-                    best_quality_score = 0.0
-                    best_screenshot_paths = list(screenshot_paths)
-        else:
-            # No judge — accept the app as soon as it runs cleanly. The
-            # no-judge arm only iterates again when the app is actually
-            # broken, using the captured server logs as the fix signal.
-            best_code = code
-            best_runtime_valid = runtime_valid
-            best_runtime_logs = runtime_logs
-            best_score = 10.0 if runtime_valid else 0.0
-            best_quality_score = best_score
-            best_screenshot_paths = list(screenshot_paths)
-
-            if runtime_valid:
-                result.passed = True
+                result.passed = False
                 result.score = best_score
-                result.quality_score = best_quality_score
-                result.value_score = best_score
+                result.quality_score = None
+                result.value_score = None
+                stop_reason = "runtime_failed"
                 break
 
-            # App is broken — refine against the server logs if budget remains.
-            if iteration < max_iterations:
-                from .prompts import build_runtime_refinement_prompt
+            previous_iteration_code = code
 
-                current_prompt = build_runtime_refinement_prompt(
-                    prompt,
-                    previous_code=code,
-                    runtime_logs=runtime_logs,
-                    iteration=iteration,
-                )
-                logger.info(
-                    "Preparing runtime-log refinement prompt for next iteration"
-                )
-                continue
+        # --- Step 5: Copy final app to output ---
+        if best_code:
+            if best_project_dir is not None and best_project_dir.exists():
+                _copy_project_tree(best_project_dir, output_path)
+            final_app = output_path / artifact_name
+            final_app.write_text(best_code, encoding="utf-8")
 
-            result.passed = False
-            result.score = best_score
-            result.quality_score = best_quality_score
-            result.value_score = best_score
-            break
+            # Copy data files
+            if data_files:
+                for fname, content in data_files.items():
+                    (output_path / fname).write_text(content, encoding="utf-8")
 
-    # --- Step 5: Copy final app to output ---
-    if best_code:
-        final_app = output_path / artifact_name
-        final_app.write_text(best_code, encoding="utf-8")
+            # Copy screenshots and update paths to point to output dir
+            result.screenshot_paths = _copy_output_screenshots(
+                output_path,
+                best_screenshot_paths,
+            )
 
-        # Copy data files
-        if data_files:
-            for fname, content in data_files.items():
-                (output_path / fname).write_text(content, encoding="utf-8")
+            result.app_dir = output_path
+            result.source_code = best_code
+            if best_runtime_valid is not None:
+                result.runtime_valid = best_runtime_valid
+                result.runtime_logs = best_runtime_logs
+            result.functional_valid = bool(best_runtime_valid)
 
-        # Copy screenshots and update paths to point to output dir
-        result.screenshot_paths = _copy_output_screenshots(
+            if not judge_models and best_runtime_valid is not None:
+                result.passed = best_runtime_valid
+                result.score = best_score
+                result.quality_score = None
+                result.value_score = None
+            elif not result.passed:
+                result.score = best_score
+                result.quality_score = best_quality_score
+                result.value_score = best_value_score
+                result.score_breakdown = best_score_breakdown
+                result.judge_feedback = best_feedback
+
+            logger.info(
+                "Final app written to %s (score=%.2f, iterations=%d)",
+                output_path,
+                result.score,
+                result.iterations,
+            )
+        else:
+            if result.error is None:
+                result.error = "No valid app code generated in any iteration"
+            stop_reason = "generation_failed"
+
+        result.first_attempt_valid = first_attempt_valid
+        result.repair_attempted = repair_attempted
+        result.repair_succeeded = repair_succeeded
+        result.stop_reason = stop_reason or "budget_exhausted"
+
+        _write_run_summary(
             output_path,
-            best_screenshot_paths,
+            result,
+            prompt=prompt,
+            requested_model=model,
+            resolved_model_id=model_id,
+            agent=agent,
+            framework_key=framework_key,
+            artifact_name=artifact_name,
+            judge_models=judge_models,
+            data_file_names=list(data_files or {}),
+            data_files=data_files,
+            use_skills=use_skills,
+            web_fetch=web_fetch,
         )
 
-        result.app_dir = output_path
-        result.source_code = best_code
-        if best_runtime_valid is not None:
-            result.runtime_valid = best_runtime_valid
-            result.runtime_logs = best_runtime_logs
-        if not judge_models and best_runtime_valid is not None:
-            result.passed = best_runtime_valid
-            result.score = best_score
-            result.quality_score = best_quality_score
-            result.value_score = best_score
-        elif not result.passed:
-            result.score = best_score
-            result.quality_score = best_quality_score
-            result.value_score = best_score
-            result.score_breakdown = best_score_breakdown
-            result.judge_feedback = best_feedback
-
-        logger.info(
-            "Final app written to %s (score=%.2f, iterations=%d)",
-            output_path,
-            result.score,
-            result.iterations,
-        )
-    else:
-        if result.error is None:
-            result.error = "No valid app code generated in any iteration"
-
-    _write_run_summary(
-        output_path,
-        result,
-        prompt=prompt,
-        requested_model=model,
-        resolved_model_id=model_id,
-        agent=agent,
-        framework_key=framework_key,
-        artifact_name=artifact_name,
-        judge_models=judge_models,
-        data_file_names=list(data_files or {}),
-        use_skills=use_skills,
-        web_fetch=web_fetch,
-    )
-
-    return result
+        return result
+    finally:
+        for td in temp_dirs_to_clean:
+            shutil.rmtree(td, ignore_errors=True)
 
 
 def _run_local_generation(
@@ -1351,7 +1533,7 @@ def _run_local_generation(
     iteration: int,
     output_path: Path | None = None,
     use_skills: bool = True,
-) -> tuple[str | None, list[_GenerationUsageRow], bool]:
+) -> tuple[str | None, list[_GenerationUsageRow], bool, Path | None]:
     """Generate a Shiny artifact on the host via LM Studio (no Docker).
 
     Host-side counterpart of :func:`_run_generation` for local LM Studio
@@ -1438,10 +1620,12 @@ def _run_local_generation(
                     lambda: asyncio.run(generate_on_host())
                 ).result()
 
-        return code, cast(list[_GenerationUsageRow], usage_rows), hit_token_limit
+        temp_proj = Path(tempfile.mkdtemp(prefix=f"shinygen_local_proj_{iteration}_"))
+        _copy_project_tree(work_dir, temp_proj)
+        return code, cast(list[_GenerationUsageRow], usage_rows), hit_token_limit, temp_proj
     except Exception as exc:
         logger.error("Local generation failed in iteration %d: %s", iteration, exc)
-        return None, [], False
+        return None, [], False, None
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
 
@@ -1459,7 +1643,7 @@ def _run_generation(
     output_path: Path | None = None,
     *,
     use_skills: bool = True,
-) -> tuple[str | None, list[_GenerationUsageRow], bool]:
+) -> tuple[str | None, list[_GenerationUsageRow], bool, Path | None]:
     """Run a single generation via Inspect AI and extract the code.
 
     LM Studio models bypass the Docker/Inspect-Task path entirely and run
@@ -1532,7 +1716,7 @@ def _run_generation(
 
         if not logs:
             logger.warning("Iteration %d: No eval logs produced", iteration)
-            return None, [], False
+            return None, [], False, None
 
         log = logs[0]
         location = getattr(log, "location", None)
@@ -1552,21 +1736,31 @@ def _run_generation(
                         iteration,
                         len(code),
                     )
-                    return code, generation_usage_rows, False
+                    temp_proj = Path(
+                        tempfile.mkdtemp(prefix=f"shinygen_proj_{iteration}_")
+                    )
+                    _copy_project_tree(artifact_path.parent, temp_proj)
+                    return code, generation_usage_rows, False, temp_proj
 
         # Strategy 2: Extract from eval log messages (fallback).
         if log_path:
             code_map = extract_from_log(log_path)
             if code_map:
-                if len(code_map) == 1:
-                    return next(iter(code_map.values())), generation_usage_rows, False
-                if "shinygen/generate" in code_map:
-                    return code_map["shinygen/generate"], generation_usage_rows, False
-                return next(iter(code_map.values())), generation_usage_rows, False
+                code_to_return = (
+                    code_map.get("shinygen/generate")
+                    if "shinygen/generate" in code_map
+                    else next(iter(code_map.values()))
+                )
+                if code_to_return:
+                    temp_proj = Path(
+                        tempfile.mkdtemp(prefix=f"shinygen_proj_{iteration}_")
+                    )
+                    (temp_proj / artifact_name).write_text(code_to_return, encoding="utf-8")
+                    return code_to_return, generation_usage_rows, False, temp_proj
 
         logger.warning("Iteration %d: No code extracted", iteration)
 
-        return None, generation_usage_rows, _log_hit_output_token_limit(log_path)
+        return None, generation_usage_rows, _log_hit_output_token_limit(log_path), None
 
     except Exception as exc:
         logger.error("Generation failed in iteration %d: %s", iteration, exc)
@@ -1582,12 +1776,17 @@ def _run_generation(
                 artifact_name,
                 iteration,
             )
+            temp_proj = Path(
+                tempfile.mkdtemp(prefix=f"shinygen_proj_{iteration}_")
+            )
+            (temp_proj / artifact_name).write_text(recovered_code, encoding="utf-8")
             return (
                 recovered_code,
                 generation_usage_rows,
                 _log_hit_output_token_limit(log_path),
+                temp_proj,
             )
-        return None, generation_usage_rows, _log_hit_output_token_limit(log_path)
+        return None, generation_usage_rows, _log_hit_output_token_limit(log_path), None
     finally:
         if output_path is not None:
             copied_agent_screenshot = _copy_agent_screenshot_artifact(

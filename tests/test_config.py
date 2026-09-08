@@ -378,8 +378,8 @@ class TestCheckAPIKey:
             set_opencode_go_session_id(None)
             assert OPENCODE_GO_SESSION_ID_ENV not in os.environ
 
-    @pytest.mark.asyncio
-    async def test_httpx_async_client_injects_opencode_session_header(self):
+    def test_httpx_async_client_injects_opencode_session_header(self):
+        import asyncio
         import httpx
 
         received_headers: dict[str, str] = {}
@@ -388,15 +388,17 @@ class TestCheckAPIKey:
             received_headers.update(dict(request.headers))
             return httpx.Response(200, json={"ok": True})
 
-        transport = httpx.MockTransport(handler)
-        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_test999"}):
-            async with httpx.AsyncClient(transport=transport) as client:
-                await client.post("https://opencode.ai/zen/go/v1/chat/completions", json={})
+        async def _run():
+            transport = httpx.MockTransport(handler)
+            with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_test999"}):
+                async with httpx.AsyncClient(transport=transport) as client:
+                    await client.post("https://opencode.ai/zen/go/v1/chat/completions", json={})
 
+        asyncio.run(_run())
         assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_test999"
 
-    @pytest.mark.asyncio
-    async def test_httpx_async_client_preserves_existing_opencode_session_header(self):
+    def test_httpx_async_client_preserves_existing_opencode_session_header(self):
+        import asyncio
         import httpx
 
         received_headers: dict[str, str] = {}
@@ -405,19 +407,21 @@ class TestCheckAPIKey:
             received_headers.update(dict(request.headers))
             return httpx.Response(200, json={"ok": True})
 
-        transport = httpx.MockTransport(handler)
-        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_default"}):
-            async with httpx.AsyncClient(transport=transport) as client:
-                await client.post(
-                    "https://opencode.ai/zen/go/v1/chat/completions",
-                    headers={OPENCODE_GO_SESSION_HEADER: "ses_explicit"},
-                    json={},
-                )
+        async def _run():
+            transport = httpx.MockTransport(handler)
+            with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_default"}):
+                async with httpx.AsyncClient(transport=transport) as client:
+                    await client.post(
+                        "https://opencode.ai/zen/go/v1/chat/completions",
+                        headers={OPENCODE_GO_SESSION_HEADER: "ses_explicit"},
+                        json={},
+                    )
 
+        asyncio.run(_run())
         assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_explicit"
 
-    @pytest.mark.asyncio
-    async def test_httpx_async_client_skips_non_opencode_urls(self):
+    def test_httpx_async_client_skips_non_opencode_urls(self):
+        import asyncio
         import httpx
 
         received_headers: dict[str, str] = {}
@@ -426,11 +430,13 @@ class TestCheckAPIKey:
             received_headers.update(dict(request.headers))
             return httpx.Response(200, json={"ok": True})
 
-        transport = httpx.MockTransport(handler)
-        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_test999"}):
-            async with httpx.AsyncClient(transport=transport) as client:
-                await client.post("https://api.openai.com/v1/chat/completions", json={})
+        async def _run():
+            transport = httpx.MockTransport(handler)
+            with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_test999"}):
+                async with httpx.AsyncClient(transport=transport) as client:
+                    await client.post("https://api.openai.com/v1/chat/completions", json={})
 
+        asyncio.run(_run())
         assert OPENCODE_GO_SESSION_HEADER not in received_headers
 
     def test_httpx_sync_client_injects_opencode_session_header(self):

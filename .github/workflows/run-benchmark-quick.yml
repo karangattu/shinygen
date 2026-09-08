@@ -111,6 +111,10 @@ on:
         required: true
         default: false
         type: boolean
+      replicate:
+        description: "Replicate ID for seed/variance tracking"
+        required: false
+        default: "1"
 
 concurrency:
   group: benchmark-quick-${{ github.workflow }}-${{ inputs.framework }}-${{ inputs.model }}
@@ -130,6 +134,7 @@ env:
   BENCHMARK_QUALITY_THRESHOLD: ${{ inputs.quality_threshold || '7.0' }}
   SHINYGEN_REQUIRE_SCREENSHOTS_FOR_JUDGE: "1"
   SHINYGEN_STRICT_SANDBOX_SCREENSHOT: "1"
+  SHINYGEN_REPLICATE: ${{ inputs.replicate || '1' }}
 
 jobs:
   prepare:
