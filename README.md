@@ -5,44 +5,57 @@ Generate, evaluate, and refine Shiny apps using LLM agents (Claude Code, Codex C
 ## Architecture
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, Arial, sans-serif'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, system-ui, -apple-system, sans-serif' }}}%%
 flowchart TD
     %% Color Palette Definitions
-    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,border-radius:8px
-    classDef core fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a,border-radius:8px
-    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87,border-radius:8px
-    classDef validation fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,border-radius:8px
-    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337,border-radius:8px
-    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d,border-radius:8px
+    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    classDef setup fill:#f8fafc,stroke:#64748b,stroke-width:2px,color:#334155
+    classDef agent fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87
+    classDef test fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+    classDef judge fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337
+    classDef loop fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#1e293b
+    classDef done fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
 
-    A["👤 User Request<br/>(Prompt + Dataset + Flags)"]:::input --> B["shinygen API / CLI"]:::core
-    
-    B --> C["Start Iteration Loop"]:::core
-    
-    subgraph Sandbox["Docker Sandbox Execution"]
+    %% 1. User Input & Setup
+    User(["👤 <b>User Request</b><br/>Dataset CSV + Prompt"]):::input
+    User --> Setup["⚙️ <b>shinygen Setup</b><br/>Selects framework (Python/R), AI model & evaluation flags"]:::setup
+
+    %% 2. Docker Sandbox Generation
+    subgraph Sandbox["🐳 Isolated Docker Sandbox"]
         direction TB
-        C --> D["Inject Framework Skills & Context"]:::agent
-        D --> E["LLM Agent Writes Code<br/>(Claude Code / Codex / OpenCode Go)"]:::agent
+        Skills("✨ <b>Design Skills & Guidelines</b><br/>UI layout patterns, thematic palettes & data schema"):::agent
+        Coder("🤖 <b>AI Coding Agent</b><br/>Generates Shiny Python or R code inside sandbox"):::agent
+        Skills --> Coder
     end
-    
-    E --> F["Host-side Runtime Validation<br/>(Unconditionally Starts App & Captures Logs)"]:::validation
-    
-    F --> G{"Screenshots<br/>Enabled?"}:::validation
-    G -- Yes --> H["Host Playwright Captures UI"]:::validation
-    G -- No --> I{"Judge Model<br/>Enabled?"}:::judge
-    H --> I
-    
-    I -- Yes --> J["LLM Judge Panel Evaluates<br/>(Scores Code + Visuals 1-10)"]:::judge
-    J --> K{"Meets Quality<br/>Threshold?"}:::judge
-    
-    I -- No --> L{"App Started<br/>Successfully?"}:::validation
-    
-    K -- No --> M["Construct Refinement Feedback<br/>(Judge Critiques + Server Error Logs)"]:::core
-    L -- No --> M
-    M --> C
-    
-    K -- Yes --> N["✅ Save Artifacts<br/>(Code, Logs, Screenshots, Summary)"]:::output
-    L -- Yes --> N
+    Setup --> Skills
+
+    %% 3. Automated Health Check & Visuals
+    subgraph Verify["⚡ Live Verification & Screenshots"]
+        direction TB
+        Launch("🚀 <b>Live App Health Check</b><br/>Boots Shiny server to test syntax & capture runtime logs"):::test
+        Snap("📸 <b>Capture Live UI Visuals</b><br/>Headless browser captures full-page dashboard screenshots"):::test
+        Launch -->|"App Runs Clean"| Snap
+    end
+    Coder --> Launch
+
+    %% 4. Multimodal AI Judge
+    subgraph Quality["⚖️ Quality Evaluation"]
+        direction TB
+        Judge("🎨 <b>Multimodal AI Judge</b><br/>Evaluates visual polish, charts & code quality (1–10)"):::judge
+        Check{"Quality Meets<br/>Target Score?"}:::judge
+        Judge --> Check
+    end
+    Snap --> Judge
+
+    %% 5. Self-Healing Refinement Loop or Success
+    Feedback("🔄 <b>Auto-Fix & Refine Loop</b><br/>Feeds console errors & judge feedback into next attempt"):::loop
+    Launch -->|"App Crashed"| Feedback
+    Check -- "❌ Needs Polish" --> Feedback
+    Feedback -.->|"Retry in Sandbox"| Coder
+
+    Success(["✅ <b>Production-Ready Shiny Dashboard</b><br/>Tested app code (app.py / app.R) • Screenshots • Cost & Quality Report"]):::done
+    Check -- "✔️ Quality Passed" --> Success
+    Snap -->|"Judging Disabled"| Success
 ```
 
 For full documentation — installation, CLI, Python API, batch mode, GitHub Actions, model aliases, skills, and data inputs — see the published docs:

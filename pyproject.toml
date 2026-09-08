@@ -69,3 +69,11 @@ typeCheckingMode = "basic"
 include = ["src", "tests"]
 venvPath = "."
 venv = ".venv"
+
+[tool.ruff]
+extend-exclude = [
+    "shinygen-*",
+    "eval_runs",
+    "gha_runs",
+    "scripts",
+]
