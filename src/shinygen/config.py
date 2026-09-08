@@ -74,27 +74,42 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 
-# OpenCode Go models that expose OpenAI-compatible chat completions endpoints.
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "glm-5.3",
     "glm-5.3-flash",
+    "glm-5.2",
+    "glm-5.1",
+    "glm-5",
     "kimi-k3",
     "kimi-k2.7-code",
+    "kimi-k2.6",
+    "kimi-k2.5",
     "deepseek-v4-pro",
     "deepseek-v4-flash",
     "deepseek-v4-flash-vision-exp",
     "mimo-v2.5-pro",
     "mimo-v2.5",
+    "mimo-v2-pro",
+    "mimo-v2-omni",
     "qwen3.8-flash",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+    "grok-4.6",
     "grok-4.5",
     "hy4-preview",
+    "hy3",
     "longcat-2.0",
+    "muse-spark-1.3-contributor",
+    "muse-spark-1.2-contributor",
 )
 
-# OpenCode Go MiniMax & Qwen Max models that expose Anthropic-compatible messages endpoint.
 OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
     "minimax-m3",
+    "minimax-m2.7",
+    "minimax-m2.5",
     "qwen3.8-max",
+    "qwen3.7-max",
+    "qwen3.7-plus",
 )
 
 
@@ -116,6 +131,18 @@ def _register_opencode_go_aliases() -> None:
             f"opencode-go-{model_name}",
         ):
             MODEL_ALIASES.setdefault(alias, ("opencode", inspect_model_id))
+
+    for prefix, target in (
+        ("muse-contributor-1.3", "muse-spark-1.3-contributor"),
+        ("muse-spark-1.3", "muse-spark-1.3-contributor"),
+        ("muse-1.3-contributor", "muse-spark-1.3-contributor"),
+        ("muse-contributor-1.2", "muse-spark-1.2-contributor"),
+        ("muse-spark-1.2", "muse-spark-1.2-contributor"),
+        ("muse-1.2-contributor", "muse-spark-1.2-contributor"),
+    ):
+        target_id = f"openai-api/opencode-go/{target}"
+        for alias in (prefix, f"opencode-go/{prefix}", f"opencode-go-{prefix}"):
+            MODEL_ALIASES.setdefault(alias, ("opencode", target_id))
 
 
 _register_opencode_go_aliases()

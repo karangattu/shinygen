@@ -11,10 +11,68 @@ on:
         options:
           - shiny_python
           - shiny_r
-      models:
-        description: "Comma-separated list of models to benchmark"
+      model_selection:
+        description: "Model selection (preset suite or individual model)"
         required: true
-        default: "claude-opus-5, claude-sonnet-5, claude-haiku-4-5, gemini-3.7-flash, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, deepseek-v4-pro, deepseek-v4-flash, glm-5.3, glm-5.3-flash, kimi-k3, kimi-k2.7-code, mimo-v2.5-pro, mimo-v2.5, minimax-m3, qwen3.8-max, qwen3.8-flash, grok-4.5"
+        default: opencode-go-all
+        type: choice
+        options:
+          - opencode-go-all
+          - opencode-go-flagship
+          - opencode-go-fast
+          - opencode-go-muse
+          - opencode-go-deepseek
+          - opencode-go-qwen
+          - opencode-go-glm
+          - opencode-go-kimi
+          - opencode-go-minimax
+          - opencode-go-mimo
+          - frontier-all
+          - all-models
+          - muse-spark-1.3-contributor
+          - muse-spark-1.2-contributor
+          - deepseek-v4-pro
+          - deepseek-v4-flash
+          - deepseek-v4-flash-vision-exp
+          - glm-5.3
+          - glm-5.3-flash
+          - glm-5.2
+          - glm-5.1
+          - glm-5
+          - kimi-k3
+          - kimi-k2.7-code
+          - kimi-k2.6
+          - kimi-k2.5
+          - minimax-m3
+          - minimax-m2.7
+          - minimax-m2.5
+          - mimo-v2.5-pro
+          - mimo-v2.5
+          - mimo-v2-pro
+          - mimo-v2-omni
+          - qwen3.8-max
+          - qwen3.8-flash
+          - qwen3.7-max
+          - qwen3.7-plus
+          - qwen3.6-plus
+          - qwen3.5-plus
+          - grok-4.6
+          - grok-4.5
+          - hy4-preview
+          - hy3
+          - longcat-2.0
+          - claude-opus-5
+          - claude-sonnet-5
+          - claude-haiku-4-5
+          - gemini-3.7-flash
+          - gpt-5.6-sol
+          - gpt-5.6-terra
+          - gpt-5.6-luna
+          - custom
+      custom_models:
+        description: "Comma-separated models (only used when model_selection is 'custom')"
+        required: false
+        default: ""
       arm:
         description: "Benchmark arm (skills or vanilla)"
         required: true
@@ -92,7 +150,8 @@ jobs:
           RAW_BENCHMARK_PROMPT: ${{ inputs.benchmark_prompt }}
           RAW_CHALLENGE: ${{ inputs.challenge }}
           RAW_DATASET: ${{ inputs.dataset }}
-          RAW_MODELS: ${{ inputs.models }}
+          RAW_MODEL_SELECTION: ${{ inputs.model_selection }}
+          RAW_CUSTOM_MODELS: ${{ inputs.custom_models }}
           RAW_ARM: ${{ inputs.arm }}
         run: |
           set -euo pipefail
@@ -133,12 +192,193 @@ jobs:
           fi
 
           models_json="[]"
-          IFS=',' read -ra ADDR <<< "${RAW_MODELS}"
-          for i in "${ADDR[@]}"; do
-            trimmed=$(echo "${i}" | xargs)
-            if [[ -n "${trimmed}" ]]; then
-              models_json=$(echo "${models_json}" | jq -c --arg val "${trimmed}" '. += [$val]')
-            fi
+          selection="${RAW_MODEL_SELECTION}"
+
+          case "${selection}" in
+            opencode-go-all)
+              models_list=(
+                "muse-spark-1.3-contributor"
+                "muse-spark-1.2-contributor"
+                "deepseek-v4-pro"
+                "deepseek-v4-flash"
+                "deepseek-v4-flash-vision-exp"
+                "glm-5.3"
+                "glm-5.3-flash"
+                "glm-5.2"
+                "glm-5.1"
+                "glm-5"
+                "kimi-k3"
+                "kimi-k2.7-code"
+                "kimi-k2.6"
+                "kimi-k2.5"
+                "minimax-m3"
+                "minimax-m2.7"
+                "minimax-m2.5"
+                "mimo-v2.5-pro"
+                "mimo-v2.5"
+                "mimo-v2-pro"
+                "mimo-v2-omni"
+                "qwen3.8-max"
+                "qwen3.8-flash"
+                "qwen3.7-max"
+                "qwen3.7-plus"
+                "qwen3.6-plus"
+                "qwen3.5-plus"
+                "grok-4.6"
+                "grok-4.5"
+                "hy4-preview"
+                "hy3"
+                "longcat-2.0"
+              )
+              ;;
+            opencode-go-flagship)
+              models_list=(
+                "deepseek-v4-pro"
+                "qwen3.8-max"
+                "glm-5.3"
+                "kimi-k3"
+                "minimax-m3"
+                "mimo-v2.5-pro"
+                "grok-4.6"
+                "muse-spark-1.3-contributor"
+              )
+              ;;
+            opencode-go-fast)
+              models_list=(
+                "deepseek-v4-flash"
+                "glm-5.3-flash"
+                "qwen3.8-flash"
+                "mimo-v2.5"
+                "hy3"
+                "muse-spark-1.2-contributor"
+              )
+              ;;
+            opencode-go-muse)
+              models_list=(
+                "muse-spark-1.3-contributor"
+                "muse-spark-1.2-contributor"
+              )
+              ;;
+            opencode-go-deepseek)
+              models_list=(
+                "deepseek-v4-pro"
+                "deepseek-v4-flash"
+                "deepseek-v4-flash-vision-exp"
+              )
+              ;;
+            opencode-go-qwen)
+              models_list=(
+                "qwen3.8-max"
+                "qwen3.8-flash"
+                "qwen3.7-max"
+                "qwen3.7-plus"
+                "qwen3.6-plus"
+                "qwen3.5-plus"
+              )
+              ;;
+            opencode-go-glm)
+              models_list=(
+                "glm-5.3"
+                "glm-5.3-flash"
+                "glm-5.2"
+                "glm-5.1"
+                "glm-5"
+              )
+              ;;
+            opencode-go-kimi)
+              models_list=(
+                "kimi-k3"
+                "kimi-k2.7-code"
+                "kimi-k2.6"
+                "kimi-k2.5"
+              )
+              ;;
+            opencode-go-minimax)
+              models_list=(
+                "minimax-m3"
+                "minimax-m2.7"
+                "minimax-m2.5"
+              )
+              ;;
+            opencode-go-mimo)
+              models_list=(
+                "mimo-v2.5-pro"
+                "mimo-v2.5"
+                "mimo-v2-pro"
+                "mimo-v2-omni"
+              )
+              ;;
+            frontier-all)
+              models_list=(
+                "claude-opus-5"
+                "claude-sonnet-5"
+                "claude-haiku-4-5"
+                "gemini-3.7-flash"
+                "gpt-5.6-sol"
+                "gpt-5.6-terra"
+                "gpt-5.6-luna"
+              )
+              ;;
+            all-models)
+              models_list=(
+                "claude-opus-5"
+                "claude-sonnet-5"
+                "claude-haiku-4-5"
+                "gemini-3.7-flash"
+                "gpt-5.6-sol"
+                "gpt-5.6-terra"
+                "gpt-5.6-luna"
+                "muse-spark-1.3-contributor"
+                "muse-spark-1.2-contributor"
+                "deepseek-v4-pro"
+                "deepseek-v4-flash"
+                "deepseek-v4-flash-vision-exp"
+                "glm-5.3"
+                "glm-5.3-flash"
+                "glm-5.2"
+                "glm-5.1"
+                "glm-5"
+                "kimi-k3"
+                "kimi-k2.7-code"
+                "kimi-k2.6"
+                "kimi-k2.5"
+                "minimax-m3"
+                "minimax-m2.7"
+                "minimax-m2.5"
+                "mimo-v2.5-pro"
+                "mimo-v2.5"
+                "mimo-v2-pro"
+                "mimo-v2-omni"
+                "qwen3.8-max"
+                "qwen3.8-flash"
+                "qwen3.7-max"
+                "qwen3.7-plus"
+                "qwen3.6-plus"
+                "qwen3.5-plus"
+                "grok-4.6"
+                "grok-4.5"
+                "hy4-preview"
+                "hy3"
+                "longcat-2.0"
+              )
+              ;;
+            custom)
+              models_list=()
+              IFS=',' read -ra ADDR <<< "${RAW_CUSTOM_MODELS}"
+              for i in "${ADDR[@]}"; do
+                trimmed=$(echo "${i}" | xargs)
+                if [[ -n "${trimmed}" ]]; then
+                  models_list+=("${trimmed}")
+                fi
+              done
+              ;;
+            *)
+              models_list=("${selection}")
+              ;;
+          esac
+
+          for m in "${models_list[@]}"; do
+            models_json=$(echo "${models_json}" | jq -c --arg val "${m}" '. += [$val]')
           done
 
           if [[ "$(echo "${models_json}" | jq 'length')" -eq 0 ]]; then
@@ -218,7 +458,7 @@ jobs:
             gemini-*)
               needs_gemini=1
               ;;
-            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*)
+            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*|grok-*|hy*|longcat-*|muse-*|opencode-go/*|openai-api/opencode-go/*|anthropic/opencode-go/*)
               needs_opencode_go=1
               ;;
           esac

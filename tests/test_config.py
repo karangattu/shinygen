@@ -107,22 +107,58 @@ class TestResolveModel:
         [
             "glm-5.3",
             "glm-5.3-flash",
+            "glm-5.2",
+            "glm-5.1",
+            "glm-5",
             "kimi-k3",
             "kimi-k2.7-code",
+            "kimi-k2.6",
+            "kimi-k2.5",
             "mimo-v2.5",
             "mimo-v2.5-pro",
+            "mimo-v2-pro",
+            "mimo-v2-omni",
             "minimax-m3",
+            "minimax-m2.7",
+            "minimax-m2.5",
             "qwen3.8-max",
             "qwen3.8-flash",
+            "qwen3.7-max",
+            "qwen3.7-plus",
+            "qwen3.6-plus",
+            "qwen3.5-plus",
             "deepseek-v4-pro",
             "deepseek-v4-flash",
+            "deepseek-v4-flash-vision-exp",
+            "grok-4.6",
             "grok-4.5",
+            "hy4-preview",
+            "hy3",
+            "longcat-2.0",
+            "muse-spark-1.3-contributor",
+            "muse-spark-1.2-contributor",
         ],
     )
     def test_all_documented_opencode_go_aliases_resolve(self, alias):
         agent, model_id = resolve_model(alias)
         assert agent == "opencode"
         assert model_id.endswith(alias)
+
+    @pytest.mark.parametrize(
+        ("alias", "expected_target"),
+        [
+            ("muse-contributor-1.3", "openai-api/opencode-go/muse-spark-1.3-contributor"),
+            ("muse-spark-1.3", "openai-api/opencode-go/muse-spark-1.3-contributor"),
+            ("muse-1.3-contributor", "openai-api/opencode-go/muse-spark-1.3-contributor"),
+            ("muse-contributor-1.2", "openai-api/opencode-go/muse-spark-1.2-contributor"),
+            ("muse-spark-1.2", "openai-api/opencode-go/muse-spark-1.2-contributor"),
+            ("muse-1.2-contributor", "openai-api/opencode-go/muse-spark-1.2-contributor"),
+        ],
+    )
+    def test_muse_convenience_aliases_resolve(self, alias, expected_target):
+        agent, model_id = resolve_model(alias)
+        assert agent == "opencode"
+        assert model_id == expected_target
 
     def test_full_anthropic_opencode_id_uses_opencode(self):
         agent, model_id = resolve_model("anthropic/opencode-go/qwen3.8-max")

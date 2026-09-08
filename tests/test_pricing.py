@@ -377,8 +377,17 @@ class TestOpenCodeGoPricing:
         assert cost is not None
         assert abs(cost - 0.498) < 1e-12
 
-    def test_qwen35_plus_returns_none(self):
-        assert get_pricing("qwen3.5-plus") is None
+    def test_qwen35_plus_known_input_output(self):
+        assert get_pricing("qwen3.5-plus") == (0.20, 1.20)
+
+    def test_muse_known_input_output(self):
+        assert get_pricing("muse-spark-1.3-contributor") == (0.10, 0.20)
+        assert get_pricing("muse-contributor-1.3") == (0.10, 0.20)
+        assert get_pricing("openai-api/opencode-go/muse-spark-1.3-contributor") == (0.10, 0.20)
+        assert get_pricing("muse-spark-1.2-contributor") == (0.10, 0.20)
+        cost = calculate_cost("openai-api/opencode-go/muse-spark-1.3-contributor", 1_000_000, 500_000)
+        assert cost is not None
+        assert abs(cost - (0.10 + 0.10)) < 1e-12
 
     def test_cache_read_uses_per_model_override(self):
         # kimi-k2.6 cache-read price is $0.16/MTok.
@@ -414,27 +423,8 @@ class TestOpenCodeGoPricing:
             OPENCODE_GO_OPENAI_COMPATIBLE_MODELS,
         )
 
-        # Models advertised in config that the smoke test can actually reach
-        # (mimo-v2-pro / mimo-v2-omni are advertised but not in the public
-        # OpenCode Go pricing table, so they are excluded here).
-        priced_models = {
-            "glm-5.2",
-            "glm-5.1",
-            "kimi-k2.6",
-            "kimi-k2.7-code",
-            "deepseek-v4-pro",
-            "deepseek-v4-flash",
-            "mimo-v2.5-pro",
-            "mimo-v2.5",
-            "qwen3.6-plus",
-            "minimax-m2.5",
-            "minimax-m2.7",
-            "minimax-m3",
-            "qwen3.7-max",
-        }
         for model in OPENCODE_GO_OPENAI_COMPATIBLE_MODELS:
-            if model in priced_models:
-                assert get_pricing(model) is not None, model
+            assert get_pricing(model) is not None, model
         for model in OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS:
             assert get_pricing(model) is not None, model
 

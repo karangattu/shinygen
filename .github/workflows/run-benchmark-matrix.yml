@@ -70,18 +70,38 @@ env:
     gpt-5.6-sol
     gpt-5.6-terra
     gpt-5.6-luna
-    glm-5.3
-    glm-5.3-flash
-    kimi-k3
-    kimi-k2.7-code
-    mimo-v2.5
-    mimo-v2.5-pro
-    minimax-m3
-    qwen3.8-max
-    qwen3.8-flash
+    muse-spark-1.3-contributor
+    muse-spark-1.2-contributor
     deepseek-v4-pro
     deepseek-v4-flash
+    deepseek-v4-flash-vision-exp
+    glm-5.3
+    glm-5.3-flash
+    glm-5.2
+    glm-5.1
+    glm-5
+    kimi-k3
+    kimi-k2.7-code
+    kimi-k2.6
+    kimi-k2.5
+    minimax-m3
+    minimax-m2.7
+    minimax-m2.5
+    mimo-v2.5-pro
+    mimo-v2.5
+    mimo-v2-pro
+    mimo-v2-omni
+    qwen3.8-max
+    qwen3.8-flash
+    qwen3.7-max
+    qwen3.7-plus
+    qwen3.6-plus
+    qwen3.5-plus
+    grok-4.6
     grok-4.5
+    hy4-preview
+    hy3
+    longcat-2.0
   BENCHMARK_EXPECTED_ARMS: |
     skills
     vanilla
@@ -191,29 +211,69 @@ jobs:
           - idx: "07"
             name: gpt-5.6-luna
           - idx: "08"
-            name: glm-5.3
+            name: muse-spark-1.3-contributor
           - idx: "09"
-            name: glm-5.3-flash
+            name: muse-spark-1.2-contributor
           - idx: "10"
-            name: kimi-k3
-          - idx: "11"
-            name: kimi-k2.7-code
-          - idx: "12"
-            name: mimo-v2.5
-          - idx: "13"
-            name: mimo-v2.5-pro
-          - idx: "14"
-            name: minimax-m3
-          - idx: "15"
-            name: qwen3.8-max
-          - idx: "16"
-            name: qwen3.8-flash
-          - idx: "17"
             name: deepseek-v4-pro
-          - idx: "18"
+          - idx: "11"
             name: deepseek-v4-flash
+          - idx: "12"
+            name: deepseek-v4-flash-vision-exp
+          - idx: "13"
+            name: glm-5.3
+          - idx: "14"
+            name: glm-5.3-flash
+          - idx: "15"
+            name: glm-5.2
+          - idx: "16"
+            name: glm-5.1
+          - idx: "17"
+            name: glm-5
+          - idx: "18"
+            name: kimi-k3
           - idx: "19"
+            name: kimi-k2.7-code
+          - idx: "20"
+            name: kimi-k2.6
+          - idx: "21"
+            name: kimi-k2.5
+          - idx: "22"
+            name: minimax-m3
+          - idx: "23"
+            name: minimax-m2.7
+          - idx: "24"
+            name: minimax-m2.5
+          - idx: "25"
+            name: mimo-v2.5-pro
+          - idx: "26"
+            name: mimo-v2.5
+          - idx: "27"
+            name: mimo-v2-pro
+          - idx: "28"
+            name: mimo-v2-omni
+          - idx: "29"
+            name: qwen3.8-max
+          - idx: "30"
+            name: qwen3.8-flash
+          - idx: "31"
+            name: qwen3.7-max
+          - idx: "32"
+            name: qwen3.7-plus
+          - idx: "33"
+            name: qwen3.6-plus
+          - idx: "34"
+            name: qwen3.5-plus
+          - idx: "35"
+            name: grok-4.6
+          - idx: "36"
             name: grok-4.5
+          - idx: "37"
+            name: hy4-preview
+          - idx: "38"
+            name: hy3
+          - idx: "39"
+            name: longcat-2.0
         # Control / treatment axis: each (framework, model) cell runs twice,
         # once with the bundled shinygen skill (`skills`) and once vanilla
         # (`vanilla`). Both arms keep web search enabled so the comparison
@@ -290,7 +350,7 @@ jobs:
             gemini-*)
               needs_gemini=1
               ;;
-            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*)
+            glm-*|kimi-*|mimo-*|minimax-*|qwen*|deepseek-*|grok-*|hy*|longcat-*|muse-*|opencode-go/*|openai-api/opencode-go/*|anthropic/opencode-go/*)
               needs_opencode_go=1
               ;;
           esac

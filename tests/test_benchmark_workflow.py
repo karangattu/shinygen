@@ -179,26 +179,44 @@ def test_benchmark_workflows_include_all_documented_opencode_go_models():
     matrix_workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
     quick_workflow = QUICK_WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    for model in [
+    all_opencode_go_models = [
         "glm-5.3",
         "glm-5.3-flash",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5",
         "kimi-k3",
         "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
         "mimo-v2.5",
         "mimo-v2.5-pro",
+        "mimo-v2-pro",
+        "mimo-v2-omni",
         "minimax-m3",
+        "minimax-m2.7",
+        "minimax-m2.5",
         "qwen3.8-max",
         "qwen3.8-flash",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-plus",
+        "qwen3.5-plus",
         "deepseek-v4-pro",
         "deepseek-v4-flash",
+        "deepseek-v4-flash-vision-exp",
+        "grok-4.6",
         "grok-4.5",
-    ]:
+        "hy4-preview",
+        "hy3",
+        "longcat-2.0",
+        "muse-spark-1.3-contributor",
+        "muse-spark-1.2-contributor",
+    ]
+
+    for model in all_opencode_go_models:
         assert f"name: {model}" in matrix_workflow
         assert f"- {model}" in quick_workflow
-
-    for outdated in ["glm-5.2", "minimax-m2.7", "qwen3.7-max", "qwen3.7-plus"]:
-        assert f"name: {outdated}" not in matrix_workflow
-        assert f"- {outdated}" not in quick_workflow
 
     assert "OPENCODE_GO_API_KEY" in matrix_workflow
     assert "OPENCODE_GO_API_KEY" in quick_workflow
@@ -219,7 +237,10 @@ def test_benchmark_aggregate_expected_models_match_run_matrix():
 
     assert "name: kimi-k2.7-code" in workflow
     assert "kimi-k2.7-code" in workflow
-    assert "kimi-k2.5" not in workflow
+    assert "name: muse-spark-1.3-contributor" in workflow
+    assert "muse-spark-1.3-contributor" in workflow
+    assert "name: kimi-k2.5" in workflow
+    assert "kimi-k2.5" in workflow
 
 
 def test_benchmark_aggregate_reports_screenshot_counts():
@@ -286,3 +307,29 @@ def test_benchmark_workflows_support_latest_anthropic_models():
         assert "claude-opus-5" in workflow
         assert "claude-sonnet-5" in workflow
         assert "claude-haiku-4-5" in workflow
+
+
+def test_benchmark_multi_model_workflow_uses_choice_selection_with_presets():
+    workflow = MULTI_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "model_selection:" in workflow
+    assert "type: choice" in workflow
+    assert "- opencode-go-all" in workflow
+    assert "- opencode-go-flagship" in workflow
+    assert "- opencode-go-fast" in workflow
+    assert "- opencode-go-muse" in workflow
+    assert "- opencode-go-deepseek" in workflow
+    assert "- opencode-go-qwen" in workflow
+    assert "- opencode-go-glm" in workflow
+    assert "- opencode-go-kimi" in workflow
+    assert "- opencode-go-minimax" in workflow
+    assert "- opencode-go-mimo" in workflow
+    assert "- frontier-all" in workflow
+    assert "- all-models" in workflow
+    assert "- muse-spark-1.3-contributor" in workflow
+    assert "- muse-spark-1.2-contributor" in workflow
+    assert "- custom" in workflow
+    assert "custom_models:" in workflow
+    assert "selection=\"${RAW_MODEL_SELECTION}\"" in workflow
+    assert "OPENCODE_GO_API_KEY" in workflow
+
