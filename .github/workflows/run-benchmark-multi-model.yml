@@ -61,6 +61,7 @@ on:
           - hy4-preview
           - hy3
           - longcat-2.0
+          - omen-alpha
           - claude-opus-5
           - claude-sonnet-5
           - claude-haiku-4-5
@@ -239,6 +240,7 @@ jobs:
                 "hy4-preview"
                 "hy3"
                 "longcat-2.0"
+                "omen-alpha"
               )
               ;;
             opencode-go-flagship)

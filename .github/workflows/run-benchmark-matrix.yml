@@ -106,6 +106,7 @@ env:
     hy4-preview
     hy3
     longcat-2.0
+    omen-alpha
   BENCHMARK_EXPECTED_ARMS: |
     skills
     vanilla

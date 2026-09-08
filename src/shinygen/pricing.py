@@ -195,6 +195,7 @@ _PRICING: dict[str, tuple[float, float]] = {
     "muse-spark-1.2-contributor": (0.10, 0.20),
     "muse-contributor-1.3": (0.10, 0.20),
     "muse-contributor-1.2": (0.10, 0.20),
+    "omen-alpha": (0.50, 2.00),
     "gemma-4-26b-a4b": (0.0, 0.0),
     "qwen3.6-27b": (0.0, 0.0),
     "qwen/qwen3.6-27b": (0.0, 0.0),

@@ -106,6 +106,8 @@ OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "longcat-2.0",
     "muse-spark-1.3-contributor",
     "muse-spark-1.2-contributor",
+    "omen-alpha",
+    "gpt-5.6-luna",
 )
 
 OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
@@ -120,6 +122,9 @@ OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
 OPENCODE_GO_RESPONSES_MODELS = (
     "muse-spark-1.3-contributor",
     "muse-spark-1.2-contributor",
+    "grok-4.5",
+    "grok-4.6",
+    "gpt-5.6-luna",
 )
 
 
@@ -483,6 +488,10 @@ def install_opencode_go_hooks() -> None:
             model_name = kwargs.get("model_name") or (args[0] if args else "")
             service = kwargs.get("service") or (model_name.split("/")[0] if "/" in model_name else "")
             if service in ("opencode-go", "opencode") or "opencode-go" in model_name:
+                if not kwargs.get("base_url") and not os.environ.get("OPENCODE_GO_BASE_URL"):
+                    kwargs["base_url"] = OPENCODE_GO_BASE_URL
+                if not kwargs.get("api_key") and "OPENCODE_GO_API_KEY" in os.environ:
+                    kwargs["api_key"] = os.environ["OPENCODE_GO_API_KEY"]
                 if any(m in model_name.lower() for m in OPENCODE_GO_RESPONSES_MODELS):
                     kwargs["responses_api"] = True
             orig_init(self, *args, **kwargs)
@@ -515,6 +524,34 @@ def install_opencode_go_hooks() -> None:
     except (ImportError, AttributeError):
         pass
 
+    try:
+        from inspect_ai.model._providers.anthropic import AnthropicAPI
+
+        orig_anthropic_init = AnthropicAPI.__init__
+
+        def patched_anthropic_init(
+            self: AnthropicAPI, *args: Any, **kwargs: Any
+        ) -> None:
+            model_name = kwargs.get("model_name") or (args[0] if args else "")
+            service = kwargs.get("service") or (
+                model_name.split("/")[0] if "/" in model_name else ""
+            )
+            if service in ("opencode-go", "opencode") or "opencode-go" in model_name:
+                base = os.environ.get(
+                    "OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL
+                ).rstrip("/")
+                if base.endswith("/v1"):
+                    base = base[: -len("/v1")]
+                if not kwargs.get("base_url"):
+                    kwargs["base_url"] = base
+                if not kwargs.get("api_key") and "OPENCODE_GO_API_KEY" in os.environ:
+                    kwargs["api_key"] = os.environ["OPENCODE_GO_API_KEY"]
+            orig_anthropic_init(self, *args, **kwargs)
+
+        setattr(AnthropicAPI, "__init__", patched_anthropic_init)
+    except (ImportError, AttributeError):
+        pass
+
 
 install_opencode_go_hooks()
 
@@ -524,6 +561,17 @@ def prepare_model_environment(model_id: str) -> None:
         os.environ.setdefault("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL)
         session_id = get_opencode_go_session_id()
         os.environ.setdefault(OPENCODE_GO_SESSION_ID_ENV, session_id)
+        if is_opencode_go_anthropic_model(model_id):
+            base = os.environ.get(
+                "OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL
+            ).rstrip("/")
+            if base.endswith("/v1"):
+                base = base[: -len("/v1")]
+            os.environ.setdefault("ANTHROPIC_BASE_URL", base)
+            if "OPENCODE_GO_API_KEY" in os.environ:
+                os.environ.setdefault(
+                    "ANTHROPIC_API_KEY", os.environ["OPENCODE_GO_API_KEY"]
+                )
         install_opencode_go_hooks()
 
 

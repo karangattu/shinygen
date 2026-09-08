@@ -61,6 +61,7 @@ on:
           - hy4-preview
           - hy3
           - longcat-2.0
+          - omen-alpha
       dataset:
         description: "Bundled CSV dataset from test_data_csv_files/"
         required: true

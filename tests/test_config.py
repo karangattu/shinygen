@@ -143,6 +143,7 @@ class TestResolveModel:
             "longcat-2.0",
             "muse-spark-1.3-contributor",
             "muse-spark-1.2-contributor",
+            "omen-alpha",
         ],
     )
     def test_all_documented_opencode_go_aliases_resolve(self, alias):
@@ -489,7 +490,14 @@ class TestCheckAPIKey:
 
         from shinygen.config import OPENCODE_GO_RESPONSES_MODELS
 
-        assert "muse-spark-1.3-contributor" in OPENCODE_GO_RESPONSES_MODELS
+        for expected in (
+            "muse-spark-1.3-contributor",
+            "muse-spark-1.2-contributor",
+            "grok-4.5",
+            "grok-4.6",
+            "gpt-5.6-luna",
+        ):
+            assert expected in OPENCODE_GO_RESPONSES_MODELS
 
         with patch.dict(
             "os.environ",
@@ -498,15 +506,38 @@ class TestCheckAPIKey:
                 "OPENCODE_GO_API_KEY": "sk-test",
             },
         ):
-            api_muse = OpenAICompatibleAPI(
-                model_name="opencode-go/muse-spark-1.3-contributor",
-            )
-            assert api_muse.responses_api is True
+            for model_name in (
+                "opencode-go/muse-spark-1.3-contributor",
+                "opencode-go/grok-4.5",
+                "opencode-go/grok-4.6",
+                "opencode-go/gpt-5.6-luna",
+            ):
+                api = OpenAICompatibleAPI(model_name=model_name)
+                assert api.responses_api is True
 
             api_glm = OpenAICompatibleAPI(
                 model_name="opencode-go/glm-5.3-flash",
             )
             assert api_glm.responses_api is None or api_glm.responses_api is False
+
+    def test_opencode_go_anthropic_model_auto_configures_base_url_and_key(self):
+        from inspect_ai.model._providers.anthropic import AnthropicAPI
+
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENCODE_GO_BASE_URL": "https://opencode.ai/zen/go/v1",
+                "OPENCODE_GO_API_KEY": "sk-test-anthropic",
+            },
+        ):
+            api = AnthropicAPI(model_name="opencode-go/minimax-m2.7")
+            assert str(api.client.base_url).rstrip("/") == "https://opencode.ai/zen/go"
+            assert getattr(api.client, "api_key", None) == "sk-test-anthropic"
+
+    def test_opencode_go_gpt56_luna_alias_resolves_to_opencode(self):
+        agent, model_id = resolve_model("opencode-go/gpt-5.6-luna")
+        assert agent == "opencode"
+        assert model_id == "openai-api/opencode-go/gpt-5.6-luna"
 
     def test_lmstudio_key_not_required(self):
         with patch.dict("os.environ", {}, clear=True):
