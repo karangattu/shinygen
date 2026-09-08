@@ -5,10 +5,12 @@ Model mappings, framework definitions, and default constants.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
+import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from inspect_ai.model import Model
@@ -73,6 +75,8 @@ MODEL_ALIASES: dict[str, tuple[str, str]] = {
 }
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
+OPENCODE_GO_SESSION_HEADER = "x-opencode-session"
+OPENCODE_GO_SESSION_ID_ENV = "OPENCODE_GO_SESSION_ID"
 
 OPENCODE_GO_OPENAI_COMPATIBLE_MODELS = (
     "glm-5.3",
@@ -354,16 +358,136 @@ def opencode_go_anthropic_model_name(model_id: str) -> str:
     return model_id.split("/", 2)[2]
 
 
-def prepare_model_environment(model_id: str) -> None:
-    """Set provider defaults needed by resolved model IDs.
+_CURRENT_OPENCODE_SESSION_ID: str | None = None
+_OPENCODE_HOOKS_INSTALLED: bool = False
 
-    Inspect's `openai-api/<provider>/<model>` provider reads
-    `<PROVIDER>_API_KEY` and `<PROVIDER>_BASE_URL`. OpenCode Go's base URL is
-    stable, so shinygen supplies it automatically while leaving the API key to
-    the caller's environment or CI secret.
-    """
+
+def normalize_opencode_go_session_id(val: str | None) -> str:
+    if not val:
+        return f"ses_{uuid.uuid4().hex}"
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "", val.strip())
+    if not cleaned:
+        return f"ses_{uuid.uuid4().hex}"
+    if not cleaned.startswith("ses_"):
+        cleaned = f"ses_{cleaned}"
+    return cleaned
+
+
+def get_opencode_go_session_id() -> str:
+    global _CURRENT_OPENCODE_SESSION_ID
+    env_val = os.environ.get(OPENCODE_GO_SESSION_ID_ENV)
+    if env_val:
+        return normalize_opencode_go_session_id(env_val)
+    if _CURRENT_OPENCODE_SESSION_ID is None:
+        _CURRENT_OPENCODE_SESSION_ID = f"ses_{uuid.uuid4().hex}"
+    return _CURRENT_OPENCODE_SESSION_ID
+
+
+def set_opencode_go_session_id(session_id: str | None) -> None:
+    global _CURRENT_OPENCODE_SESSION_ID
+    _CURRENT_OPENCODE_SESSION_ID = (
+        normalize_opencode_go_session_id(session_id) if session_id else None
+    )
+    if _CURRENT_OPENCODE_SESSION_ID:
+        os.environ[OPENCODE_GO_SESSION_ID_ENV] = _CURRENT_OPENCODE_SESSION_ID
+    else:
+        os.environ.pop(OPENCODE_GO_SESSION_ID_ENV, None)
+
+
+def reset_opencode_go_session_id() -> str:
+    new_id = f"ses_{uuid.uuid4().hex}"
+    set_opencode_go_session_id(new_id)
+    return new_id
+
+
+def _is_opencode_go_url(url: object) -> bool:
+    try:
+        url_str = str(url).lower()
+        host = ""
+        url_host = getattr(url, "host", None)
+        if url_host:
+            host = str(url_host).lower()
+        elif "://" in url_str:
+            host = url_str.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
+        if host == "opencode.ai" or host.endswith(".opencode.ai"):
+            return True
+        configured_base = os.environ.get(
+            "OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL
+        ).lower().rstrip("/")
+        if url_str.startswith(configured_base):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def install_opencode_go_hooks() -> None:
+    global _OPENCODE_HOOKS_INSTALLED
+    if _OPENCODE_HOOKS_INSTALLED:
+        return
+    _OPENCODE_HOOKS_INSTALLED = True
+
+    try:
+        import httpx
+
+        orig_async_send = httpx.AsyncClient.send
+        orig_sync_send = httpx.Client.send
+
+        async def patched_async_send(
+            self: httpx.AsyncClient,
+            request: httpx.Request,
+            *args: Any,
+            **kwargs: Any,
+        ) -> httpx.Response:
+            if _is_opencode_go_url(request.url):
+                if OPENCODE_GO_SESSION_HEADER not in request.headers:
+                    request.headers[OPENCODE_GO_SESSION_HEADER] = get_opencode_go_session_id()
+            return await orig_async_send(self, request, *args, **kwargs)
+
+        def patched_sync_send(
+            self: httpx.Client,
+            request: httpx.Request,
+            *args: Any,
+            **kwargs: Any,
+        ) -> httpx.Response:
+            if _is_opencode_go_url(request.url):
+                if OPENCODE_GO_SESSION_HEADER not in request.headers:
+                    request.headers[OPENCODE_GO_SESSION_HEADER] = get_opencode_go_session_id()
+            return orig_sync_send(self, request, *args, **kwargs)
+
+        setattr(httpx.AsyncClient, "send", patched_async_send)
+        setattr(httpx.Client, "send", patched_sync_send)
+    except ImportError:
+        pass
+
+    try:
+        from inspect_ai.model._providers.openai_compatible import OpenAICompatibleAPI
+
+        orig_request_headers = OpenAICompatibleAPI.request_headers
+
+        def patched_request_headers(
+            self: OpenAICompatibleAPI,
+            config: Any,
+        ) -> dict[str, str]:
+            headers = orig_request_headers(self, config) if orig_request_headers else {}
+            if getattr(self, "service", "") in ("opencode-go", "opencode"):
+                headers.setdefault(OPENCODE_GO_SESSION_HEADER, get_opencode_go_session_id())
+            return headers
+
+        setattr(OpenAICompatibleAPI, "request_headers", patched_request_headers)
+    except (ImportError, AttributeError):
+        pass
+
+
+install_opencode_go_hooks()
+
+
+def prepare_model_environment(model_id: str) -> None:
     if is_opencode_go_model(model_id):
         os.environ.setdefault("OPENCODE_GO_BASE_URL", OPENCODE_GO_BASE_URL)
+        session_id = get_opencode_go_session_id()
+        os.environ.setdefault(OPENCODE_GO_SESSION_ID_ENV, session_id)
+        install_opencode_go_hooks()
 
 
 def resolve_framework(alias: str) -> str:

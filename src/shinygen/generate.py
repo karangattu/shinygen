@@ -32,6 +32,7 @@ from .config import (
     SANDBOX_WORK_DIR,
     is_lmstudio_model,
     is_opencode_go_model,
+    prepare_model_environment,
     sandbox_time_limit_for_framework,
 )
 from .prompts import build_system_prompt, build_user_prompt
@@ -543,6 +544,9 @@ def build_generation_task(
     )
 
     dataset = MemoryDataset(samples=[sample])
+
+    if model_id:
+        prepare_model_environment(model_id)
 
     # Select solver. `web_fetch=False` disables Codex's `web_search` tool;
     # when True we leave the disallowed list empty so the agent can use

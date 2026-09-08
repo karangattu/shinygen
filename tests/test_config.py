@@ -8,17 +8,23 @@ import pytest
 
 from shinygen.config import (
     FRAMEWORKS,
+    OPENCODE_GO_SESSION_HEADER,
+    OPENCODE_GO_SESSION_ID_ENV,
     APIKeyMissingError,
     DockerNotAvailableError,
     check_api_key,
     check_docker,
     find_free_port,
+    get_opencode_go_session_id,
     is_opencode_go_anthropic_model,
+    normalize_opencode_go_session_id,
     opencode_go_anthropic_model_name,
     preflight_checks,
     prepare_model_environment,
+    reset_opencode_go_session_id,
     resolve_framework,
     resolve_model,
+    set_opencode_go_session_id,
 )
 
 
@@ -350,6 +356,98 @@ class TestCheckAPIKey:
         with patch.dict("os.environ", {"OPENCODE_GO_API_KEY": "sk-test"}, clear=True):
             prepare_model_environment("openai-api/opencode-go/kimi-k2.6")
             assert os.environ["OPENCODE_GO_BASE_URL"] == "https://opencode.ai/zen/go/v1"
+            assert os.environ[OPENCODE_GO_SESSION_ID_ENV].startswith("ses_")
+
+    def test_normalize_opencode_go_session_id(self):
+        assert normalize_opencode_go_session_id(None).startswith("ses_")
+        assert normalize_opencode_go_session_id("").startswith("ses_")
+        assert normalize_opencode_go_session_id("ses_12345") == "ses_12345"
+        assert normalize_opencode_go_session_id("run-34186935196-skills") == "ses_run34186935196skills"
+
+    def test_get_set_reset_opencode_go_session_id(self):
+        with patch.dict("os.environ", {}, clear=True):
+            set_opencode_go_session_id("ses_custom123")
+            assert get_opencode_go_session_id() == "ses_custom123"
+            assert os.environ[OPENCODE_GO_SESSION_ID_ENV] == "ses_custom123"
+
+            new_id = reset_opencode_go_session_id()
+            assert new_id.startswith("ses_")
+            assert new_id != "ses_custom123"
+            assert get_opencode_go_session_id() == new_id
+
+            set_opencode_go_session_id(None)
+            assert OPENCODE_GO_SESSION_ID_ENV not in os.environ
+
+    @pytest.mark.asyncio
+    async def test_httpx_async_client_injects_opencode_session_header(self):
+        import httpx
+
+        received_headers: dict[str, str] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            received_headers.update(dict(request.headers))
+            return httpx.Response(200, json={"ok": True})
+
+        transport = httpx.MockTransport(handler)
+        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_test999"}):
+            async with httpx.AsyncClient(transport=transport) as client:
+                await client.post("https://opencode.ai/zen/go/v1/chat/completions", json={})
+
+        assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_test999"
+
+    @pytest.mark.asyncio
+    async def test_httpx_async_client_preserves_existing_opencode_session_header(self):
+        import httpx
+
+        received_headers: dict[str, str] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            received_headers.update(dict(request.headers))
+            return httpx.Response(200, json={"ok": True})
+
+        transport = httpx.MockTransport(handler)
+        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_default"}):
+            async with httpx.AsyncClient(transport=transport) as client:
+                await client.post(
+                    "https://opencode.ai/zen/go/v1/chat/completions",
+                    headers={OPENCODE_GO_SESSION_HEADER: "ses_explicit"},
+                    json={},
+                )
+
+        assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_explicit"
+
+    @pytest.mark.asyncio
+    async def test_httpx_async_client_skips_non_opencode_urls(self):
+        import httpx
+
+        received_headers: dict[str, str] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            received_headers.update(dict(request.headers))
+            return httpx.Response(200, json={"ok": True})
+
+        transport = httpx.MockTransport(handler)
+        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_test999"}):
+            async with httpx.AsyncClient(transport=transport) as client:
+                await client.post("https://api.openai.com/v1/chat/completions", json={})
+
+        assert OPENCODE_GO_SESSION_HEADER not in received_headers
+
+    def test_httpx_sync_client_injects_opencode_session_header(self):
+        import httpx
+
+        received_headers: dict[str, str] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            received_headers.update(dict(request.headers))
+            return httpx.Response(200, json={"ok": True})
+
+        transport = httpx.MockTransport(handler)
+        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_sync123"}):
+            with httpx.Client(transport=transport) as client:
+                client.post("https://opencode.ai/zen/go/v1/chat/completions", json={})
+
+        assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_sync123"
 
     def test_lmstudio_key_not_required(self):
         with patch.dict("os.environ", {}, clear=True):
