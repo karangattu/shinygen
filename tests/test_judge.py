@@ -4,6 +4,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -168,7 +169,7 @@ class TestJudgePrompt:
 
 class TestOpenAIJudgeRequest:
     def test_luna_uses_high_reasoning_and_max_completion_tokens(self, monkeypatch):
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         class FakeUsage:
             prompt_tokens = 123
