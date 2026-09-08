@@ -579,7 +579,7 @@ def _judge_with_openai(
         if model_name.startswith("gpt-5"):
             kwargs: dict[str, Any] = {
                 "model": model_name,
-                "max_completion_tokens": 2048,
+                "max_completion_tokens": 4096,
                 "messages": messages,
             }
             if model_name == "gpt-5.6-luna":

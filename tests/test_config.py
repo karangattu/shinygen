@@ -455,6 +455,59 @@ class TestCheckAPIKey:
 
         assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_sync123"
 
+    def test_httpx2_clients_inject_opencode_session_header(self):
+        try:
+            import httpx2
+        except ImportError:
+            return
+
+        import asyncio
+
+        received_headers: dict[str, str] = {}
+
+        def handler(request):
+            received_headers.update(dict(request.headers))
+            return httpx2.Response(200, json={"ok": True})
+
+        transport = httpx2.MockTransport(handler)
+        with patch.dict("os.environ", {OPENCODE_GO_SESSION_ID_ENV: "ses_httpx2_val"}):
+            with httpx2.Client(transport=transport) as client:
+                client.post("https://opencode.ai/zen/go/v1/responses", json={})
+            assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_httpx2_val"
+
+            received_headers.clear()
+
+            async def _run():
+                async with httpx2.AsyncClient(transport=transport) as client:
+                    await client.post("https://opencode.ai/zen/go/v1/responses", json={})
+
+            asyncio.run(_run())
+            assert received_headers.get(OPENCODE_GO_SESSION_HEADER) == "ses_httpx2_val"
+
+    def test_opencode_go_responses_models_auto_enable_responses_api(self):
+        from inspect_ai.model._providers.openai_compatible import OpenAICompatibleAPI
+
+        from shinygen.config import OPENCODE_GO_RESPONSES_MODELS
+
+        assert "muse-spark-1.3-contributor" in OPENCODE_GO_RESPONSES_MODELS
+
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENCODE_GO_BASE_URL": "https://opencode.ai/zen/go/v1",
+                "OPENCODE_GO_API_KEY": "sk-test",
+            },
+        ):
+            api_muse = OpenAICompatibleAPI(
+                model_name="opencode-go/muse-spark-1.3-contributor",
+            )
+            assert api_muse.responses_api is True
+
+            api_glm = OpenAICompatibleAPI(
+                model_name="opencode-go/glm-5.3-flash",
+            )
+            assert api_glm.responses_api is None or api_glm.responses_api is False
+
     def test_lmstudio_key_not_required(self):
         with patch.dict("os.environ", {}, clear=True):
             check_api_key("opencode", "openai/google/gemma-4-26b-a4b-qat")

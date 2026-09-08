@@ -217,7 +217,7 @@ class TestOpenAIJudgeRequest:
         assert result.composite == 7.0
         assert captured["model"] == "gpt-5.6-luna"
         assert captured["reasoning_effort"] == "high"
-        assert captured["max_completion_tokens"] == 2048
+        assert captured["max_completion_tokens"] == 4096
         assert "max_tokens" not in captured
         assert captured["messages"][0]["content"] == _build_judge_system()
 

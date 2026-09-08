@@ -4,6 +4,7 @@ Model mappings, framework definitions, and default constants.
 
 from __future__ import annotations
 
+import importlib
 import os
 import re
 import shutil
@@ -114,6 +115,11 @@ OPENCODE_GO_ANTHROPIC_COMPATIBLE_MODELS = (
     "qwen3.8-max",
     "qwen3.7-max",
     "qwen3.7-plus",
+)
+
+OPENCODE_GO_RESPONSES_MODELS = (
+    "muse-spark-1.3-contributor",
+    "muse-spark-1.2-contributor",
 )
 
 
@@ -427,43 +433,59 @@ def install_opencode_go_hooks() -> None:
         return
     _OPENCODE_HOOKS_INSTALLED = True
 
-    try:
-        import httpx
+    for mod_name in ("httpx", "httpx2"):
+        try:
+            mod = importlib.import_module(mod_name)
+            orig_async_send = mod.AsyncClient.send
+            orig_sync_send = mod.Client.send
 
-        orig_async_send = httpx.AsyncClient.send
-        orig_sync_send = httpx.Client.send
+            def make_patched_async(orig: Any) -> Any:
+                async def patched_async_send(
+                    self: Any,
+                    request: Any,
+                    *args: Any,
+                    **kwargs: Any,
+                ) -> Any:
+                    if _is_opencode_go_url(request.url):
+                        if OPENCODE_GO_SESSION_HEADER not in request.headers:
+                            request.headers[OPENCODE_GO_SESSION_HEADER] = get_opencode_go_session_id()
+                    return await orig(self, request, *args, **kwargs)
 
-        async def patched_async_send(
-            self: httpx.AsyncClient,
-            request: httpx.Request,
-            *args: Any,
-            **kwargs: Any,
-        ) -> httpx.Response:
-            if _is_opencode_go_url(request.url):
-                if OPENCODE_GO_SESSION_HEADER not in request.headers:
-                    request.headers[OPENCODE_GO_SESSION_HEADER] = get_opencode_go_session_id()
-            return await orig_async_send(self, request, *args, **kwargs)
+                return patched_async_send
 
-        def patched_sync_send(
-            self: httpx.Client,
-            request: httpx.Request,
-            *args: Any,
-            **kwargs: Any,
-        ) -> httpx.Response:
-            if _is_opencode_go_url(request.url):
-                if OPENCODE_GO_SESSION_HEADER not in request.headers:
-                    request.headers[OPENCODE_GO_SESSION_HEADER] = get_opencode_go_session_id()
-            return orig_sync_send(self, request, *args, **kwargs)
+            def make_patched_sync(orig: Any) -> Any:
+                def patched_sync_send(
+                    self: Any,
+                    request: Any,
+                    *args: Any,
+                    **kwargs: Any,
+                ) -> Any:
+                    if _is_opencode_go_url(request.url):
+                        if OPENCODE_GO_SESSION_HEADER not in request.headers:
+                            request.headers[OPENCODE_GO_SESSION_HEADER] = get_opencode_go_session_id()
+                    return orig(self, request, *args, **kwargs)
 
-        setattr(httpx.AsyncClient, "send", patched_async_send)
-        setattr(httpx.Client, "send", patched_sync_send)
-    except ImportError:
-        pass
+                return patched_sync_send
+
+            setattr(mod.AsyncClient, "send", make_patched_async(orig_async_send))
+            setattr(mod.Client, "send", make_patched_sync(orig_sync_send))
+        except (ImportError, AttributeError):
+            pass
 
     try:
         from inspect_ai.model._providers.openai_compatible import OpenAICompatibleAPI
 
+        orig_init = OpenAICompatibleAPI.__init__
         orig_request_headers = OpenAICompatibleAPI.request_headers
+        orig_generate = OpenAICompatibleAPI.generate
+
+        def patched_init(self: OpenAICompatibleAPI, *args: Any, **kwargs: Any) -> None:
+            model_name = kwargs.get("model_name") or (args[0] if args else "")
+            service = kwargs.get("service") or (model_name.split("/")[0] if "/" in model_name else "")
+            if service in ("opencode-go", "opencode") or "opencode-go" in model_name:
+                if any(m in model_name.lower() for m in OPENCODE_GO_RESPONSES_MODELS):
+                    kwargs["responses_api"] = True
+            orig_init(self, *args, **kwargs)
 
         def patched_request_headers(
             self: OpenAICompatibleAPI,
@@ -474,7 +496,22 @@ def install_opencode_go_hooks() -> None:
                 headers.setdefault(OPENCODE_GO_SESSION_HEADER, get_opencode_go_session_id())
             return headers
 
+        async def patched_generate(
+            self: OpenAICompatibleAPI,
+            input: Any,
+            tools: Any,
+            tool_choice: Any,
+            config: Any,
+        ) -> Any:
+            if getattr(self, "service", "") in ("opencode-go", "opencode"):
+                extra = dict(config.extra_headers or {})
+                extra.setdefault(OPENCODE_GO_SESSION_HEADER, get_opencode_go_session_id())
+                config.extra_headers = extra
+            return await orig_generate(self, input, tools, tool_choice, config)
+
+        setattr(OpenAICompatibleAPI, "__init__", patched_init)
         setattr(OpenAICompatibleAPI, "request_headers", patched_request_headers)
+        setattr(OpenAICompatibleAPI, "generate", patched_generate)
     except (ImportError, AttributeError):
         pass
 
