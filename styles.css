@@ -21,3 +21,16 @@
   margin-top: 0;
   color: var(--bs-primary);
 }
+
+/* Mermaid diagrams: scale to column width instead of clipping */
+.mermaid {
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.mermaid svg {
+  max-width: 100% !important;
+  height: auto !important;
+}

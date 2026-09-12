@@ -5,7 +5,7 @@ Generate, evaluate, and refine Shiny apps using LLM agents (Claude Code, Codex C
 ## Architecture
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, system-ui, -apple-system, sans-serif' }}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Inter, system-ui, -apple-system, sans-serif', 'fontSize': '15px', 'lineColor': '#475569', 'edgeLabelBackground': '#ffffff' }, 'flowchart': { 'padding': 8, 'nodeSpacing': 30, 'rankSpacing': 35, 'curve': 'linear', 'htmlLabels': true, 'useMaxWidth': true }}}%%
 flowchart TD
     %% Color Palette Definitions
     classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
@@ -17,45 +17,44 @@ flowchart TD
     classDef done fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
 
     %% 1. User Input & Setup
-    User(["👤 <b>User Request</b><br/>Dataset CSV + Prompt"]):::input
-    User --> Setup["⚙️ <b>shinygen Setup</b><br/>Selects framework (Python/R), AI model & evaluation flags"]:::setup
+    User(["User Request<br/>CSV data + prompt"]):::input
+    User --> Setup["shinygen Setup<br/>Python/R, model, flags"]:::setup
 
     %% 2. Docker Sandbox Generation
-    subgraph Sandbox["🐳 Isolated Docker Sandbox"]
+    subgraph Sandbox["Docker Sandbox"]
         direction TB
-        Skills("✨ <b>Design Skills & Guidelines</b><br/>UI layout patterns, thematic palettes & data schema"):::agent
-        Coder("🤖 <b>AI Coding Agent</b><br/>Generates Shiny Python or R code inside sandbox"):::agent
+        Skills["Design Skills<br/>layouts, palettes, schema"]:::agent
+        Coder["AI Coding Agent<br/>writes Shiny code"]:::agent
         Skills --> Coder
     end
     Setup --> Skills
 
     %% 3. Automated Health Check & Visuals
-    subgraph Verify["⚡ Live Verification & Screenshots"]
+    subgraph Verify["Live Verification"]
         direction TB
-        Launch("🚀 <b>Live App Health Check</b><br/>Boots Shiny server to test syntax & capture runtime logs"):::test
-        Snap("📸 <b>Capture Live UI Visuals</b><br/>Headless browser captures full-page dashboard screenshots"):::test
-        Launch -->|"App Runs Clean"| Snap
+        Launch["Health Check<br/>boot app, read logs"]:::test
+        Snap["Screenshots<br/>full-page capture"]:::test
+        Launch --> Snap
     end
     Coder --> Launch
 
     %% 4. Multimodal AI Judge
-    subgraph Quality["⚖️ Quality Evaluation"]
+    subgraph Quality["Quality Evaluation"]
         direction TB
-        Judge("🎨 <b>Multimodal AI Judge</b><br/>Evaluates visual polish, charts & code quality (1–10)"):::judge
-        Check{"Quality Meets<br/>Target Score?"}:::judge
+        Judge["AI Judge<br/>design + code<br/>scores 1 to 10"]:::judge
+        Check{"Score OK?"}:::judge
         Judge --> Check
     end
     Snap --> Judge
 
     %% 5. Self-Healing Refinement Loop or Success
-    Feedback("🔄 <b>Auto-Fix & Refine Loop</b><br/>Feeds console errors & judge feedback into next attempt"):::loop
-    Launch -->|"App Crashed"| Feedback
-    Check -- "❌ Needs Polish" --> Feedback
-    Feedback -.->|"Retry in Sandbox"| Coder
-
-    Success(["✅ <b>Production-Ready Shiny Dashboard</b><br/>Tested app code (app.py / app.R) • Screenshots • Cost & Quality Report"]):::done
-    Check -- "✔️ Quality Passed" --> Success
-    Snap -->|"Judging Disabled"| Success
+    Feedback["Auto-Fix Loop<br/>retry with feedback"]:::loop
+    Success(["Dashboard Ready<br/>app code, screenshots<br/>cost + quality report"]):::done
+    Launch -- crashed --> Feedback
+    Check -- no --> Feedback
+    Check -- yes --> Success
+    Snap -- no judge --> Success
+    Feedback -. retry .-> Coder
 ```
 
 For full documentation — installation, CLI, Python API, batch mode, GitHub Actions, model aliases, skills, and data inputs — see the published docs:
