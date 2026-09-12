@@ -287,6 +287,21 @@ When `--screenshot` is enabled, the sandbox agent leverages the **`visual-qa`** 
 3. The agent reviews the screenshot, identifies design flaws (e.g., overlapping text, unstyled charts, missing headers), modifies the code, and takes another screenshot until it is satisfied.
 4. It terminates the background daemon before submitting the final draft.
 
+### Geographic Task Coverage
+
+The **`visual-qa` v1.3** skill requires a useful map when location materially helps answer the user's questions and the data contains reliable coordinates or mappable geographic areas. For example, an Airbnb dashboard should let users locate listings and relate neighborhood prices and guest quality to geography. A location column alone does not require a map for an unrelated task, and missing geographic data must not be invented.
+
+The map must provide recognizable geographic context, fit the area of interest, and have enough space to interpret its records or aggregates. Neighborhood bars, a bare latitude/longitude scatter, an unreadable map strip, or markers lost in an overly broad extent do not satisfy a spatial comparison task. A clearly labeled, usable map tab is acceptable when it preserves relevant filter context; a duplicate overview map is not required.
+
+| Geographic obstacle | Review priority | Visual quality ceiling |
+| --- | --- | --- |
+| An applicable map is missing or materially inadequate while other analysis remains useful | Medium | 7/10 |
+| A broken or unusable map blocks the primary spatial workflow | High | 3/10 |
+
+Apply the lowest applicable ceiling, including existing render-state and label-readability ceilings, and group related map defects into one task-level finding. These are review rules, not validated predictions of human preference.
+
+For screenshot-only reviews, inspect all supplied views before reporting a missing map. Distinguish absence from the supplied evidence from confirmed absence in a running app, and mark unpictured map tabs and untested filter linkage as unverified. An archived loading state does not establish a persistent runtime failure.
+
 ### Host-Side Verification & Logging
 
 Once the agent completes its run, `shinygen` performs a host-side runtime check:
