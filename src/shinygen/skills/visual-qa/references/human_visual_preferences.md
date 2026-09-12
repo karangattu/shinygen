@@ -37,6 +37,16 @@ Maps often rate highly for geographic data because they make the domain immediat
 
 Do not reward a map or large chart merely for existing. It must be populated, well-framed, readable, and integrated with the surrounding analysis.
 
+#### Geographic task coverage
+
+Require a map panel when both conditions hold: location materially helps answer the user's questions (for example, locating listings, comparing neighborhoods, service coverage, or regional patterns), and the data contains usable coordinates or geographic areas that can be mapped reliably. State the spatial question and the available geographic fields before applying this requirement. A location column alone does not make a map necessary for a task unrelated to geography. Do not invent coordinates, boundaries, or a geocoding result; explain unavailable or unreliable geographic data.
+
+The map must show relevant records or aggregates with recognizable geographic context, fit the area of interest, and provide enough space to distinguish locations and interpret its encodings. Use a basemap, labeled boundaries, or equivalent geographic reference appropriate to the task. Neighborhood bars and a bare latitude/longitude scatter do not replace a map when users need to understand where places are. A decorative map, an unreadable strip, or markers lost in an unnecessarily broad extent do not satisfy the requirement.
+
+Integrate the map into the main analytical workflow. Prefer the overview when location is central to the first question; a clearly labeled map tab is acceptable when it preserves relevant filter context and does not needlessly separate essential comparisons. Do not require a duplicate overview map merely because one exists on another usable view. For a live review, trace locating a matching record or area and relating it to the relevant metric/detail. For screenshot-only reviews, inspect all supplied views and navigation before reporting a missing map; distinguish "absent from supplied evidence" from confirmed absence, and mark unpictured map tabs or untested filter linkage as unverified.
+
+Report a **medium-priority** geographic-coverage finding when an applicable map is missing or materially inadequate while other analysis remains useful; cap visual quality at **7/10**. Use **high priority** and the **3/10** unusable-primary-view ceiling when a broken or unusable map blocks the dashboard's primary spatial workflow. Apply a lower existing ceiling when essential labels are unreadable or outputs repeatedly fail. Group map sizing, framing, and missing context into the affected task finding rather than counting the same obstacle repeatedly. These are review rules, not validated predictions of human preference.
+
 ### 5. Familiar controls and visible detail
 
 Humans value filters in expected locations, clear reset behavior, understandable labels, and a table or detail view that makes the analysis feel trustworthy. A screenshot should make exploration look obvious even when the evaluator cannot interact with it.
@@ -127,6 +137,7 @@ These are review calibration rules, not empirically validated predictors of huma
 | --- | --- |
 | Repeated unresolved outputs or an unusable primary view | 3/10 |
 | Essential labels unreadable at normal size, preventing interpretation | 6/10 |
+| An applicable map is missing or materially inadequate, while other analysis remains useful | 7/10 |
 | Severe hierarchy failure or avoidable scrolling that separates essential comparisons | 7/10 |
 
 The lowest applicable ceiling wins; a ceiling is not a target score. Explain the affected task and screenshot region. A single broken primary output may be severe even when other cards render; an explained intentional empty state is different. Missing capture evidence lowers confidence rather than proving a defect.

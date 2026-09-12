@@ -3,7 +3,7 @@ name: visual-qa
 description: Visually verify the rendered dashboard application by running it, checking logs, and reviewing screenshots to evaluate human-perceived visual appeal, UX quality, information hierarchy, and layout correctness.
 metadata:
   author: Antigravity
-  version: "1.2"
+  version: "1.3"
   license: MIT
 ---
 
@@ -28,6 +28,8 @@ Judge the screenshot as a human deciding whether the dashboard looks clear, usef
 The dashboard study suggests **one-screen usefulness** matters: compact filters, concise KPIs, a prominent decision-relevant visualization, supporting comparisons, and accessible detail. This is a candidate archetype, not a mandatory template or evidence that every audience prefers it. Judge whether those parts work together for the actual task, not whether they exist.
 
 **Clean alone is not enough.** A tidy screenshot should not score highly when it is sparse, dominated by oversized KPI tiles, missing useful context, or forces users across several views to understand the basic story.
+
+**Require a useful map when geography matters to the task and the data supports mapping.** Evaluate its presence, geographic context, framing, readability, and connection to the other views using the applicability rules in [references/human_visual_preferences.md](references/human_visual_preferences.md#geographic-task-coverage). Charts alone do not satisfy a spatial comparison task.
 
 Apply the **render-state gate** before judging aesthetics. Repeated empty panels, unresolved output placeholders, tiny loading marks, or stuck spinners make the visible dashboard incomplete even when its code and surrounding cards look polished.
 
