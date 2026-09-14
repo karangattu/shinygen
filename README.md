@@ -61,5 +61,6 @@ For full documentation — installation, CLI, Python API, batch mode, GitHub Act
 
 **[https://karangattu.github.io/shinygen/](https://karangattu.github.io/shinygen/)**
 
-Give your inputs in this survey to help us what kinds of dashboards we want AI to be able to generate:
-**[DashSwipe Survey](https://usertestingapp.vercel.app)**
+## posit::conf(2026)
+
+posit::conf(2026) presentation slides can be found [here](https://canva.link/64jrxv5w33a9dts).
